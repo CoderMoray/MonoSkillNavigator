@@ -24,6 +24,7 @@ export interface ReviewFinding {
 
 export interface ReviewReport {
   id: string;
+  skillSlug: string;
   skillName: string;
   version: string;
   contentHash: string;
@@ -60,9 +61,13 @@ export interface FunctionalEvaluationReport {
 }
 
 export interface SkillManifest {
+  slug: string;
   name: string;
   description: string;
   version?: string;
+  categories?: string[];
+  topics?: string[];
+  "release-tags"?: string[];
   author?: string;
   license?: string;
   tags?: string[];
@@ -106,12 +111,14 @@ export interface RegistryVersion {
   review: ReviewReport;
   evaluation?: FunctionalEvaluationReport;
   status: ReviewVerdict;
+  releaseTags: string[];
   downloads: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface RegistrySkill {
+  slug: string;
   name: string;
   description: string;
   ownerUserId?: string;
@@ -127,6 +134,7 @@ export interface RegistrySkill {
 }
 
 export interface SkillSearchResult {
+  slug: string;
   name: string;
   description: string;
   latestVersion: string;

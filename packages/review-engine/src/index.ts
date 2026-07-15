@@ -1,4 +1,5 @@
 import {
+  getSkillSlug,
   normalizeTools,
   type SkillSnapshot,
   validateSkillSnapshot
@@ -30,6 +31,7 @@ export interface ReviewScores {
 
 export interface ReviewReport {
   id: string;
+  skillSlug: string;
   skillName: string;
   version: string;
   contentHash: string;
@@ -150,6 +152,7 @@ export function reviewSkillSnapshot(snapshot: SkillSnapshot, versionOverride?: s
 
   return {
     id: `review_${snapshot.contentHash.slice(0, 16)}_${Date.now()}`,
+    skillSlug: getSkillSlug(snapshot.manifest),
     skillName: snapshot.manifest.name,
     version,
     contentHash: snapshot.contentHash,

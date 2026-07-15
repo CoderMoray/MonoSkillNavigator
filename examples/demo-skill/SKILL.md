@@ -1,5 +1,6 @@
 ---
-name: demo-skill
+slug: demo-skill
+name: Demo Skill
 description: Reviews a short product idea and returns structured feedback. Use when the user asks for a lightweight product idea critique.
 version: 0.1.0
 author: skill-platform

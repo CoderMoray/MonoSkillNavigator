@@ -89,10 +89,10 @@ export default function LeaderboardPage() {
           ) : (
             <ul className="list">
               {items.map((item, index) => (
-                <li className="list-item" key={item.name}>
+                <li className="list-item" key={item.slug}>
                   <div className="card-head">
                     <div>
-                      <Link href={`/skills/${encodeURIComponent(item.name)}`}>
+                      <Link href={`/skills/${encodeURIComponent(item.slug)}`}>
                         <strong>#{index + 1} {item.name}</strong>
                       </Link>
                       <p className="description">

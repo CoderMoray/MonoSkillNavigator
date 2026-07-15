@@ -28,8 +28,8 @@ export async function getLeaderboard(sort = "functional", limit = 8): Promise<Sk
   return data.items;
 }
 
-export async function getSkill(name: string): Promise<RegistrySkill> {
-  return request<RegistrySkill>(new URL(`/skills/${encodeURIComponent(name)}`, API_BASE_URL));
+export async function getSkill(slug: string): Promise<RegistrySkill> {
+  return request<RegistrySkill>(new URL(`/skills/${encodeURIComponent(slug)}`, API_BASE_URL));
 }
 
 export function getApiBaseUrl(): string {
@@ -78,26 +78,26 @@ export async function changePassword(
 export async function publishSkillArchive(
   token: string,
   archiveBase64: string,
-  version?: string
+  metadata: PublishSkillMetadata
 ): Promise<PublishSkillResponse> {
   return request<PublishSkillResponse>(new URL("/skills/publish", API_BASE_URL), {
     method: "POST",
     token,
     body: JSON.stringify({
       archiveBase64,
-      version: version?.trim() || undefined
+      metadata
     })
   });
 }
 
 export async function addSkillContributor(
   token: string,
-  skillName: string,
+  skillSlug: string,
   name: string,
   role: RegistryContributor["role"]
 ): Promise<RegistryContributor> {
   const data = await request<{ contributor: RegistryContributor }>(
-    new URL(`/skills/${encodeURIComponent(skillName)}/contributors`, API_BASE_URL),
+    new URL(`/skills/${encodeURIComponent(skillSlug)}/contributors`, API_BASE_URL),
     {
       method: "POST",
       token,
@@ -114,12 +114,24 @@ interface AuthResponse {
 }
 
 export interface PublishSkillResponse {
-  skill: string;
+  slug: string;
+  name: string;
   version: string;
+  releaseTags: string[];
   status: string;
   contentHash: string;
   review: ReviewReport;
   evaluation?: FunctionalEvaluationReport;
+}
+
+export interface PublishSkillMetadata {
+  displayName: string;
+  slug: string;
+  summary: string;
+  categories: string[];
+  topics: string[];
+  version: string;
+  releaseTags: string[];
 }
 
 interface RequestOptions {

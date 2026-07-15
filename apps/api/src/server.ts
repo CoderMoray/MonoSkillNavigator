@@ -3,7 +3,14 @@ import Fastify from "fastify";
 import { pathToFileURL } from "node:url";
 import { evaluateSkillSnapshot } from "@skill-platform/evaluator";
 import { reviewSkillSnapshot } from "@skill-platform/review-engine";
-import { readSkillZipBuffer, skillSnapshotToZipBuffer, type SkillSnapshot } from "@skill-platform/skill-spec";
+import {
+  applySkillPublishMetadata,
+  getSkillSlug,
+  readSkillZipBuffer,
+  skillSnapshotToZipBuffer,
+  type SkillPublishMetadata,
+  type SkillSnapshot
+} from "@skill-platform/skill-spec";
 import {
   createAuthStoreFromEnv,
   createRegistryStoreFromEnv,
@@ -23,6 +30,7 @@ interface PublishBody {
   snapshot?: SkillSnapshot;
   archiveBase64?: string;
   version?: string;
+  metadata?: SkillPublishMetadata;
 }
 
 interface ReviewBody {
@@ -67,11 +75,11 @@ interface ChangePasswordBody {
 }
 
 interface SkillParams {
-  name: string;
+  slug: string;
 }
 
 interface VersionParams {
-  name: string;
+  slug: string;
   version: string;
 }
 
@@ -160,8 +168,13 @@ export function buildServer() {
     }
 
     try {
-      const { snapshot, version } = readSkillFromBody(request.body);
-      const existingSkill = await store.getSkill(snapshot.manifest.name);
+      const uploaded = readSkillFromBody(request.body);
+      const snapshot = request.body.metadata
+        ? applySkillPublishMetadata(uploaded.snapshot, request.body.metadata)
+        : uploaded.snapshot;
+      const version = request.body.metadata?.version ?? uploaded.version;
+      const slug = getSkillSlug(snapshot.manifest);
+      const existingSkill = await store.getSkill(slug);
       if (existingSkill && !isSkillContributor(existingSkill, user)) {
         return reply.code(403).send({ error: "Only skill contributors can publish new versions" });
       }
@@ -172,12 +185,15 @@ export function buildServer() {
         owner: {
           userId: user.id,
           username: user.username
-        }
+        },
+        releaseTags: request.body.metadata?.releaseTags
       });
 
       return reply.code(201).send({
-        skill: registryVersion.manifest.name,
+        slug,
+        name: registryVersion.manifest.name,
         version: registryVersion.version,
+        releaseTags: registryVersion.releaseTags,
         status: registryVersion.status,
         contentHash: registryVersion.contentHash,
         review: registryVersion.review,
@@ -212,6 +228,7 @@ export function buildServer() {
     return {
       reviewed: reviewed.length,
       items: reviewed.map((item) => ({
+        slug: getSkillSlug(item.manifest),
         name: item.manifest.name,
         version: item.version,
         status: item.status,
@@ -227,14 +244,14 @@ export function buildServer() {
     };
   });
 
-  app.post<{ Params: SkillParams; Body: ContributorBody }>("/skills/:name/contributors", async (request, reply) => {
+  app.post<{ Params: SkillParams; Body: ContributorBody }>("/skills/:slug/contributors", async (request, reply) => {
     try {
       const user = await getAuthenticatedUser(request.headers.authorization, authStore);
       if (!user) {
         return reply.code(401).send({ error: "Unauthorized" });
       }
 
-      const skill = await store.getSkill(request.params.name);
+      const skill = await store.getSkill(request.params.slug);
       if (!skill) {
         return reply.code(404).send({ error: "skill_not_found" });
       }
@@ -243,7 +260,7 @@ export function buildServer() {
       }
 
       const contributorUser = await authStore.getUserByUsername(request.body.name).catch(() => undefined);
-      const contributor = await store.addContributor(request.params.name, {
+      const contributor = await store.addContributor(request.params.slug, {
         role: request.body.role,
         name: contributorUser?.username ?? request.body.name,
         username: contributorUser?.username,
@@ -255,9 +272,9 @@ export function buildServer() {
     }
   });
 
-  app.post<{ Params: SkillParams; Body: IssueBody }>("/skills/:name/issues", async (request, reply) => {
+  app.post<{ Params: SkillParams; Body: IssueBody }>("/skills/:slug/issues", async (request, reply) => {
     try {
-      const issue = await store.createIssue(request.params.name, request.body);
+      const issue = await store.createIssue(request.params.slug, request.body);
       return reply.code(201).send({ issue });
     } catch {
       return reply.code(404).send({ error: "skill_not_found" });
@@ -265,23 +282,23 @@ export function buildServer() {
   });
 
   app.get<{ Params: SkillParams; Querystring: { status?: IssueStatus } }>(
-    "/skills/:name/issues",
+    "/skills/:slug/issues",
     async (request, reply) => {
-      const skill = await store.getSkill(request.params.name);
+      const skill = await store.getSkill(request.params.slug);
       if (!skill) {
         return reply.code(404).send({ error: "skill_not_found" });
       }
 
       return {
-        items: await store.listIssues(request.params.name, request.query.status)
+        items: await store.listIssues(request.params.slug, request.query.status)
       };
     }
   );
 
-  app.post<{ Params: SkillParams; Body: RatingBody }>("/skills/:name/ratings", async (request, reply) => {
+  app.post<{ Params: SkillParams; Body: RatingBody }>("/skills/:slug/ratings", async (request, reply) => {
     try {
-      const rating = await store.addRating(request.params.name, request.body);
-      const skill = await store.getSkill(request.params.name);
+      const rating = await store.addRating(request.params.slug, request.body);
+      const skill = await store.getSkill(request.params.slug);
       return reply.code(201).send({
         rating,
         averageRating: skill?.averageRating ?? 0,
@@ -293,8 +310,8 @@ export function buildServer() {
     }
   });
 
-  app.get<{ Params: SkillParams }>("/skills/:name", async (request, reply) => {
-    const skill = await store.getSkill(request.params.name);
+  app.get<{ Params: SkillParams }>("/skills/:slug", async (request, reply) => {
+    const skill = await store.getSkill(request.params.slug);
     if (!skill) {
       return reply.code(404).send({ error: "skill_not_found" });
     }
@@ -302,8 +319,8 @@ export function buildServer() {
     return skill;
   });
 
-  app.get<{ Params: VersionParams }>("/skills/:name/versions/:version", async (request, reply) => {
-    const registryVersion = await store.getVersion(request.params.name, request.params.version);
+  app.get<{ Params: VersionParams }>("/skills/:slug/versions/:version", async (request, reply) => {
+    const registryVersion = await store.getVersion(request.params.slug, request.params.version);
     if (!registryVersion) {
       return reply.code(404).send({ error: "version_not_found" });
     }
@@ -312,13 +329,13 @@ export function buildServer() {
     return metadata;
   });
 
-  app.get<{ Params: VersionParams }>("/skills/:name/versions/:version/download", async (request, reply) => {
-    const snapshot = await store.downloadSnapshot(request.params.name, request.params.version);
+  app.get<{ Params: VersionParams }>("/skills/:slug/versions/:version/download", async (request, reply) => {
+    const snapshot = await store.downloadSnapshot(request.params.slug, request.params.version);
     if (!snapshot) {
       return reply.code(404).send({ error: "version_not_found" });
     }
 
-    const fileName = `${snapshot.manifest.name}-${request.params.version}.zip`;
+    const fileName = `${getSkillSlug(snapshot.manifest)}-${request.params.version}.zip`;
     return reply
       .header("content-type", "application/zip")
       .header("content-disposition", `attachment; filename="${fileName}"`)

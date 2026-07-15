@@ -26,7 +26,7 @@ npm run setup            # 终端3：注册测试用户 + 发布 Demo Skill
 
 然后打开 `http://127.0.0.1:3001`，用 `alice / password123` 登录。
 
-API 和 Web 均支持热更新，修改源码自动刷新，无需手动重启。
+Web 支持热更新；API 使用一次性 `tsx` 进程，修改 API 或共享后端包后需要重启 `npm run dev:api`。
 
 发布、下载和安装：
 
@@ -90,8 +90,19 @@ npm run dev:api
 npm run dev:worker
 ```
 
-PostgreSQL schema 会在首次访问时自动初始化。启用 MinIO 后，发布 Skill 时会把 Skill zip artifact 写入 MinIO，注册表元数据中保留 artifact descriptor；下载和 Worker 重审会优先从 MinIO 读取 zip 并解包成 snapshot 做审查。
-用户数据会跟随 `REGISTRY_STORE` 选择存储后端：本地模式写入 `.data/users.json`，PostgreSQL 模式写入 `auth_state` 表。
+PostgreSQL schema 会在首次访问时自动初始化。Skill 注册表已拆分为 `skills`、`skill_versions`、`skill_version_files`、`skill_reviews`、`skill_review_findings`、`skill_evaluations`、`skill_contributors`、`skill_issues` 和 `skill_ratings` 等关系表；用户认证拆分为 `platform_users` 与 `auth_sessions`。这使 Skill、版本、审查评分、贡献者、Issue、评分、用户和会话都可以直接通过 SQL 查询与建立索引。
+
+已有的 `registry_skills.document` 和 `auth_state.document` JSONB 数据会在首次使用新版存储层时自动迁移一次，迁移状态记录在 `platform_schema_migrations`。旧 JSONB 表会保留为只读迁移备份，新代码不会再读取或写入它们。启用 MinIO 后，发布 Skill 时会把 Skill zip artifact 写入 MinIO；下载和 Worker 重审会优先从 MinIO 读取 zip 并解包成 snapshot 做审查。
+
+`skills.slug` 是 Skill 的稳定唯一标识，`skills.name` 是展示名称。可直接查询最近发布的版本及审查分数：
+
+```sql
+select s.slug, s.name, v.version, v.status, r.overall_score, v.downloads
+from skills s
+join skill_versions v on v.skill_slug = s.slug and v.version = s.latest_version
+join skill_reviews r on r.skill_slug = v.skill_slug and r.version = v.version
+order by s.updated_at desc;
+```
 
 PostgreSQL 容器内部仍使用 `5432`，宿主机默认映射到 `15432`，用于避开本机 PostgreSQL 或 Windows 保留端口冲突。如需修改，调整 `.env` 中的 `POSTGRES_PORT` 和 `DATABASE_URL`。
 
@@ -125,13 +136,13 @@ MinIO 控制台默认地址：`http://127.0.0.1:9001`。
 - `POST /evaluations/run`
 - `POST /reviews/rebuild`
 - `GET /leaderboard?sort=functional`
-- `GET /skills/:name`
-- `POST /skills/:name/contributors`
-- `POST /skills/:name/issues`
-- `GET /skills/:name/issues`
-- `POST /skills/:name/ratings`
-- `GET /skills/:name/versions/:version`
-- `GET /skills/:name/versions/:version/download`，返回 `application/zip`
+- `GET /skills/:slug`
+- `POST /skills/:slug/contributors`
+- `POST /skills/:slug/issues`
+- `GET /skills/:slug/issues`
+- `POST /skills/:slug/ratings`
+- `GET /skills/:slug/versions/:version`
+- `GET /skills/:slug/versions/:version/download`，返回 `application/zip`
 
 ## 协作开发
 

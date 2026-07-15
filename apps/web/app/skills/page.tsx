@@ -146,7 +146,7 @@ export default function SkillsPage() {
         ) : (
           <div className="claw-list">
             {skills.map((skill) => (
-              <SkillCard key={skill.name} skill={skill} variant="row" />
+              <SkillCard key={skill.slug} skill={skill} variant="row" />
             ))}
           </div>
         )}

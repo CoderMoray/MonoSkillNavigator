@@ -10,7 +10,7 @@ export function SkillCard({ skill, variant = "card" }: { skill: SkillSearchResul
 
   if (variant === "row") {
     return (
-      <Link className="skill-row" href={`/skills/${encodeURIComponent(skill.name)}`}>
+      <Link className="skill-row" href={`/skills/${encodeURIComponent(skill.slug)}`}>
         <div className="skill-row-main">
           <div className="skill-icon">{skill.name.slice(0, 1).toUpperCase()}</div>
           <div>
@@ -35,7 +35,7 @@ export function SkillCard({ skill, variant = "card" }: { skill: SkillSearchResul
   }
 
   return (
-    <Link className="skill-card" href={`/skills/${encodeURIComponent(skill.name)}`}>
+    <Link className="skill-card" href={`/skills/${encodeURIComponent(skill.slug)}`}>
       <div className="card-head">
         <div>
           <h3 className="skill-title">{skill.name}</h3>

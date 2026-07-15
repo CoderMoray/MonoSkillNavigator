@@ -39,7 +39,7 @@ flowchart TD
 
 一期采用 `.data/registry.json` 保存注册表状态，便于快速开发和本地验证。数据结构保持接近未来服务端模型：
 
-- `skills`：Skill 聚合根，按 `name` 唯一。
+- `skills`：Skill 聚合根，按不可变 `slug` 唯一；`name` 仅用于展示。
 - `versions`：不可变版本，包含 manifest、hash、snapshot、review report、发布状态。
 - `reviews`：每次审查的报告和 findings。
 

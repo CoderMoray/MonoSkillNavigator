@@ -33,7 +33,8 @@ overallScore = quality * 0.30 + security * 0.35 + privacy * 0.25 + functional * 
 检查项：
 
 - `SKILL.md` 是否存在且包含合法 frontmatter。
-- `name` 是否符合 kebab-case，且与目录意图一致。
+- `slug` 是否符合 kebab-case，且与目录意图一致。
+- `name` 是否清晰表达 Skill 的展示名称。
 - `description` 是否同时说明 “做什么” 和 “何时使用”。
 - `version`、`license`、`tags`、`supportedAgents` 是否完整。
 - 引用文件是否存在，目录是否清晰。
