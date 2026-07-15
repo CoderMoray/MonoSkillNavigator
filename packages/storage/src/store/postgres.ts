@@ -1,6 +1,6 @@
 import type { FunctionalEvaluationFinding, FunctionalEvaluationReport, FunctionalEvaluationTaskResult } from "@skill-platform/evaluator";
 import type { ReviewFinding, ReviewReport, ReviewVerdict } from "@skill-platform/review-engine";
-import { getSkillSlug, type SkillManifest } from "@skill-platform/skill-spec";
+import { getSkillSlug, type SkillManifest, type SkillSnapshot } from "@skill-platform/skill-spec";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { eq, and, sql, desc, or, ilike, inArray, sum, count } from "drizzle-orm";
 import pg from "pg";
@@ -9,6 +9,7 @@ import * as schema from "../schema";
 import type {
   ArtifactDescriptor,
   ArtifactProvider,
+  ArtifactStore,
   ContributorRole,
   IssueSeverity,
   IssueStatus,
@@ -627,6 +628,122 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         tasksTotal: evaluation.tasksTotal ?? evaluation.tasks_total ?? 0,
         tasksPassed: evaluation.tasksPassed ?? evaluation.tasks_passed ?? 0,
       },
+    });
+
+    return (await this.getSkill(slug))?.versions[version]!;
+  }
+
+  async publishSnapshot(snapshot: any, review: any, evaluation?: any, options: any = {}): Promise<RegistryVersion> {
+    await this.ensureSchema();
+    const slug = (snapshot.manifest as any).slug || getSkillSlug(snapshot.manifest);
+    const version = review.version;
+    const now = new Date();
+    const releaseTags = options.releaseTags ?? (snapshot.manifest as any)["release-tags"] ?? ["latest"];
+    const name = (snapshot.manifest as any).name;
+    const description = (snapshot.manifest as any).description ?? "";
+
+    // Check version conflict
+    const [existingV] = await this.db.select()
+      .from(schema.skillVersions).where(and(eq(schema.skillVersions.skillSlug, slug), eq(schema.skillVersions.version, version))).limit(1);
+    if (existingV) throw new Error(`Version already exists: ${slug}@${version}`);
+
+    const [existingSkill] = await this.db.select().from(schema.skills).where(eq(schema.skills.slug, slug)).limit(1);
+    if (!existingSkill && !releaseTags.includes("latest")) throw new Error("First version must include latest tag");
+
+    // Artifact to MinIO
+    const artifact = !!(this as any).artifactStore
+      ? await ((this as any).artifactStore as ArtifactStore).putSnapshot(slug, version, snapshot)
+      : undefined;
+
+    await this.db.transaction(async (tx) => {
+      if (existingSkill) {
+        await tx.update(schema.skills)
+          .set({ latestVersion: releaseTags.includes("latest") ? version : existingSkill.latestVersion, updatedAt: now })
+          .where(eq(schema.skills.slug, slug));
+      } else {
+        await tx.insert(schema.skills).values({
+          slug, name, description, ownerUserId: options.owner?.userId ?? null,
+          latestVersion: version, createdAt: now, updatedAt: now,
+        });
+      }
+
+      if (releaseTags.includes("latest")) {
+        const oldLatest = await tx.select({ v: schema.skillVersions.version, tags: schema.skillVersions.releaseTags })
+          .from(schema.skillVersions)
+          .where(eq(schema.skillVersions.skillSlug, slug));
+        for (const ov of oldLatest) {
+          if (ov.tags.includes("latest")) {
+            await tx.update(schema.skillVersions)
+              .set({ releaseTags: ov.tags.filter((t: string) => t !== "latest") })
+              .where(and(eq(schema.skillVersions.skillSlug, slug), eq(schema.skillVersions.version, ov.v)));
+          }
+        }
+      }
+
+      await tx.insert(schema.skillVersions).values({
+        skillSlug: slug, version, status: review.verdict,
+        manifestName: name, manifestDescription: description,
+        manifestVersion: snapshot.manifest.version ?? null,
+        manifestAuthor: snapshot.manifest.author ?? null,
+        manifestLicense: snapshot.manifest.license ?? null,
+        tagsDefined: !!snapshot.manifest.tags?.length,
+        categories: snapshot.manifest.categories ?? [], topics: snapshot.manifest.topics ?? [],
+        releaseTags, contentHash: snapshot.contentHash, readme: snapshot.readme ?? "",
+        snapshotCreatedAt: now, createdAt: now, updatedAt: now,
+      });
+
+      if (snapshot.manifest.tags?.length) {
+        await tx.insert(schema.skillVersionTags).values(
+          snapshot.manifest.tags.map((tag: string, i: number) => ({ skillSlug: slug, version, position: i, tag }))
+        );
+      }
+
+      if (snapshot.files?.length) {
+        await tx.insert(schema.skillVersionFiles).values(
+          snapshot.files.map((f: any) => ({ skillSlug: slug, version, path: f.path, content: f.content, size: f.size, sha256: f.sha256 }))
+        );
+      }
+
+      await tx.insert(schema.skillReviews).values({
+        skillSlug: slug, version, reviewId: review.id ?? `review_${Date.now()}`,
+        reportVersion: review.version ?? "1.0", contentHash: review.contentHash ?? "",
+        verdict: review.verdict,
+        qualityScore: review.scores.qualityScore, securityScore: review.scores.securityScore,
+        privacyScore: review.scores.privacyScore, functionalScore: review.scores.functionalScore,
+        overallScore: review.scores.overallScore, createdAt: now,
+      });
+
+      if (review.findings?.length) {
+        await tx.insert(schema.skillReviewFindings).values(
+          review.findings.map((f: any, i: number) => ({
+            skillSlug: slug, version, position: i, findingId: f.id ?? `finding_${i}`,
+            category: f.category, severity: f.severity, title: f.title, message: f.message,
+            path: f.path ?? null, evidence: f.evidence ?? null, recommendation: f.recommendation,
+          }))
+        );
+      }
+
+      if (evaluation) {
+        await tx.insert(schema.skillEvaluations).values({
+          skillSlug: slug, version, evaluationId: evaluation.id,
+          provider: evaluation.provider, status: evaluation.status,
+          score: evaluation.score, tasksTotal: evaluation.tasksTotal ?? 0,
+          tasksPassed: evaluation.tasksPassed ?? 0, createdAt: now,
+        });
+      }
+
+      const ownerName = options.owner?.username ?? snapshot.manifest.author ?? "unknown";
+      const [existingC] = await tx.select()
+        .from(schema.skillContributors)
+        .where(and(eq(schema.skillContributors.skillSlug, slug), eq(schema.skillContributors.name, ownerName)))
+        .limit(1);
+      if (!existingC) {
+        await tx.insert(schema.skillContributors).values({
+          id: `contributor_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          skillSlug: slug, userId: options.owner?.userId ?? null,
+          username: options.owner?.username ?? null, name: ownerName, role: "owner", addedAt: now,
+        });
+      }
     });
 
     return (await this.getSkill(slug))?.versions[version]!;
