@@ -18,19 +18,15 @@
 ## 快速开始
 
 ```bash
-npm install
-npm run dev:api        # 启动 API（端口 3000）
-npm run dev:web        # 启动 Web（端口 3001）
-npm run setup          # 注册测试用户 + 发布 Demo Skill
+npm install              # 安装依赖（首次需要）
+npm run dev:api          # 终端1：启动 API（端口 3000）
+npm run dev:web          # 终端2：启动 Web 前端（端口 3001）
+npm run setup            # 终端3：注册测试用户 + 发布 Demo Skill
 ```
 
-另开终端注册并登录用户，复制返回的 token：
+然后打开 `http://127.0.0.1:3001`，用 `alice / password123` 登录。
 
-```bash
-curl -X POST http://127.0.0.1:3000/auth/register ^
-  -H "Content-Type: application/json" ^
-  -d "{\"username\":\"alice\",\"password\":\"password123\"}"
-```
+API 和 Web 均支持热更新，修改源码自动刷新，无需手动重启。
 
 发布、下载和安装：
 
