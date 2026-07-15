@@ -67,5 +67,8 @@ npx drizzle-kit migrate    # 执行迁移
 - 新发布的 Skill 必须提供显式 `slug`。
 - 改表结构必须走 Drizzle 迁移流程：改 `schema/*.ts` → `generate` → `migrate`。
 - 修改 API 路由、响应或标识语义后，更新 CLI、Web 路由和 README。
-- 完成后运行 `npm run typecheck` + `npm run test`。
+- 改代码后验证：
+  1. `npm run typecheck` — TypeScript 编译检查，零报错
+  2. `npm run test` — 8 个 API 烟雾测试，全过即合。
+     （当前覆盖注册/登录/发布/搜索/详情/排行/下载的快乐路径，错误分支和性能测试待补充）
 - 不要提交 `.env`、凭证、token、数据库备份或 MinIO 导出文件。
