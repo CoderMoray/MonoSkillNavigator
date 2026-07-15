@@ -21,7 +21,7 @@ packages/
   skill-spec/     SKILL.md 解析、校验、快照与 ZIP
   review-engine/  静态风险审查与评分
   evaluator/      tests/*.json 功能性评估
-  storage/        File/PostgreSQL 注册表、认证与 MinIO artifact
+  storage/        PostgreSQL 注册表 + MinIO artifact
 docs/
   rules/          Skill 规范与审查规则
 examples/
@@ -32,54 +32,40 @@ examples/
 
 - 所有包均使用 ESM、严格 TypeScript；共享包通过 `@skill-platform/*` 路径别名导入。
 - API 是应用和 Web 的唯一数据入口；Web 不直接访问 PostgreSQL 或 MinIO。
-- PostgreSQL 使用关系表存储 Skill、版本、审查、评估、贡献者、Issue、评分、用户和会话。
-- `registry_skills` 与 `auth_state` JSONB 表仅是历史迁移备份；新代码不得再读写它们。
-- 数据库迁移由 `packages/storage` 中的 schema 初始化逻辑管理，并记录到 `platform_schema_migrations`。
+- 强制 PostgreSQL，无 JSON 文件模式。`DATABASE_URL` 必须配置。
+- 表定义：`packages/storage/src/schema/*.ts`（Drizzle ORM，纯 TypeScript）。
+- 迁移 SQL：`packages/storage/drizzle/*.sql`（`drizzle-kit generate` 生成，需提交 Git）。
+- 首次启动 API 自动执行迁移，已执行记录在 `_migrations` 表，不会重复跑。
 - 发布与下载 artifact 使用 ZIP；开启 MinIO 时，artifact descriptor 存在 PostgreSQL，包文件存在 MinIO。
 - API 合同或存储类型变更时，同步检查 `apps/api`、`apps/cli`、`apps/web/lib/types.ts` 和 `apps/web/lib/api.ts`。
 
 ## 常用命令
 
 ```bash
-# 安装与基础校验
-npm install
-npm run typecheck
-npm run review:demo
+npm install             # 安装依赖
+npm run dev             # 同时启动前后端（热重载）
+npm run setup           # 种子数据
+npm run test            # 8 个 API 烟雾测试
+npm run typecheck       # TypeScript 编译检查
+npm run infra:up        # Docker 备选（PostgreSQL + MinIO）
 
-# 基础设施（PostgreSQL + MinIO）
-npm run infra:up
-npm run infra:down
-
-# 本地服务（分别在独立终端运行）
-npm run dev:api
-npm run dev:web
-npm run dev:worker
-
-# Web 生产构建
-npm run build:web
-
-# CLI 示例
-npm run skill -- review examples/demo-skill
-npm run skill -- publish examples/demo-skill --token <token>
-npm run skill -- search demo
-npm run skill -- info demo-skill
-npm run skill -- install demo-skill installed/demo-skill
+# 改表结构
+npx drizzle-kit generate   # 生成迁移 SQL
+npx drizzle-kit migrate    # 执行迁移
 ```
-
-`apps/api` 的 `dev` 脚本使用一次性 `tsx`，不是 watch 模式。修改 API 或共享后端包后，必须重启 `npm run dev:api`；存储 schema 修改后尤其如此。
 
 ## 配置与本地运行
 
-1. 从 `.env.example` 创建 `.env`。
-2. 使用 PostgreSQL 时设置 `REGISTRY_STORE=postgres` 和 `DATABASE_URL`。
-3. 启用对象存储时设置 `MINIO_ENABLED=true`；本地默认端口为 MinIO `9000/9001`、PostgreSQL 宿主机 `15432`。
+1. 从 `.env.example` 创建 `.env`，设置 `DATABASE_URL`。
+2. `skill_platform` 库必须已存在（`createdb skill_platform` 或 Docker）。
+3. 可选：启用 MinIO（`MINIO_ENABLED=true`），本地默认端口 `9000`。
 4. Web 通过 `NEXT_PUBLIC_API_URL` 访问 API，默认 `http://127.0.0.1:3000`。
 
 ## 开发与验证要求
 
 - 修改 `SKILL.md` 规范时，同时更新 `docs/rules/skill-spec.md`、示例包和必要的审查逻辑。
-- 新发布的 Skill 必须提供显式 `slug`；旧 kebab-case `name` 仅作为兼容回退。
-- 新建或修改数据库字段时，提供可重复执行、事务安全的迁移，并验证现有 PostgreSQL 数据。
+- 新发布的 Skill 必须提供显式 `slug`。
+- 改表结构必须走 Drizzle 迁移流程：改 `schema/*.ts` → `generate` → `migrate`。
 - 修改 API 路由、响应或标识语义后，更新 CLI、Web 路由和 README。
-- 完成 TypeScript 改动后至少运行 `npm run typecheck`；修改 Web 后再运行 `npm run build:web`。
+- 完成后运行 `npm run typecheck` + `npm run test`。
 - 不要提交 `.env`、凭证、token、数据库备份或 MinIO 导出文件。
