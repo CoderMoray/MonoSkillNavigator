@@ -749,6 +749,54 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     return (await this.getSkill(slug))?.versions[version]!;
   }
 
+  async reviewAll(reviewFn: any, evaluationFn?: any): Promise<RegistryVersion[]> {
+    await this.ensureSchema();
+    const versions = await this.db
+      .select({ slug: schema.skillVersions.skillSlug, version: schema.skillVersions.version })
+      .from(schema.skillVersions);
+
+    const results: RegistryVersion[] = [];
+    for (const { slug, version } of versions) {
+      const skill = await this.getSkill(slug);
+      const rv = skill?.versions[version];
+      if (!rv) continue;
+
+      const review = reviewFn(rv.snapshot, version);
+      await this.upsertReview(slug, version, review);
+
+      if (evaluationFn) {
+        const evaluation = evaluationFn(rv.snapshot);
+        await this.upsertEvaluation(slug, version, evaluation);
+      }
+
+      results.push((await this.getSkill(slug))!.versions[version]!);
+    }
+    return results;
+  }
+
+  async listIssues(slug: string, status?: string): Promise<any[]> {
+    await this.ensureSchema();
+    const rows = await this.db.select()
+      .from(schema.skillIssues)
+      .where(eq(schema.skillIssues.skillSlug, slug))
+      .orderBy(schema.skillIssues.createdAt);
+
+    return rows
+      .filter((i) => !status || i.status === status)
+      .map((i) => ({
+        id: i.id, type: i.type, status: i.status, severity: i.severity,
+        title: i.title, body: i.body ?? undefined, createdBy: i.createdBy ?? undefined,
+        createdAt: String(i.createdAt), updatedAt: String(i.updatedAt),
+      }));
+  }
+
+  async getVersion(slug: string, ver = "latest"): Promise<RegistryVersion | undefined> {
+    const skill = await this.getSkill(slug);
+    if (!skill) return undefined;
+    const resolved = ver === "latest" ? skill.latestVersion : ver;
+    return skill.versions[resolved];
+  }
+
   protected async load(): Promise<RegistryData> {
     await this.ensureSchema();
     const client = await this.pool.connect();
