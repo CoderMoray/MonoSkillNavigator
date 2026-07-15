@@ -7,6 +7,8 @@
 | 数据库 | PostgreSQL 16（Docker） | 维持，生产可换云数据库 |
 | 对象存储 | MinIO（Docker） | 未来切阿里云 OSS（改一行 `endPoint`） |
 | 注册表 | 本地 JSON / PostgreSQL | 维持两套，JSON 供本地开发 |
+| ORM / 迁移 | 手写 SQL 嵌在 index.ts | 引入 Drizzle ORM，拆分 schema + 自动生成迁移 |
+| 测试 | 无 | Vitest + 核心流程测试覆盖 |
 
 ---
 
@@ -25,6 +27,7 @@
 - [ ] 主题切换器 UI（Light / Dark / System 手动切换按钮，CSS 已有，缺组件）
 - [ ] 响应式适配移动端
 - [ ] Welcome 开场动画（Arc 浏览器风格，含 BGM，首次进入播放，低优先级）
+- [ ] 引入 Vitest + 核心流程测试（注册→登录→发布→搜索→下载→审查）
 
 ---
 
