@@ -1,10 +1,6 @@
 export * from "./auth";
 
 export {
-  FileRegistryStore,
-} from "./store/file";
-
-export {
   MinioArtifactStore,
 } from "./store/minio";
 

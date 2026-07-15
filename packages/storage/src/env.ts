@@ -1,24 +1,16 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { loadEnvFile } from "node:process";
-import type { ArtifactStore, RegistryStore } from "./types";
-import type { MinioArtifactStoreOptions } from "./types";
-import { FileRegistryStore } from "./store/file";
+import type { ArtifactStore, MinioArtifactStoreOptions, RegistryStore } from "./types";
 import { MinioArtifactStore } from "./store/minio";
 import { PostgresRegistryStore } from "./store/postgres";
 
 export function createRegistryStoreFromEnv(env: NodeJS.ProcessEnv = process.env): RegistryStore {
   const artifactStore = createArtifactStoreFromEnv(env);
-  const storeType = env.REGISTRY_STORE ?? (env.DATABASE_URL ? "postgres" : "file");
-
-  if (storeType === "postgres") {
-    if (!env.DATABASE_URL) {
-      throw new Error("DATABASE_URL is required when REGISTRY_STORE=postgres");
-    }
-    return new PostgresRegistryStore(env.DATABASE_URL, { artifactStore });
+  if (!env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required");
   }
-
-  return new FileRegistryStore(env.DATA_DIR ?? ".data", { artifactStore });
+  return new PostgresRegistryStore(env.DATABASE_URL, { artifactStore });
 }
 
 export function loadDotEnvIfPresent(filePath = ".env"): void {
