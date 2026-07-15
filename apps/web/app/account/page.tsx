@@ -146,7 +146,7 @@ export default function AccountPage() {
               {creator?.skills.length ? (
                 <div className="claw-list" style={{ marginTop: 18 }}>
                   {creator.skills.map((skill) => (
-                    <SkillCard key={skill.name} skill={skill} variant="row" />
+                    <SkillCard key={skill.slug} skill={skill} variant="row" />
                   ))}
                 </div>
               ) : (

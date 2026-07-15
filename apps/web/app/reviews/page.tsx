@@ -23,7 +23,7 @@ export default function ReviewsPage() {
       setError(null);
       try {
         const summaries = await getSkills();
-        const details = await Promise.all(summaries.map((item) => getSkill(item.name)));
+        const details = await Promise.all(summaries.map((item) => getSkill(item.slug)));
         if (!cancelled) {
           setSkills(details);
         }
@@ -105,10 +105,10 @@ export default function ReviewsPage() {
                   }
 
                   return (
-                    <li className="list-item" key={skill.name}>
+                    <li className="list-item" key={skill.slug}>
                       <div className="card-head">
                         <div>
-                          <Link href={`/skills/${encodeURIComponent(skill.name)}`}>
+                          <Link href={`/skills/${encodeURIComponent(skill.slug)}`}>
                             <strong>{skill.name}</strong>
                           </Link>
                           <p className="description">

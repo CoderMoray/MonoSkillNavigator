@@ -151,7 +151,7 @@ export default function HomePage() {
           ) : (
             <div className="claw-list">
               {items.slice(0, 8).map((skill) => (
-                <SkillCard key={skill.name} skill={skill} variant="row" />
+                <SkillCard key={skill.slug} skill={skill} variant="row" />
               ))}
             </div>
           )}

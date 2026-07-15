@@ -125,7 +125,7 @@ export default function CreatorProfilePage() {
             </div>
             <div className="claw-list">
               {creator.skills.map((skill) => (
-                <SkillCard key={skill.name} skill={skill} variant="row" />
+                <SkillCard key={skill.slug} skill={skill} variant="row" />
               ))}
             </div>
           </section>

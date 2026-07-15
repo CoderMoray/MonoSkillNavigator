@@ -7,15 +7,35 @@ import { z } from "zod";
 
 const frontmatterPattern = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 
+export const skillSlugSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/);
+
+export const semverSchema = z
+  .string()
+  .regex(
+    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/,
+    "Version must be valid SemVer, for example 1.0.0"
+  );
+
+export const releaseTagSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z0-9][a-z0-9._-]*$/, "Release tags must use lowercase letters, numbers, dots, underscores, or hyphens");
+
 export const skillManifestSchema = z
   .object({
-    name: z
-      .string()
-      .min(1)
-      .max(64)
-      .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/),
+    slug: skillSlugSchema.optional(),
+    name: z.string().trim().min(1).max(128),
     description: z.string().min(20).max(1024),
     version: z.string().optional(),
+    categories: z.array(z.string().trim().min(1).max(64)).optional(),
+    topics: z.array(z.string().trim().min(1).max(64)).optional(),
+    "release-tags": z.array(releaseTagSchema).optional(),
     author: z.string().optional(),
     license: z.string().optional(),
     tags: z.array(z.string()).optional(),
@@ -26,6 +46,18 @@ export const skillManifestSchema = z
   .passthrough();
 
 export type SkillManifest = z.infer<typeof skillManifestSchema>;
+
+export const skillPublishMetadataSchema = z.object({
+  displayName: z.string().trim().min(1).max(128),
+  slug: skillSlugSchema,
+  summary: z.string().trim().min(20).max(1024),
+  categories: z.array(z.string().trim().min(1).max(64)).min(1).max(10),
+  topics: z.array(z.string().trim().min(1).max(64)).max(20).optional().default([]),
+  version: semverSchema,
+  releaseTags: z.array(releaseTagSchema).min(1).max(10)
+});
+
+export type SkillPublishMetadata = z.infer<typeof skillPublishMetadataSchema>;
 
 export interface SkillFile {
   path: string;
@@ -64,9 +96,75 @@ export function parseSkillMarkdown(markdown: string): ParsedSkillMarkdown {
   const parsed = skillManifestSchema.parse(rawFrontmatter ?? {});
 
   return {
-    manifest: parsed,
+    manifest: {
+      ...parsed,
+      slug: getSkillSlug(parsed)
+    },
     body: match[2] ?? "",
     rawFrontmatter: rawFrontmatter ?? {}
+  };
+}
+
+export function getSkillSlug(manifest: Pick<SkillManifest, "name" | "slug">): string {
+  const explicitSlug = skillSlugSchema.safeParse(manifest.slug);
+  if (explicitSlug.success) {
+    return explicitSlug.data;
+  }
+
+  if (manifest.slug === undefined) {
+    const legacyName = skillSlugSchema.safeParse(manifest.name);
+    if (legacyName.success) {
+      return legacyName.data;
+    }
+    throw new Error("slug is required when the display name is not a legacy kebab-case identifier");
+  }
+
+  throw new Error("slug must contain 1-64 lowercase letters, numbers, or hyphens");
+}
+
+export function applySkillPublishMetadata(
+  snapshot: SkillSnapshot,
+  input: SkillPublishMetadata
+): SkillSnapshot {
+  const metadata = normalizePublishMetadata(input);
+  const skillMd = snapshot.files.find((file) => file.path === "SKILL.md");
+  if (!skillMd) {
+    throw new Error("Skill package must include SKILL.md");
+  }
+
+  const parsed = parseSkillMarkdown(skillMd.content);
+  const frontmatter = {
+    ...parsed.rawFrontmatter,
+    slug: metadata.slug,
+    name: metadata.displayName,
+    description: metadata.summary,
+    version: metadata.version,
+    categories: metadata.categories,
+    topics: metadata.topics,
+    "release-tags": metadata.releaseTags
+  };
+  const manifest = skillManifestSchema.parse(frontmatter);
+  const content = `---\n${yaml.dump(frontmatter, { lineWidth: -1, noRefs: true })}---\n${parsed.body}`;
+  const files = snapshot.files.map((file) =>
+    file.path === "SKILL.md"
+      ? {
+          ...file,
+          content,
+          size: Buffer.byteLength(content, "utf8"),
+          sha256: sha256(content)
+        }
+      : file
+  );
+
+  return {
+    manifest: {
+      ...manifest,
+      slug: getSkillSlug(manifest)
+    },
+    readme: parsed.body,
+    files,
+    contentHash: hashSnapshotFiles(files),
+    createdAt: snapshot.createdAt
   };
 }
 
@@ -168,6 +266,16 @@ export function validateSkillSnapshot(snapshot: SkillSnapshot): SkillValidationI
         path: issue.path.join(".")
       });
     }
+  } else {
+    try {
+      getSkillSlug(parsed.data);
+    } catch (error) {
+      issues.push({
+        code: "invalid-frontmatter",
+        message: error instanceof Error ? error.message : "Invalid slug",
+        path: "slug"
+      });
+    }
   }
 
   for (const file of snapshot.files) {
@@ -211,6 +319,20 @@ export function normalizeTools(value: SkillManifest["allowed-tools"]): string[] 
     .split(/[,\s]+/)
     .map((tool) => tool.trim())
     .filter(Boolean);
+}
+
+function normalizePublishMetadata(input: SkillPublishMetadata): SkillPublishMetadata {
+  const metadata = skillPublishMetadataSchema.parse(input);
+  return {
+    ...metadata,
+    categories: uniqueStrings(metadata.categories),
+    topics: uniqueStrings(metadata.topics),
+    releaseTags: uniqueStrings(metadata.releaseTags)
+  };
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
 export function sha256(content: string): string {

@@ -14,7 +14,7 @@ import type { RegistryContributor, RegistrySkill } from "../../../lib/types";
 
 export default function SkillDetailPage() {
   const params = useParams<{ name: string }>();
-  const skillName = decodeURIComponent(params.name);
+  const skillSlug = decodeURIComponent(params.name);
   const [skill, setSkill] = useState<RegistrySkill | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +31,7 @@ export default function SkillDetailPage() {
       setLoading(true);
       setError(null);
       try {
-        const data = await getSkill(skillName);
+        const data = await getSkill(skillSlug);
         if (!cancelled) {
           setSkill(data);
         }
@@ -50,7 +50,7 @@ export default function SkillDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [skillName]);
+  }, [skillSlug]);
 
   const latest = useMemo(() => {
     if (!skill) {
@@ -61,7 +61,7 @@ export default function SkillDetailPage() {
 
   if (loading) {
     return (
-      <AppShell title={skillName}>
+      <AppShell title={skillSlug}>
         <div className="loading-grid">
           {Array.from({ length: 6 }).map((_, index) => (
             <div className="skeleton" key={index} />
@@ -73,14 +73,14 @@ export default function SkillDetailPage() {
 
   if (error || !skill || !latest) {
     return (
-      <AppShell title={skillName}>
+      <AppShell title={skillSlug}>
         <div className="error">{error ?? "Skill 不存在"}</div>
       </AppShell>
     );
   }
 
   const tags = latest.manifest.tags ?? [];
-  const installCommand = `npm run skill -- install ${skill.name}`;
+  const installCommand = `npm run skill -- install ${skill.slug}`;
 
   async function handleAddContributor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -105,7 +105,7 @@ export default function SkillDetailPage() {
 
     setAddingContributor(true);
     try {
-      const contributor = await addSkillContributor(token, skill.name, name, contributorRole);
+      const contributor = await addSkillContributor(token, skill.slug, name, contributorRole);
       setSkill((current) => {
         if (!current) {
           return current;
@@ -146,6 +146,7 @@ export default function SkillDetailPage() {
             <h1>{skill.name}</h1>
             <p>{skill.description}</p>
             <div className="tag-row">
+              <span className="badge mono">{skill.slug}</span>
               <span className="badge">v{skill.latestVersion}</span>
               <span className="badge">
                 <Star size={13} /> {skill.averageRating ? skill.averageRating.toFixed(1) : "暂无评分"}

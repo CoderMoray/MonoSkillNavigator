@@ -5,6 +5,7 @@ import { Command } from "commander";
 import { evaluateSkillSnapshot, type FunctionalEvaluationReport } from "@skill-platform/evaluator";
 import { reviewSkillSnapshot, type ReviewReport } from "@skill-platform/review-engine";
 import {
+  getSkillSlug,
   readSkillPackage,
   readSkillPackageZipBuffer,
   readSkillZipBuffer,
@@ -59,7 +60,8 @@ program
   .action(async (input: string, options: { version?: string; registry: string; token?: string }) => {
     const archive = await readSkillPackageZipBuffer(resolveUserPath(input));
     const response = await postJson<{
-      skill: string;
+      slug: string;
+      name: string;
       version: string;
       status: string;
       contentHash: string;
@@ -76,7 +78,7 @@ program
       return;
     }
 
-    console.log(`Published ${response.body.skill}@${response.body.version}`);
+    console.log(`Published ${response.body.name} (${response.body.slug})@${response.body.version}`);
     console.log(`Status: ${response.body.status}`);
     console.log(`Hash: ${response.body.contentHash}`);
     printReview(response.body.review);
@@ -135,27 +137,29 @@ program
 program
   .command("info")
   .description("Show skill metadata")
-  .argument("<name>", "Skill name")
+  .argument("<slug>", "Skill slug")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
-  .action(async (name: string, options: { registry: string }) => {
-    const response = await getJson<Record<string, unknown>>(`${options.registry}/skills/${name}`);
+  .action(async (slug: string, options: { registry: string }) => {
+    const response = await getJson<Record<string, unknown>>(
+      `${options.registry}/skills/${encodeURIComponent(slug)}`
+    );
     printJson(response.body);
   });
 
 program
   .command("install")
   .description("Download a skill zip from the registry and install it as a directory")
-  .argument("<name>", "Skill name")
+  .argument("<slug>", "Skill slug")
   .argument("[targetDir]", "Target directory")
   .option("--version <version>", "Version to install", "latest")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
   .action(
     async (
-      name: string,
+      slug: string,
       targetDir: string | undefined,
       options: { version: string; registry: string }
     ) => {
-      const endpoint = `${options.registry}/skills/${name}/versions/${options.version}/download`;
+      const endpoint = `${options.registry}/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(options.version)}/download`;
       const response = await getBinary(endpoint);
 
       if (response.status >= 400) {
@@ -165,7 +169,7 @@ program
       }
 
       const snapshot = readSkillZipBuffer(response.body);
-      const installDir = resolveUserPath(targetDir ?? snapshot.manifest.name);
+      const installDir = resolveUserPath(targetDir ?? getSkillSlug(snapshot.manifest));
       await writeSkillSnapshot(snapshot, installDir);
       console.log(`Installed ${snapshot.manifest.name} to ${installDir}`);
       console.log(`Hash: ${snapshot.contentHash}`);
@@ -175,12 +179,12 @@ program
 program
   .command("download")
   .description("Download a skill version as a zip package")
-  .argument("<name>", "Skill name")
+  .argument("<slug>", "Skill slug")
   .argument("[output]", "Output zip path")
   .option("--version <version>", "Version to download", "latest")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
-  .action(async (name: string, output: string | undefined, options: { version: string; registry: string }) => {
-    const endpoint = `${options.registry}/skills/${name}/versions/${options.version}/download`;
+  .action(async (slug: string, output: string | undefined, options: { version: string; registry: string }) => {
+    const endpoint = `${options.registry}/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(options.version)}/download`;
     const response = await getBinary(endpoint);
 
     if (response.status >= 400) {
@@ -189,15 +193,15 @@ program
       return;
     }
 
-    const outputPath = resolveUserPath(output ?? `${name}-${options.version}.zip`);
+    const outputPath = resolveUserPath(output ?? `${slug}-${options.version}.zip`);
     await writeFile(outputPath, response.body);
-    console.log(`Downloaded ${name}@${options.version} to ${outputPath}`);
+    console.log(`Downloaded ${slug}@${options.version} to ${outputPath}`);
   });
 
 program
   .command("rate")
   .description("Rate a skill in the registry")
-  .argument("<name>", "Skill name")
+  .argument("<slug>", "Skill slug")
   .requiredOption("--user <user>", "User or contributor name")
   .requiredOption("--score <score>", "Score from 1 to 5")
   .option("--version <version>", "Version being rated")
@@ -205,15 +209,18 @@ program
   .option("--registry <url>", "Registry API URL", defaultRegistry)
   .action(
     async (
-      name: string,
+      slug: string,
       options: { user: string; score: string; version?: string; comment?: string; registry: string }
     ) => {
-      const response = await postJson<Record<string, unknown>>(`${options.registry}/skills/${name}/ratings`, {
+      const response = await postJson<Record<string, unknown>>(
+        `${options.registry}/skills/${encodeURIComponent(slug)}/ratings`,
+        {
         user: options.user,
         score: Number(options.score),
         version: options.version,
         comment: options.comment
-      });
+        }
+      );
       printJson(response.body);
     }
   );
@@ -221,7 +228,7 @@ program
 program
   .command("issue")
   .description("Create an issue for a skill")
-  .argument("<name>", "Skill name")
+  .argument("<slug>", "Skill slug")
   .requiredOption("--title <title>", "Issue title")
   .option("--type <type>", "bug, security, compatibility, feature, docs", "bug")
   .option("--severity <severity>", "low, medium, high, critical", "medium")
@@ -230,7 +237,7 @@ program
   .option("--registry <url>", "Registry API URL", defaultRegistry)
   .action(
     async (
-      name: string,
+      slug: string,
       options: {
         title: string;
         type: string;
@@ -240,13 +247,16 @@ program
         registry: string;
       }
     ) => {
-      const response = await postJson<Record<string, unknown>>(`${options.registry}/skills/${name}/issues`, {
+      const response = await postJson<Record<string, unknown>>(
+        `${options.registry}/skills/${encodeURIComponent(slug)}/issues`,
+        {
         title: options.title,
         type: options.type,
         severity: options.severity,
         body: options.body,
         createdBy: options.createdBy
-      });
+        }
+      );
       printJson(response.body);
     }
   );
@@ -254,11 +264,11 @@ program
 program
   .command("issues")
   .description("List issues for a skill")
-  .argument("<name>", "Skill name")
+  .argument("<slug>", "Skill slug")
   .option("--status <status>", "open, triaged, closed")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
-  .action(async (name: string, options: { status?: string; registry: string }) => {
-    const url = new URL(`/skills/${name}/issues`, options.registry);
+  .action(async (slug: string, options: { status?: string; registry: string }) => {
+    const url = new URL(`/skills/${encodeURIComponent(slug)}/issues`, options.registry);
     if (options.status) {
       url.searchParams.set("status", options.status);
     }
@@ -270,16 +280,20 @@ program
 program
   .command("contributor")
   .description("Add or update a skill contributor")
-  .argument("<name>", "Skill name")
+  .argument("<slug>", "Skill slug")
   .requiredOption("--person <person>", "Contributor display name")
   .option("--role <role>", "owner, maintainer, reviewer, contributor", "contributor")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
   .option("--token <token>", "Bearer token, defaults to SKILL_AUTH_TOKEN")
-  .action(async (name: string, options: { person: string; role: string; registry: string; token?: string }) => {
-    const response = await postJson<Record<string, unknown>>(`${options.registry}/skills/${name}/contributors`, {
-      name: options.person,
-      role: options.role
-    }, resolveAuthToken(options.token));
+  .action(async (slug: string, options: { person: string; role: string; registry: string; token?: string }) => {
+    const response = await postJson<Record<string, unknown>>(
+      `${options.registry}/skills/${encodeURIComponent(slug)}/contributors`,
+      {
+        name: options.person,
+        role: options.role
+      },
+      resolveAuthToken(options.token)
+    );
     printJson(response.body);
   });
 
