@@ -28,6 +28,13 @@ npm run setup            # 终端3：注册测试用户 + 发布 Demo Skill
 
 Web 支持热更新；API 使用一次性 `tsx` 进程，修改 API 或共享后端包后需要重启 `npm run dev:api`。
 
+## 测试
+
+```bash
+npm run test           # 运行 8 个 API 烟雾测试（注册/登录/发布/搜索/详情/排行/下载）
+npm run test:watch     # watch 模式，改代码自动重跑
+```
+
 发布、下载和安装：
 
 ```bash
