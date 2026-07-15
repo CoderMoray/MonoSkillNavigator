@@ -40,6 +40,9 @@ Thumbs.db
 minio-data/
 pgdata/
 
+# Drizzle (SQL 文件需提交，meta 是本地缓存)
+packages/storage/drizzle/meta/
+
 # Temporary files
 tmp/
 temp/
