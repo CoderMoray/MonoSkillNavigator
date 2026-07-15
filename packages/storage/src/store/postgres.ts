@@ -1,7 +1,11 @@
 import type { FunctionalEvaluationFinding, FunctionalEvaluationReport, FunctionalEvaluationTaskResult } from "@skill-platform/evaluator";
 import type { ReviewFinding, ReviewReport, ReviewVerdict } from "@skill-platform/review-engine";
 import { getSkillSlug, type SkillManifest } from "@skill-platform/skill-spec";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { eq, and, sql, desc, or, ilike, inArray, sum, count } from "drizzle-orm";
 import pg from "pg";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import * as schema from "../schema";
 import type {
   ArtifactDescriptor,
   ArtifactProvider,
@@ -16,10 +20,13 @@ import type {
   RegistryRating,
   RegistrySkill,
   RegistryVersion,
+  SkillSearchResult,
   LeaderboardSort,
 } from "../types";
 import { emptyRegistry, normalizeRegistryData, toSearchResult } from "../utils";
 import { JsonRegistryStore } from "./base";
+
+type DB = NodePgDatabase<typeof schema>;
 
 function toIsoString(value: string | Date | number | null | undefined): string {
   if (!value) return new Date().toISOString();
@@ -196,11 +203,245 @@ interface DatabaseRatingRow {
 
 export class PostgresRegistryStore extends JsonRegistryStore {
   private readonly pool: pg.Pool;
+  private db!: DB;
   private schemaReady?: Promise<void>;
 
   constructor(databaseUrl: string, options: PostgresRegistryStoreOptions = {}) {
     super(options.artifactStore);
     this.pool = new pg.Pool({ connectionString: databaseUrl });
+    this.db = drizzle(this.pool, { schema });
+  }
+
+  // --- 高频读操作：直接 Drizzle 查询，不走 load/save ---
+
+  async search(query = ""): Promise<SkillSearchResult[]> {
+    await this.ensureSchema();
+    const q = query.trim();
+    const searchPattern = q ? `%${q}%` : "%";
+
+    const rows = await this.db
+      .select({
+        slug: schema.skills.slug,
+        name: schema.skills.name,
+        description: schema.skills.description,
+        latestVersion: schema.skills.latestVersion,
+        status: schema.skillVersions.status,
+        qualityScore: schema.skillReviews.qualityScore,
+        securityScore: schema.skillReviews.securityScore,
+        privacyScore: schema.skillReviews.privacyScore,
+        functionalScore: schema.skillReviews.functionalScore,
+        overallScore: schema.skillReviews.overallScore,
+        averageRating: schema.skills.averageRating,
+        ratingCount: schema.skills.ratingCount,
+        totalDownloads: sql<number>`coalesce(sum(${schema.skillVersions.downloads}), 0)`.mapWith(Number),
+        updatedAt: schema.skills.updatedAt,
+        openIssues: sql<number>`(
+          select count(*) from ${schema.skillIssues}
+          where ${schema.skillIssues.skillSlug} = ${schema.skills.slug}
+          and ${schema.skillIssues.status} != 'closed'
+        )`.mapWith(Number),
+      })
+      .from(schema.skills)
+      .innerJoin(
+        schema.skillVersions,
+        and(
+          eq(schema.skillVersions.skillSlug, schema.skills.slug),
+          eq(schema.skillVersions.version, schema.skills.latestVersion)
+        )
+      )
+      .innerJoin(
+        schema.skillReviews,
+        and(
+          eq(schema.skillReviews.skillSlug, schema.skills.slug),
+          eq(schema.skillReviews.version, schema.skills.latestVersion)
+        )
+      )
+      .where(
+        q
+          ? or(
+              ilike(schema.skills.slug, searchPattern),
+              ilike(schema.skills.name, searchPattern),
+              ilike(schema.skills.description, searchPattern)
+            )
+          : undefined
+      )
+      .groupBy(
+        schema.skills.slug, schema.skills.name, schema.skills.description,
+        schema.skills.latestVersion, schema.skillVersions.status,
+        schema.skillReviews.qualityScore, schema.skillReviews.securityScore,
+        schema.skillReviews.privacyScore, schema.skillReviews.functionalScore,
+        schema.skillReviews.overallScore, schema.skills.averageRating,
+        schema.skills.ratingCount, schema.skills.updatedAt
+      )
+      .orderBy(desc(schema.skills.updatedAt));
+
+    const slugs = rows.map((r) => r.slug);
+    if (slugs.length === 0) return [];
+
+    // 批量查 contributors
+    const allContributors = await this.db
+      .select()
+      .from(schema.skillContributors)
+      .where(inArray(schema.skillContributors.skillSlug, slugs));
+
+    const contributorsMap = new Map<string, SkillSearchResult["contributors"]>();
+    for (const c of allContributors) {
+      const list = contributorsMap.get(c.skillSlug) ?? [];
+      list.push({
+        id: c.id,
+        userId: c.userId ?? undefined,
+        username: c.username ?? undefined,
+        name: c.name,
+        role: c.role as SkillSearchResult["contributors"][number]["role"],
+        addedAt: String(c.addedAt),
+      });
+      contributorsMap.set(c.skillSlug, list);
+    }
+
+    return rows.map((r) => ({
+      slug: r.slug,
+      name: r.name,
+      description: r.description,
+      latestVersion: r.latestVersion,
+      status: r.status as SkillSearchResult["status"],
+      scores: {
+        qualityScore: Number(r.qualityScore),
+        securityScore: Number(r.securityScore),
+        privacyScore: Number(r.privacyScore),
+        functionalScore: Number(r.functionalScore),
+        overallScore: Number(r.overallScore),
+      },
+      averageRating: Number(r.averageRating),
+      ratingCount: Number(r.ratingCount),
+      openIssues: r.openIssues,
+      contributors: contributorsMap.get(r.slug) ?? [],
+      downloads: r.totalDownloads,
+      updatedAt: String(r.updatedAt),
+    }));
+  }
+
+  async getSkill(slug: string): Promise<RegistrySkill | undefined> {
+    await this.ensureSchema();
+    const [row] = await this.db
+      .select()
+      .from(schema.skills)
+      .where(eq(schema.skills.slug, slug))
+      .limit(1);
+
+    if (!row) return undefined;
+
+    const versions = await this.db
+      .select()
+      .from(schema.skillVersions)
+      .where(eq(schema.skillVersions.skillSlug, slug))
+      .orderBy(schema.skillVersions.createdAt);
+
+    const contributors = await this.db
+      .select()
+      .from(schema.skillContributors)
+      .where(eq(schema.skillContributors.skillSlug, slug));
+
+    const issues = await this.db
+      .select()
+      .from(schema.skillIssues)
+      .where(eq(schema.skillIssues.skillSlug, slug));
+
+    const ratings = await this.db
+      .select()
+      .from(schema.skillRatings)
+      .where(eq(schema.skillRatings.skillSlug, slug));
+
+    // Load each version's details
+    const versionMap: Record<string, RegistryVersion> = {};
+    for (const v of versions) {
+      const tags = await this.db.select({ tag: schema.skillVersionTags.tag })
+        .from(schema.skillVersionTags)
+        .where(and(eq(schema.skillVersionTags.skillSlug, slug), eq(schema.skillVersionTags.version, v.version)))
+        .orderBy(schema.skillVersionTags.position);
+
+      const files = await this.db.select()
+        .from(schema.skillVersionFiles)
+        .where(and(eq(schema.skillVersionFiles.skillSlug, slug), eq(schema.skillVersionFiles.version, v.version)))
+        .orderBy(schema.skillVersionFiles.path);
+
+      const [review] = await this.db.select()
+        .from(schema.skillReviews)
+        .where(and(eq(schema.skillReviews.skillSlug, slug), eq(schema.skillReviews.version, v.version)));
+
+      const findings = review
+        ? await this.db.select().from(schema.skillReviewFindings)
+            .where(and(eq(schema.skillReviewFindings.skillSlug, slug), eq(schema.skillReviewFindings.version, v.version)))
+            .orderBy(schema.skillReviewFindings.position)
+        : [];
+
+      versionMap[v.version] = {
+        version: v.version,
+        manifest: {
+          slug, name: v.manifestName, description: v.manifestDescription,
+          version: v.manifestVersion ?? undefined,
+          author: v.manifestAuthor ?? undefined,
+          license: v.manifestLicense ?? undefined,
+          tags: tags.map((t) => t.tag),
+          ...(v.supportedAgentsDefined ? { supportedAgents: v.supportedAgents } : {}),
+          ...(v.allowedToolsDefined ? { "allowed-tools": v.allowedToolsIsScalar ? v.allowedTools[0] : v.allowedTools } : {}),
+          ...(v.disallowedToolsDefined ? { "disallowed-tools": v.disallowedToolsIsScalar ? v.disallowedTools[0] : v.disallowedTools } : {}),
+          categories: v.categories, topics: v.topics,
+          "release-tags": v.releaseTags,
+        } as RegistryVersion["manifest"],
+        contentHash: v.contentHash,
+        snapshot: {
+          manifest: {} as RegistryVersion["manifest"],
+          readme: v.readme,
+          files: files.map((f) => ({ path: f.path, content: f.content, size: f.size, sha256: f.sha256 })),
+          contentHash: v.contentHash, createdAt: String(v.snapshotCreatedAt),
+        },
+        artifact: v.artifactProvider ? {
+          provider: v.artifactProvider as "minio", bucket: v.artifactBucket!,
+          objectKey: v.artifactObjectKey!, contentHash: v.artifactContentHash!,
+          size: Number(v.artifactSize ?? 0), storedAt: String(v.artifactStoredAt ?? ""),
+        } : undefined,
+        review: review ? {
+          id: review.reviewId, skillSlug: slug, skillName: v.manifestName,
+          version: review.reportVersion, contentHash: review.contentHash,
+          verdict: review.verdict as RegistryVersion["status"],
+          scores: {
+            qualityScore: Number(review.qualityScore), securityScore: Number(review.securityScore),
+            privacyScore: Number(review.privacyScore), functionalScore: Number(review.functionalScore),
+            overallScore: Number(review.overallScore),
+          },
+          findings: findings.map((f) => ({
+            id: f.findingId, category: f.category as any, severity: f.severity as any,
+            title: f.title, message: f.message, path: f.path ?? undefined,
+            evidence: f.evidence ?? undefined, recommendation: f.recommendation,
+          })),
+          createdAt: String(review.createdAt),
+        } : {} as RegistryVersion["review"],
+        status: v.status as RegistryVersion["status"],
+        releaseTags: v.releaseTags, downloads: Number(v.downloads),
+        createdAt: String(v.createdAt), updatedAt: String(v.updatedAt),
+      };
+    }
+
+    return {
+      slug: row.slug, name: row.name, description: row.description,
+      ownerUserId: row.ownerUserId ?? undefined, latestVersion: row.latestVersion,
+      versions: versionMap,
+      contributors: contributors.map((c) => ({
+        id: c.id, userId: c.userId ?? undefined, username: c.username ?? undefined,
+        name: c.name, role: c.role as any, addedAt: String(c.addedAt),
+      })),
+      issues: issues.map((i) => ({
+        id: i.id, type: i.type as any, status: i.status as any,
+        severity: i.severity as any, title: i.title, body: i.body ?? undefined,
+        createdBy: i.createdBy ?? undefined, createdAt: String(i.createdAt), updatedAt: String(i.updatedAt),
+      })),
+      ratings: ratings.map((r) => ({
+        id: r.id, version: r.version ?? undefined, user: r.userName,
+        score: r.score, comment: r.comment ?? undefined, createdAt: String(r.createdAt),
+      })),
+      averageRating: Number(row.averageRating), ratingCount: Number(row.ratingCount),
+      createdAt: String(row.createdAt), updatedAt: String(row.updatedAt),
+    };
   }
 
   protected async load(): Promise<RegistryData> {
