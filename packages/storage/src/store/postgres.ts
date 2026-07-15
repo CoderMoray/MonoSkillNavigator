@@ -444,6 +444,127 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     };
   }
 
+  // --- 写操作：增量 Drizzle，不走 load/save ---
+
+  async addRating(slug: string, rating: { version?: string; user: string; score: number; comment?: string }): Promise<RegistryRating> {
+    await this.ensureSchema();
+    if (rating.score < 1 || rating.score > 5) throw new Error("Rating score must be between 1 and 5");
+
+    const id = `rating_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const createdAt = new Date();
+
+    await this.db.insert(schema.skillRatings).values({
+      id, skillSlug: slug, version: rating.version ?? null,
+      userName: rating.user, score: rating.score, comment: rating.comment ?? null, createdAt,
+    });
+
+    const [agg] = await this.db
+      .select({
+        count: sql<number>`cast(count(*) as integer)`.mapWith(Number),
+        avg: sql<number>`round(avg(${schema.skillRatings.score})::numeric, 1)`.mapWith(Number),
+      })
+      .from(schema.skillRatings)
+      .where(eq(schema.skillRatings.skillSlug, slug));
+
+    const now = new Date();
+    await this.db.update(schema.skills)
+      .set({ averageRating: String(agg?.avg ?? 0), ratingCount: agg?.count ?? 0, updatedAt: now })
+      .where(eq(schema.skills.slug, slug));
+
+    return { id, version: rating.version, user: rating.user, score: rating.score, comment: rating.comment, createdAt: createdAt.toISOString() };
+  }
+
+  async createIssue(slug: string, issue: { type: string; severity?: string; title: string; body?: string; createdBy?: string }): Promise<RegistryIssue> {
+    await this.ensureSchema();
+    const id = `issue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const createdAt = new Date();
+
+    await this.db.insert(schema.skillIssues).values({
+      id, skillSlug: slug,
+      type: issue.type as any, status: "open" as any, severity: (issue.severity ?? "medium") as any,
+      title: issue.title, body: issue.body ?? null, createdBy: issue.createdBy ?? null,
+      createdAt, updatedAt: createdAt,
+    });
+
+    return {
+      id, type: issue.type as any, status: "open" as any, severity: (issue.severity ?? "medium") as any,
+      title: issue.title, body: issue.body, createdBy: issue.createdBy,
+      createdAt: createdAt.toISOString(), updatedAt: createdAt.toISOString(),
+    };
+  }
+
+  async addContributor(slug: string, contributor: { userId?: string; username?: string; name: string; role: string }): Promise<RegistryContributor> {
+    await this.ensureSchema();
+    const addedAt = new Date();
+    const id = `contributor_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    const [existing] = await this.db.select()
+      .from(schema.skillContributors)
+      .where(and(eq(schema.skillContributors.skillSlug, slug), eq(schema.skillContributors.name, contributor.name)))
+      .limit(1);
+
+    if (existing) {
+      await this.db.update(schema.skillContributors)
+        .set({ role: contributor.role as any })
+        .where(eq(schema.skillContributors.id, existing.id));
+      return {
+        id: existing.id, userId: existing.userId ?? undefined, username: existing.username ?? undefined,
+        name: existing.name, role: contributor.role as any, addedAt: String(existing.addedAt),
+      };
+    }
+
+    await this.db.insert(schema.skillContributors).values({
+      id, skillSlug: slug, userId: contributor.userId ?? null,
+      username: contributor.username ?? null, name: contributor.name,
+      role: contributor.role as any, addedAt,
+    });
+
+    return { id, userId: contributor.userId, username: contributor.username, name: contributor.name, role: contributor.role as any, addedAt: addedAt.toISOString() };
+  }
+
+  async downloadSnapshot(slug: string, version = "latest"): Promise<any | undefined> {
+    await this.ensureSchema();
+    const resolved = version === "latest"
+      ? (await this.db.select({ v: schema.skills.latestVersion }).from(schema.skills).where(eq(schema.skills.slug, slug)).limit(1))[0]?.v
+      : version;
+    if (!resolved) return undefined;
+
+    const [v] = await this.db.select()
+      .from(schema.skillVersions)
+      .where(and(eq(schema.skillVersions.skillSlug, slug), eq(schema.skillVersions.version, resolved)))
+      .limit(1);
+    if (!v) return undefined;
+
+    await this.db.update(schema.skillVersions)
+      .set({ downloads: sql`${schema.skillVersions.downloads} + 1`, updatedAt: new Date() })
+      .where(and(eq(schema.skillVersions.skillSlug, slug), eq(schema.skillVersions.version, resolved)));
+
+    if (v.artifactProvider && this.artifactStore) {
+      return this.artifactStore.getSnapshot({
+        provider: v.artifactProvider as "minio", bucket: v.artifactBucket!,
+        objectKey: v.artifactObjectKey!, contentHash: v.artifactContentHash!,
+        size: Number(v.artifactSize ?? 0), storedAt: String(v.artifactStoredAt ?? ""),
+      });
+    }
+
+    const files = await this.db.select()
+      .from(schema.skillVersionFiles)
+      .where(and(eq(schema.skillVersionFiles.skillSlug, slug), eq(schema.skillVersionFiles.version, resolved)))
+      .orderBy(schema.skillVersionFiles.path);
+
+    const tags = await this.db.select({ tag: schema.skillVersionTags.tag })
+      .from(schema.skillVersionTags)
+      .where(and(eq(schema.skillVersionTags.skillSlug, slug), eq(schema.skillVersionTags.version, resolved)))
+      .orderBy(schema.skillVersionTags.position);
+
+    return {
+      manifest: { slug, name: v.manifestName, description: v.manifestDescription, tags: tags.map((t) => t.tag), categories: v.categories, topics: v.topics },
+      readme: v.readme,
+      files: files.map((f) => ({ path: f.path, content: f.content, size: f.size, sha256: f.sha256 })),
+      contentHash: v.contentHash, createdAt: String(v.snapshotCreatedAt),
+    };
+  }
+
   protected async load(): Promise<RegistryData> {
     await this.ensureSchema();
     const client = await this.pool.connect();
