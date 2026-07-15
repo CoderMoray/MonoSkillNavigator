@@ -18,6 +18,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit",
     "review:demo": "npm --workspace @skill-platform/cli run dev -- review examples/demo-skill",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "setup": "bash scripts/setup.sh"
   },
   "dependencies": {
@@ -34,6 +36,7 @@
     "@types/node": "^24.10.2",
     "@types/pg": "^8.20.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   }
 }
