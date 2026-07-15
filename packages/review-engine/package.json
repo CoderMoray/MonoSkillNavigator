@@ -1,0 +1,13 @@
+{
+  "name": "@skill-platform/review-engine",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@skill-platform/evaluator": "0.1.0",
+    "@skill-platform/skill-spec": "0.1.0"
+  }
+}

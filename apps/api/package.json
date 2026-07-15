@@ -1,0 +1,15 @@
+{
+  "name": "@skill-platform/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@skill-platform/evaluator": "0.1.0",
+    "@skill-platform/review-engine": "0.1.0",
+    "@skill-platform/skill-spec": "0.1.0",
+    "@skill-platform/storage": "0.1.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@skill-platform/storage",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@skill-platform/evaluator": "0.1.0",
+    "@skill-platform/review-engine": "0.1.0",
+    "@skill-platform/skill-spec": "0.1.0",
+    "minio": "^8.0.7",
+    "pg": "^8.22.0"
+  }
+}

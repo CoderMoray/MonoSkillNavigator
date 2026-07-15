@@ -1,0 +1,17 @@
+{
+  "name": "@skill-platform/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "skill-platform": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@skill-platform/evaluator": "0.1.0",
+    "@skill-platform/review-engine": "0.1.0",
+    "@skill-platform/skill-spec": "0.1.0"
+  }
+}

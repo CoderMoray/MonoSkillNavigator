@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@skill-platform/evaluator": [
+        "packages/evaluator/src/index.ts"
+      ],
+      "@skill-platform/skill-spec": [
+        "packages/skill-spec/src/index.ts"
+      ],
+      "@skill-platform/review-engine": [
+        "packages/review-engine/src/index.ts"
+      ],
+      "@skill-platform/storage": [
+        "packages/storage/src/index.ts"
+      ]
+    },
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true
+  }
+}

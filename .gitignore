@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+dist/
+coverage/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Data & storage
+.data/
+installed-demo-skill/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# TypeScript
+*.tsbuildinfo
+
+# MinIO / Docker volumes
+minio-data/
+pgdata/
+
+# Temporary files
+tmp/
+temp/

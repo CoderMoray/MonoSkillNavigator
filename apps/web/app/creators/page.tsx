@@ -1,0 +1,141 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { BadgeCheck, Download, Search, Sparkles, UserRound } from "lucide-react";
+import { AppShell } from "../../components/AppShell";
+import { getLeaderboard } from "../../lib/api";
+import { aggregateCreators, type CreatorSummary } from "../../lib/creators";
+import { formatNumber } from "../../lib/format";
+
+const filters = ["All", "Verified", "Orgs", "Organizations", "Users"];
+
+export default function CreatorsPage() {
+  const [creators, setCreators] = useState<CreatorSummary[]>([]);
+  const [filter, setFilter] = useState("All");
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const skills = await getLeaderboard("downloads", 100);
+        if (!cancelled) {
+          setCreators(aggregateCreators(skills));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "加载失败");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const visibleCreators = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return creators.filter((creator) => {
+      if (filter === "Users" && creator.name.toLowerCase().includes("org")) {
+        return false;
+      }
+      if ((filter === "Orgs" || filter === "Organizations") && !creator.name.toLowerCase().includes("org")) {
+        return false;
+      }
+      if (filter === "Verified" && creator.published < 2 && creator.downloads < 1000) {
+        return false;
+      }
+      if (!normalizedQuery) {
+        return true;
+      }
+      return creator.name.toLowerCase().includes(normalizedQuery) || creator.handle.includes(normalizedQuery);
+    });
+  }, [creators, filter, query]);
+
+  return (
+    <AppShell title="Creators">
+      <div className="market-stack">
+        <section className="creator-hero">
+          <span className="eyebrow">
+            <Sparkles size={14} />
+            Creators
+          </span>
+          <h1>Explore publishers behind trusted skills.</h1>
+          <p>查看平台中的发布者、贡献者、代表 Skill、发布数量和下载表现。</p>
+        </section>
+
+        <section className="market-panel">
+          <div className="market-toolbar">
+            <div className="segmented">
+              {filters.map((item) => (
+                <button className={filter === item ? "active" : ""} key={item} onClick={() => setFilter(item)} type="button">
+                  {item}
+                </button>
+              ))}
+            </div>
+            <div className="searchbox compact-search">
+              <Search size={16} color="var(--muted)" />
+              <input
+                aria-label="搜索 Creator"
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search creators..."
+                value={query}
+              />
+            </div>
+          </div>
+
+          <div className="section-head">
+            <div>
+              <h2>Popular publishers</h2>
+              <p>按下载量和发布数量排序。</p>
+            </div>
+          </div>
+
+          {error ? <div className="error">{error}。请确认 API 已启动。</div> : null}
+
+          {loading ? (
+            <div className="publisher-list">
+              {Array.from({ length: 8 }).map((_, index) => (
+                <div className="publisher-row skeleton-row" key={index} />
+              ))}
+            </div>
+          ) : visibleCreators.length === 0 ? (
+            <div className="empty">暂无匹配 Creator。</div>
+          ) : (
+            <div className="publisher-list">
+              {visibleCreators.map((creator) => (
+                <Link className="publisher-row" href={`/creators/${encodeURIComponent(creator.handle)}`} key={creator.handle}>
+                  <div className="creator-avatar">{creator.name.slice(0, 1).toUpperCase()}</div>
+                  <div className="publisher-main">
+                    <div className="publisher-title">
+                      <strong>{creator.name}</strong>
+                      <span>@{creator.handle}</span>
+                      {creator.published >= 2 ? <BadgeCheck size={15} color="var(--blue)" /> : null}
+                    </div>
+                    <p>{creator.skills.slice(0, 3).map((skill) => skill.name).join(" · ") || "Publisher on SkillHub."}</p>
+                  </div>
+                  <div className="publisher-stats">
+                    <span><UserRound size={13} /> {formatNumber(creator.published)} published</span>
+                    <span><Download size={13} /> {formatNumber(creator.downloads)} downloads</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </AppShell>
+  );
+}

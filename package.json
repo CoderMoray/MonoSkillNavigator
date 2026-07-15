@@ -1,0 +1,38 @@
+{
+  "name": "skill-management-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace @skill-platform/api run dev",
+    "dev:web": "npm --workspace @skill-platform/web run dev",
+    "build:web": "npm --workspace @skill-platform/web run build",
+    "dev:worker": "npm --workspace @skill-platform/worker run dev",
+    "infra:up": "docker compose up -d postgres minio",
+    "infra:down": "docker compose down",
+    "skill": "npm --workspace @skill-platform/cli run dev --",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "review:demo": "npm --workspace @skill-platform/cli run dev -- review examples/demo-skill"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "commander": "^14.0.2",
+    "fastify": "^5.6.2",
+    "js-yaml": "^4.1.1",
+    "minio": "^8.0.7",
+    "pg": "^8.22.0",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.10.2",
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
