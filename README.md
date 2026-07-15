@@ -19,8 +19,9 @@
 
 ```bash
 npm install
-npm run review:demo
-npm run dev:api
+npm run dev:api        # 启动 API（端口 3000）
+npm run dev:web        # 启动 Web（端口 3001）
+npm run setup          # 注册测试用户 + 发布 Demo Skill
 ```
 
 另开终端注册并登录用户，复制返回的 token：

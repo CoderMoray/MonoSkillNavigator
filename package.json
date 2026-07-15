@@ -17,7 +17,8 @@
     "skill": "npm --workspace @skill-platform/cli run dev --",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "review:demo": "npm --workspace @skill-platform/cli run dev -- review examples/demo-skill"
+    "review:demo": "npm --workspace @skill-platform/cli run dev -- review examples/demo-skill",
+    "setup": "bash scripts/setup.sh"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
