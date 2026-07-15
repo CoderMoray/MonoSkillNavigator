@@ -24,6 +24,7 @@
 - [ ] Issue 和 Contributor 的可视化管理
 - [ ] 主题切换器 UI（Light / Dark / System 手动切换按钮，CSS 已有，缺组件）
 - [ ] 响应式适配移动端
+- [ ] Welcome 动画（首次进入的渐变浮动开场，类似 Arc 浏览器，纯视觉炫技，低优先级）
 
 ---
 
