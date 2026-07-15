@@ -565,6 +565,73 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     };
   }
 
+  async upsertReview(slug: string, version: string, review: any): Promise<RegistryVersion> {
+    await this.ensureSchema();
+    const createdAt = new Date();
+
+    await this.db.insert(schema.skillReviews).values({
+      skillSlug: slug, version, reviewId: review.id, reportVersion: review.version ?? "1.0",
+      contentHash: review.contentHash ?? "", verdict: review.verdict,
+      qualityScore: review.scores.qualityScore, securityScore: review.scores.securityScore,
+      privacyScore: review.scores.privacyScore, functionalScore: review.scores.functionalScore,
+      overallScore: review.scores.overallScore, createdAt,
+    }).onConflictDoUpdate({
+      target: [schema.skillReviews.skillSlug, schema.skillReviews.version],
+      set: {
+        reviewId: review.id, reportVersion: review.version ?? "1.0",
+        contentHash: review.contentHash ?? "", verdict: review.verdict,
+        qualityScore: review.scores.qualityScore, securityScore: review.scores.securityScore,
+        privacyScore: review.scores.privacyScore, functionalScore: review.scores.functionalScore,
+        overallScore: review.scores.overallScore,
+      },
+    });
+
+    // Delete old findings and re-insert
+    await this.db.delete(schema.skillReviewFindings)
+      .where(and(eq(schema.skillReviewFindings.skillSlug, slug), eq(schema.skillReviewFindings.version, version)));
+
+    if (review.findings?.length) {
+      await this.db.insert(schema.skillReviewFindings).values(
+        review.findings.map((f: any, i: number) => ({
+          skillSlug: slug, version, position: i,
+          findingId: f.id ?? `finding_${i}`,
+          category: f.category, severity: f.severity,
+          title: f.title, message: f.message,
+          path: f.path ?? null, evidence: f.evidence ?? null,
+          recommendation: f.recommendation,
+        }))
+      );
+    }
+
+    await this.db.update(schema.skillVersions)
+      .set({ status: review.verdict, updatedAt: new Date() })
+      .where(and(eq(schema.skillVersions.skillSlug, slug), eq(schema.skillVersions.version, version)));
+
+    return (await this.getSkill(slug))?.versions[version]!;
+  }
+
+  async upsertEvaluation(slug: string, version: string, evaluation: any): Promise<RegistryVersion> {
+    await this.ensureSchema();
+    const createdAt = new Date();
+
+    await this.db.insert(schema.skillEvaluations).values({
+      skillSlug: slug, version, evaluationId: evaluation.id,
+      provider: evaluation.provider, status: evaluation.status,
+      score: evaluation.score, tasksTotal: evaluation.tasksTotal ?? evaluation.tasks_total ?? 0,
+      tasksPassed: evaluation.tasksPassed ?? evaluation.tasks_passed ?? 0, createdAt,
+    }).onConflictDoUpdate({
+      target: [schema.skillEvaluations.skillSlug, schema.skillEvaluations.version],
+      set: {
+        evaluationId: evaluation.id, provider: evaluation.provider,
+        status: evaluation.status, score: evaluation.score,
+        tasksTotal: evaluation.tasksTotal ?? evaluation.tasks_total ?? 0,
+        tasksPassed: evaluation.tasksPassed ?? evaluation.tasks_passed ?? 0,
+      },
+    });
+
+    return (await this.getSkill(slug))?.versions[version]!;
+  }
+
   protected async load(): Promise<RegistryData> {
     await this.ensureSchema();
     const client = await this.pool.connect();
