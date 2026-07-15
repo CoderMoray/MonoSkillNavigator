@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
     "dev:api": "npm --workspace @skill-platform/api run dev",
     "dev:web": "npm --workspace @skill-platform/web run dev",
     "build:web": "npm --workspace @skill-platform/web run build",
