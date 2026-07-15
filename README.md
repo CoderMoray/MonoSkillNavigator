@@ -136,6 +136,17 @@ MinIO 控制台默认地址：`http://127.0.0.1:9001`。
 - `GET /skills/:name/versions/:version`
 - `GET /skills/:name/versions/:version/download`，返回 `application/zip`
 
+## 协作开发
+
+```bash
+# 避免不同系统/不同 npm 版本导致的文件权限污染 Git diff
+git config core.fileMode false
+```
+
+提交规范：一个 commit 做一件事，message 清晰即可。
+
+Maintainers: [@chrismoray](https://github.com/chrismoray) [@JShiu0915](https://github.com/JShiu0915)
+
 ## 后续方向
 
 - 将 Worker 替换为 Redis/BullMQ 队列消费者。

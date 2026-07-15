@@ -6,6 +6,9 @@ node_modules/
 dist/
 coverage/
 
+# Auto-generated
+next-env.d.ts
+
 # Environment variables
 .env
 .env.local
