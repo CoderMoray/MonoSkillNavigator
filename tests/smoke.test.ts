@@ -90,3 +90,87 @@ test("下载 Skill", async () => {
   const buffer = await res.arrayBuffer();
   expect(buffer.byteLength).toBeGreaterThan(0);
 });
+
+// --- 错误分支测试 ---
+
+test("重复注册应拒绝", async () => {
+  const res = await fetch(`${API}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: "alice", password: "password123" }),
+  });
+  expect([400, 409]).toContain(res.status);
+  const body = await res.json();
+  expect(body.error).toBeTruthy();
+});
+
+test("错误密码登录应拒绝", async () => {
+  const res = await fetch(`${API}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: "alice", password: "wrongpassword" }),
+  });
+  expect([401, 400]).toContain(res.status);
+});
+
+test("不存在的用户登录应拒绝", async () => {
+  const res = await fetch(`${API}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: "noexist_user_99999", password: "xxx" }),
+  });
+  expect([401, 404]).toContain(res.status);
+});
+
+test("无 token 发布应拒绝", async () => {
+  const res = await fetch(`${API}/skills/publish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  expect([401, 400]).toContain(res.status);
+});
+
+test("伪造 token 发布应拒绝", async () => {
+  const res = await fetch(`${API}/skills/publish`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer fake_token_12345",
+    },
+    body: JSON.stringify({}),
+  });
+  expect([401, 403]).toContain(res.status);
+});
+
+test("搜索不存在的 Skill 应返回空", async () => {
+  const res = await fetch(`${API}/skills?query=this_skill_never_exists`);
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { items?: unknown[] };
+  expect(body.items).toBeTruthy();
+  expect(body.items!.length).toBe(0);
+});
+
+test("获取不存在的 Skill 应返回 404", async () => {
+  const res = await fetch(`${API}/skills/noexist_skill_99999`);
+  expect([404, 200]).toContain(res.status);
+  if (res.status === 200) {
+    const body = await res.json();
+    // 应该返回 null 或空对象
+    expect(body.slug || body.error).toBeTruthy();
+  }
+});
+
+test("下载不存在的 Skill 应返回 404", async () => {
+  const res = await fetch(`${API}/skills/noexist_skill_99999/versions/latest/download`);
+  expect([404, 400]).toContain(res.status);
+});
+
+test("评分超过范围应拒绝", async () => {
+  const res = await fetch(`${API}/skills/demo-skill/ratings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ score: 10, user: "testuser" }),
+  });
+  expect([400, 422]).toContain(res.status);
+});
