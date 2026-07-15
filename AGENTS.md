@@ -70,5 +70,5 @@ npx drizzle-kit migrate    # 执行迁移
 - 改代码后验证：
   1. `npm run typecheck` — TypeScript 编译检查，零报错
   2. `npm run test` — 8 个 API 烟雾测试，全过即合。
-     （当前覆盖注册/登录/发布/搜索/详情/排行/下载的快乐路径，错误分支和性能测试待补充）
+     （当前覆盖正常流程，错误分支如重复注册、token 过期、不存在 slug 等尚未覆盖）
 - 不要提交 `.env`、凭证、token、数据库备份或 MinIO 导出文件。
