@@ -43,6 +43,9 @@ pgdata/
 # Drizzle (SQL 文件需提交，meta 是本地缓存)
 packages/storage/drizzle/meta/
 
+# CodeGraph (本地索引，不提交)
+.codegraph/
+
 # Temporary files
 tmp/
 temp/
