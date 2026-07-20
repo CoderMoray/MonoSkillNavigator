@@ -401,7 +401,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         } : {} as RegistryVersion["review"],
         evaluation: hydratedEvaluation,
         status: v.status as RegistryVersion["status"],
-        releaseTags: v.releaseTags, downloads: Number(v.downloads),
+        releaseTags: v.releaseTags, changelog: v.changelog ?? undefined, downloads: Number(v.downloads),
         createdAt: String(v.createdAt), updatedAt: String(v.updatedAt),
       };
     }
@@ -649,7 +649,12 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     await this.db.transaction(async (tx) => {
       if (existingSkill) {
         await tx.update(schema.skills)
-          .set({ latestVersion: releaseTags.includes("latest") ? version : existingSkill.latestVersion, updatedAt: now })
+          .set({
+            name,
+            description,
+            latestVersion: releaseTags.includes("latest") ? version : existingSkill.latestVersion,
+            updatedAt: now
+          })
           .where(eq(schema.skills.slug, slug));
       } else {
         await tx.insert(schema.skills).values({
@@ -687,7 +692,8 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         disallowedToolsDefined: disallowedTools !== undefined,
         disallowedToolsIsScalar: typeof disallowedTools === "string",
         categories: snapshot.manifest.categories ?? [], topics: snapshot.manifest.topics ?? [],
-        releaseTags, contentHash: snapshot.contentHash, readme: snapshot.readme ?? "",
+        releaseTags, changelog: options.changelog?.trim() || null,
+        contentHash: snapshot.contentHash, readme: snapshot.readme ?? "",
         snapshotCreatedAt: now, createdAt: now, updatedAt: now,
       });
 

@@ -78,14 +78,16 @@ export async function changePassword(
 export async function publishSkillArchive(
   token: string,
   archiveBase64: string,
-  metadata: PublishSkillMetadata
+  metadata: PublishSkillMetadata,
+  changelog?: string
 ): Promise<PublishSkillResponse> {
   return request<PublishSkillResponse>(new URL("/skills/publish", API_BASE_URL), {
     method: "POST",
     token,
     body: JSON.stringify({
       archiveBase64,
-      metadata
+      metadata,
+      ...(changelog?.trim() ? { changelog: changelog.trim() } : {})
     })
   });
 }
@@ -122,6 +124,7 @@ export interface PublishSkillResponse {
   contentHash: string;
   review: ReviewReport;
   evaluation?: FunctionalEvaluationReport;
+  changelog?: string;
 }
 
 export interface PublishSkillMetadata {

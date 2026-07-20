@@ -129,6 +129,7 @@ export interface RegistryVersion {
   evaluation?: FunctionalEvaluationReport;
   status: ReviewVerdict;
   releaseTags: string[];
+  changelog?: string;
   downloads: number;
   createdAt: string;
   updatedAt: string;

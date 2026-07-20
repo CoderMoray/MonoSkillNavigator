@@ -1959,6 +1959,12 @@ button {
   box-shadow: 0 10px 22px rgba(26, 115, 232, 0.08);
 }
 
+.version-entry.active .version-row {
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+  box-shadow: none;
+}
+
 .version-row-main {
   display: grid;
   gap: 4px;
@@ -1985,6 +1991,24 @@ button {
   color: var(--muted);
   font-size: 12px;
   font-weight: 650;
+}
+
+.version-changelog {
+  border: 1px solid rgba(26, 115, 232, 0.34);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--blue-soft);
+  padding: 16px;
+}
+
+.changelog-content {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--muted-strong);
+  padding: 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .requirements-grid {
@@ -2043,6 +2067,7 @@ button {
 :root[data-theme="dark"] .file-list,
 :root[data-theme="dark"] .file-preview,
 :root[data-theme="dark"] .version-row,
+:root[data-theme="dark"] .changelog-content,
 :root[data-theme="dark"] .requirement-card,
 :root[data-theme="dark"] .review-score-card,
 :root[data-theme="dark"] .evaluation-summary > div {

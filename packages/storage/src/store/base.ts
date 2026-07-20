@@ -65,6 +65,7 @@ export abstract class JsonRegistryStore implements RegistryStore {
       evaluation,
       status: review.verdict,
       releaseTags,
+      changelog: options.changelog,
       downloads: 0,
       createdAt: now,
       updatedAt: now,

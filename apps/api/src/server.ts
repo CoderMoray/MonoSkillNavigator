@@ -31,6 +31,7 @@ interface PublishBody {
   archiveBase64?: string;
   version?: string;
   metadata?: SkillPublishMetadata;
+  changelog?: string;
 }
 
 interface ReviewBody {
@@ -168,6 +169,7 @@ export function buildServer() {
     }
 
     try {
+      const changelog = normalizeChangelog(request.body.changelog);
       const uploaded = readSkillFromBody(request.body);
       const snapshot = request.body.metadata
         ? applySkillPublishMetadata(uploaded.snapshot, request.body.metadata)
@@ -186,7 +188,8 @@ export function buildServer() {
           userId: user.id,
           username: user.username
         },
-        releaseTags: request.body.metadata?.releaseTags
+        releaseTags: request.body.metadata?.releaseTags,
+        changelog
       });
 
       return reply.code(201).send({
@@ -197,7 +200,8 @@ export function buildServer() {
         status: registryVersion.status,
         contentHash: registryVersion.contentHash,
         review: registryVersion.review,
-        evaluation: registryVersion.evaluation
+        evaluation: registryVersion.evaluation,
+        changelog: registryVersion.changelog
       });
     } catch (error) {
       const message = errorMessage(error);
@@ -385,6 +389,21 @@ function readSkillFromBody(body: PublishBody | ReviewBody): { snapshot: SkillSna
 function stripDataUrlPrefix(value: string): string {
   const commaIndex = value.indexOf(",");
   return value.startsWith("data:") && commaIndex >= 0 ? value.slice(commaIndex + 1) : value;
+}
+
+function normalizeChangelog(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    throw new Error("Changelog must be text");
+  }
+
+  const changelog = value.trim();
+  if (changelog.length > 10_000) {
+    throw new Error("Changelog must not exceed 10000 characters");
+  }
+  return changelog || undefined;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

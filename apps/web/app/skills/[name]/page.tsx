@@ -8,6 +8,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
   BookOpen,
+  ChevronDown,
   ChevronRight,
   Copy,
   Download,
@@ -26,10 +27,10 @@ import {
 import { AppShell } from "../../../components/AppShell";
 import { ScoreBars } from "../../../components/ScoreBars";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
-import { addSkillContributor, getSkill } from "../../../lib/api";
+import { addSkillContributor, getCurrentUser, getSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { formatDateTime, formatNumber } from "../../../lib/format";
-import type { RegistryContributor, RegistrySkill } from "../../../lib/types";
+import type { PublicUser, RegistryContributor, RegistrySkill } from "../../../lib/types";
 
 type DetailPanel =
   | "skill-md"
@@ -72,10 +73,12 @@ export default function SkillDetailPage() {
   const params = useParams<{ name: string }>();
   const skillSlug = decodeURIComponent(params.name);
   const [skill, setSkill] = useState<RegistrySkill | null>(null);
+  const [viewer, setViewer] = useState<PublicUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activePanel, setActivePanel] = useState<DetailPanel>("skill-md");
   const [selectedVersionName, setSelectedVersionName] = useState<string | null>(null);
+  const [expandedVersionNames, setExpandedVersionNames] = useState<Set<string>>(() => new Set());
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [contributorName, setContributorName] = useState("");
   const [contributorRole, setContributorRole] = useState<RegistryContributor["role"]>("contributor");
@@ -90,10 +93,16 @@ export default function SkillDetailPage() {
       setLoading(true);
       setError(null);
       try {
-        const data = await getSkill(skillSlug);
+        const token = getAuthToken();
+        const [data, currentUser] = await Promise.all([
+          getSkill(skillSlug),
+          token ? getCurrentUser(token).catch(() => null) : Promise.resolve(null)
+        ]);
         if (!cancelled) {
           setSkill(data);
+          setViewer(currentUser);
           setSelectedVersionName(data.latestVersion);
+          setExpandedVersionNames(new Set());
           setSelectedFilePath(null);
           setActivePanel("skill-md");
         }
@@ -151,6 +160,15 @@ export default function SkillDetailPage() {
   const skillMdFile = files.find((file) => file.path === "SKILL.md");
   const markdownContent = snapshot?.readme?.trim() || stripFrontmatter(skillMdFile?.content ?? "");
   const selectedFile = files.find((file) => file.path === selectedFilePath) ?? files[0];
+  const isOwner = Boolean(
+    viewer &&
+      (skill.ownerUserId === viewer.id ||
+        skill.contributors.some(
+          (contributor) =>
+            contributor.role === "owner" &&
+            (contributor.userId === viewer.id || contributor.username === viewer.username)
+        ))
+  );
   const tags = currentVersion.manifest.tags ?? [];
   const openIssues = skill.issues.filter((issue) => issue.status !== "closed");
   const reviewFindings = currentVersion.review?.findings ?? [];
@@ -302,6 +320,13 @@ export default function SkillDetailPage() {
                     {tag}
                   </span>
                 ))}
+              </div>
+            ) : null}
+            {isOwner ? (
+              <div className="hero-actions">
+                <Link className="button primary" href={`/skills/publish?skill=${encodeURIComponent(skill.slug)}`}>
+                  <Plus size={16} /> 发布新版本
+                </Link>
               </div>
             ) : null}
           </div>
@@ -581,39 +606,56 @@ export default function SkillDetailPage() {
                 <div>
                   <span className="eyebrow">Release history</span>
                   <h2>Versions</h2>
-                  <p className="description">选择版本后，其他卡片将同步展示该版本的数据。</p>
+                  <p className="description">点击版本可独立展开或收起 Changelog，并同步更新其他卡片。</p>
                 </div>
                 <span className="badge">{versions.length} 个版本</span>
               </div>
               <div className="version-list">
                 {versions.map((version) => {
                   const isSelected = version.version === currentVersion.version;
+                  const isExpanded = expandedVersionNames.has(version.version);
                   return (
-                    <button
-                      aria-pressed={isSelected}
-                      className={`version-row ${isSelected ? "active" : ""}`}
-                      key={version.version}
-                      onClick={() => {
-                        setSelectedVersionName(version.version);
-                        setSelectedFilePath(null);
-                      }}
-                      type="button"
-                    >
-                      <span className="version-row-main">
-                        <span className="version-name-row">
-                          <strong>v{version.version}</strong>
-                          {version.version === skill.latestVersion ? <span className="badge">latest</span> : null}
+                    <div className={`version-entry ${isExpanded ? "active" : ""}`} key={version.version}>
+                      <button
+                        aria-expanded={isExpanded}
+                        aria-pressed={isSelected}
+                        className={`version-row ${isSelected ? "active" : ""}`}
+                        onClick={() => {
+                          setSelectedVersionName(version.version);
+                          setSelectedFilePath(null);
+                          setExpandedVersionNames((expanded) => {
+                            const next = new Set(expanded);
+                            if (next.has(version.version)) {
+                              next.delete(version.version);
+                            } else {
+                              next.add(version.version);
+                            }
+                            return next;
+                          });
+                        }}
+                        type="button"
+                      >
+                        <span className="version-row-main">
+                          <span className="version-name-row">
+                            <strong>v{version.version}</strong>
+                            {version.version === skill.latestVersion ? <span className="badge">latest</span> : null}
+                          </span>
+                          <span>{formatDateTime(version.createdAt)}</span>
                         </span>
-                        <span>{formatDateTime(version.createdAt)}</span>
-                      </span>
-                      <span className="version-row-meta">
-                        <span>
-                          <Download size={13} /> {formatNumber(version.downloads)}
+                        <span className="version-row-meta">
+                          <span>
+                            <Download size={13} /> {formatNumber(version.downloads)}
+                          </span>
+                          <VerdictBadge verdict={version.status} />
+                          {isExpanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
                         </span>
-                        <VerdictBadge verdict={version.status} />
-                        <ChevronRight size={17} />
-                      </span>
-                    </button>
+                      </button>
+                      {isExpanded ? (
+                        <div className="version-changelog">
+                          <div className="changelog-content">{version.changelog?.trim() || "未提供 Changelog"}</div>
+                        </div>
+                      ) : null}
+                    </div>
                   );
                 })}
               </div>

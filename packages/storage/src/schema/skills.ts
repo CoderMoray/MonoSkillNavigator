@@ -35,6 +35,7 @@ export const skillVersions = pgTable("skill_versions", {
   categories: text("categories").array().notNull().default([]),
   topics: text("topics").array().notNull().default([]),
   releaseTags: text("release_tags").array().notNull().default([]),
+  changelog: text("changelog"),
   contentHash: text("content_hash").notNull(),
   readme: text("readme").notNull(),
   snapshotCreatedAt: timestamp("snapshot_created_at", { withTimezone: true }).notNull(),
