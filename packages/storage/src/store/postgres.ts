@@ -1,6 +1,13 @@
 import type { FunctionalEvaluationFinding, FunctionalEvaluationReport, FunctionalEvaluationTaskResult } from "@skill-platform/evaluator";
 import type { ReviewFinding, ReviewReport, ReviewVerdict } from "@skill-platform/review-engine";
-import { getSkillSlug, readSkillZipBuffer, skillSnapshotToZipBuffer, type SkillManifest, type SkillSnapshot } from "@skill-platform/skill-spec";
+import {
+  getSkillSlug,
+  parseSkillMarkdown,
+  readSkillZipBuffer,
+  skillSnapshotToZipBuffer,
+  type SkillManifest,
+  type SkillSnapshot
+} from "@skill-platform/skill-spec";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { eq, and, sql, desc, or, ilike, inArray } from "drizzle-orm";
 import pg from "pg";
@@ -17,6 +24,88 @@ import { emptyRegistry, normalizeRegistryData, toSearchResult } from "../utils";
 import { JsonRegistryStore } from "./base";
 
 type DB = NodePgDatabase<typeof schema>;
+
+type EvaluationFindingRow = {
+  findingId: string;
+  taskName: string | null;
+  severity: string;
+  message: string;
+  recommendation: string;
+};
+
+function toFunctionalEvaluationFinding(row: EvaluationFindingRow): FunctionalEvaluationFinding {
+  return {
+    id: row.findingId,
+    task: row.taskName ?? undefined,
+    severity: row.severity as FunctionalEvaluationFinding["severity"],
+    message: row.message,
+    recommendation: row.recommendation,
+  };
+}
+
+function toStringList(value: unknown): string[] {
+  if (typeof value === "string") {
+    return [value];
+  }
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+async function replaceEvaluationDetails(db: any, slug: string, version: string, evaluation: FunctionalEvaluationReport) {
+  const reportFindings = Array.isArray(evaluation.findings) ? evaluation.findings : [];
+  const taskResults = Array.isArray(evaluation.taskResults) ? evaluation.taskResults : [];
+
+  await db.delete(schema.skillEvaluationReportFindings)
+    .where(and(eq(schema.skillEvaluationReportFindings.skillSlug, slug), eq(schema.skillEvaluationReportFindings.version, version)));
+  await db.delete(schema.skillEvaluationTaskFindings)
+    .where(and(eq(schema.skillEvaluationTaskFindings.skillSlug, slug), eq(schema.skillEvaluationTaskFindings.version, version)));
+  await db.delete(schema.skillEvaluationTasks)
+    .where(and(eq(schema.skillEvaluationTasks.skillSlug, slug), eq(schema.skillEvaluationTasks.version, version)));
+
+  if (reportFindings.length) {
+    await db.insert(schema.skillEvaluationReportFindings).values(
+      reportFindings.map((finding, position) => ({
+        skillSlug: slug,
+        version,
+        position,
+        findingId: finding.id ?? `evaluation_report_finding_${position}`,
+        taskName: finding.task ?? null,
+        severity: finding.severity,
+        message: finding.message,
+        recommendation: finding.recommendation,
+      }))
+    );
+  }
+
+  if (taskResults.length) {
+    await db.insert(schema.skillEvaluationTasks).values(
+      taskResults.map((task, taskPosition) => ({
+        skillSlug: slug,
+        version,
+        taskPosition,
+        name: task.name,
+        score: task.score,
+      }))
+    );
+
+    const taskFindings = taskResults.flatMap((task, taskPosition) =>
+      (Array.isArray(task.findings) ? task.findings : []).map((finding, position) => ({
+        skillSlug: slug,
+        version,
+        taskPosition,
+        position,
+        findingId: finding.id ?? `evaluation_task_finding_${taskPosition}_${position}`,
+        taskName: finding.task ?? task.name,
+        severity: finding.severity,
+        message: finding.message,
+        recommendation: finding.recommendation,
+      }))
+    );
+
+    if (taskFindings.length) {
+      await db.insert(schema.skillEvaluationTaskFindings).values(taskFindings);
+    }
+  }
+}
 
 export class PostgresRegistryStore extends JsonRegistryStore {
   private readonly pool: pg.Pool;
@@ -180,6 +269,15 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         .from(schema.skillVersionFiles)
         .where(and(eq(schema.skillVersionFiles.skillSlug, slug), eq(schema.skillVersionFiles.version, v.version)))
         .orderBy(schema.skillVersionFiles.path);
+      const parsedManifest = (() => {
+        const skillMd = files.find((file) => file.path === "SKILL.md");
+        if (!skillMd) return undefined;
+        try {
+          return parseSkillMarkdown(skillMd.content).manifest;
+        } catch {
+          return undefined;
+        }
+      })();
 
       const [review] = await this.db.select()
         .from(schema.skillReviews)
@@ -191,6 +289,64 @@ export class PostgresRegistryStore extends JsonRegistryStore {
             .orderBy(schema.skillReviewFindings.position)
         : [];
 
+      const [evaluation] = await this.db.select()
+        .from(schema.skillEvaluations)
+        .where(and(eq(schema.skillEvaluations.skillSlug, slug), eq(schema.skillEvaluations.version, v.version)));
+
+      const evaluationTasks = evaluation
+        ? await this.db.select().from(schema.skillEvaluationTasks)
+            .where(and(
+              eq(schema.skillEvaluationTasks.skillSlug, slug),
+              eq(schema.skillEvaluationTasks.version, v.version)
+            ))
+            .orderBy(schema.skillEvaluationTasks.taskPosition)
+        : [];
+
+      const evaluationReportFindings = evaluation
+        ? await this.db.select().from(schema.skillEvaluationReportFindings)
+            .where(and(
+              eq(schema.skillEvaluationReportFindings.skillSlug, slug),
+              eq(schema.skillEvaluationReportFindings.version, v.version)
+            ))
+            .orderBy(schema.skillEvaluationReportFindings.position)
+        : [];
+
+      const evaluationTaskFindings = evaluation
+        ? await this.db.select().from(schema.skillEvaluationTaskFindings)
+            .where(and(
+              eq(schema.skillEvaluationTaskFindings.skillSlug, slug),
+              eq(schema.skillEvaluationTaskFindings.version, v.version)
+            ))
+            .orderBy(schema.skillEvaluationTaskFindings.taskPosition, schema.skillEvaluationTaskFindings.position)
+        : [];
+
+      const taskFindingsByPosition = new Map<number, FunctionalEvaluationFinding[]>();
+      for (const finding of evaluationTaskFindings) {
+        const taskFindings = taskFindingsByPosition.get(finding.taskPosition) ?? [];
+        taskFindings.push(toFunctionalEvaluationFinding(finding));
+        taskFindingsByPosition.set(finding.taskPosition, taskFindings);
+      }
+
+      const hydratedEvaluation: FunctionalEvaluationReport | undefined = evaluation
+        ? {
+            id: evaluation.evaluationId,
+            provider: evaluation.provider as FunctionalEvaluationReport["provider"],
+            status: evaluation.status as FunctionalEvaluationReport["status"],
+            score: Number(evaluation.score),
+            tasksTotal: Number(evaluation.tasksTotal),
+            tasksPassed: Number(evaluation.tasksPassed),
+            taskResults: evaluationTasks.map(
+              (task): FunctionalEvaluationTaskResult => ({
+                name: task.name,
+                score: Number(task.score),
+                findings: taskFindingsByPosition.get(task.taskPosition) ?? [],
+              })
+            ),
+            findings: evaluationReportFindings.map(toFunctionalEvaluationFinding),
+            createdAt: String(evaluation.createdAt),
+          }
+        : undefined;
+
       versionMap[v.version] = {
         version: v.version,
         manifest: {
@@ -199,9 +355,19 @@ export class PostgresRegistryStore extends JsonRegistryStore {
           author: v.manifestAuthor ?? undefined,
           license: v.manifestLicense ?? undefined,
           tags: tags.map((t) => t.tag),
-          ...(v.supportedAgentsDefined ? { supportedAgents: v.supportedAgents } : {}),
-          ...(v.allowedToolsDefined ? { "allowed-tools": v.allowedToolsIsScalar ? v.allowedTools[0] : v.allowedTools } : {}),
-          ...(v.disallowedToolsDefined ? { "disallowed-tools": v.disallowedToolsIsScalar ? v.disallowedTools[0] : v.disallowedTools } : {}),
+          ...(v.supportedAgentsDefined
+            ? { supportedAgents: v.supportedAgents }
+            : parsedManifest?.supportedAgents ? { supportedAgents: parsedManifest.supportedAgents } : {}),
+          ...(v.allowedToolsDefined
+            ? { "allowed-tools": v.allowedToolsIsScalar ? v.allowedTools[0] : v.allowedTools }
+            : parsedManifest?.["allowed-tools"] !== undefined
+              ? { "allowed-tools": parsedManifest["allowed-tools"] }
+              : {}),
+          ...(v.disallowedToolsDefined
+            ? { "disallowed-tools": v.disallowedToolsIsScalar ? v.disallowedTools[0] : v.disallowedTools }
+            : parsedManifest?.["disallowed-tools"] !== undefined
+              ? { "disallowed-tools": parsedManifest["disallowed-tools"] }
+              : {}),
           categories: v.categories, topics: v.topics,
           "release-tags": v.releaseTags,
         } as RegistryVersion["manifest"],
@@ -233,6 +399,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
           })),
           createdAt: String(review.createdAt),
         } : {} as RegistryVersion["review"],
+        evaluation: hydratedEvaluation,
         status: v.status as RegistryVersion["status"],
         releaseTags: v.releaseTags, downloads: Number(v.downloads),
         createdAt: String(v.createdAt), updatedAt: String(v.updatedAt),
@@ -431,19 +598,24 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     await this.ensureSchema();
     const createdAt = new Date();
 
-    await this.db.insert(schema.skillEvaluations).values({
-      skillSlug: slug, version, evaluationId: evaluation.id,
-      provider: evaluation.provider, status: evaluation.status,
-      score: evaluation.score, tasksTotal: evaluation.tasksTotal ?? evaluation.tasks_total ?? 0,
-      tasksPassed: evaluation.tasksPassed ?? evaluation.tasks_passed ?? 0, createdAt,
-    }).onConflictDoUpdate({
-      target: [schema.skillEvaluations.skillSlug, schema.skillEvaluations.version],
-      set: {
-        evaluationId: evaluation.id, provider: evaluation.provider,
-        status: evaluation.status, score: evaluation.score,
-        tasksTotal: evaluation.tasksTotal ?? evaluation.tasks_total ?? 0,
-        tasksPassed: evaluation.tasksPassed ?? evaluation.tasks_passed ?? 0,
-      },
+    await this.db.transaction(async (tx) => {
+      await tx.insert(schema.skillEvaluations).values({
+        skillSlug: slug, version, evaluationId: evaluation.id,
+        provider: evaluation.provider, status: evaluation.status,
+        score: evaluation.score, tasksTotal: evaluation.tasksTotal ?? evaluation.tasks_total ?? 0,
+        tasksPassed: evaluation.tasksPassed ?? evaluation.tasks_passed ?? 0, createdAt,
+      }).onConflictDoUpdate({
+        target: [schema.skillEvaluations.skillSlug, schema.skillEvaluations.version],
+        set: {
+          evaluationId: evaluation.id, provider: evaluation.provider,
+          status: evaluation.status, score: evaluation.score,
+          tasksTotal: evaluation.tasksTotal ?? evaluation.tasks_total ?? 0,
+          tasksPassed: evaluation.tasksPassed ?? evaluation.tasks_passed ?? 0,
+          createdAt,
+        },
+      });
+
+      await replaceEvaluationDetails(tx, slug, version, evaluation);
     });
 
     return (await this.getSkill(slug))?.versions[version]!;
@@ -457,6 +629,9 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     const releaseTags = options.releaseTags ?? (snapshot.manifest as any)["release-tags"] ?? ["latest"];
     const name = (snapshot.manifest as any).name;
     const description = (snapshot.manifest as any).description ?? "";
+    const supportedAgents = toStringList(snapshot.manifest.supportedAgents);
+    const allowedTools = snapshot.manifest["allowed-tools"];
+    const disallowedTools = snapshot.manifest["disallowed-tools"];
 
     // Check version conflict
     const [existingV] = await this.db.select()
@@ -503,6 +678,14 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         manifestAuthor: snapshot.manifest.author ?? null,
         manifestLicense: snapshot.manifest.license ?? null,
         tagsDefined: !!snapshot.manifest.tags?.length,
+        supportedAgents,
+        supportedAgentsDefined: snapshot.manifest.supportedAgents !== undefined,
+        allowedTools: toStringList(allowedTools),
+        allowedToolsDefined: allowedTools !== undefined,
+        allowedToolsIsScalar: typeof allowedTools === "string",
+        disallowedTools: toStringList(disallowedTools),
+        disallowedToolsDefined: disallowedTools !== undefined,
+        disallowedToolsIsScalar: typeof disallowedTools === "string",
         categories: snapshot.manifest.categories ?? [], topics: snapshot.manifest.topics ?? [],
         releaseTags, contentHash: snapshot.contentHash, readme: snapshot.readme ?? "",
         snapshotCreatedAt: now, createdAt: now, updatedAt: now,
@@ -546,6 +729,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
           score: evaluation.score, tasksTotal: evaluation.tasksTotal ?? 0,
           tasksPassed: evaluation.tasksPassed ?? 0, createdAt: now,
         });
+        await replaceEvaluationDetails(tx, slug, version, evaluation);
       }
 
       const ownerName = options.owner?.username ?? snapshot.manifest.author ?? "unknown";

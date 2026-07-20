@@ -72,6 +72,22 @@ export interface SkillManifest {
   license?: string;
   tags?: string[];
   supportedAgents?: string[];
+  "allowed-tools"?: string[] | string;
+  "disallowed-tools"?: string[] | string;
+}
+
+export interface SkillFile {
+  path: string;
+  content: string;
+  size: number;
+  sha256: string;
+}
+
+export interface SkillSnapshot {
+  readme: string;
+  files: SkillFile[];
+  contentHash: string;
+  createdAt: string;
 }
 
 export interface RegistryContributor {
@@ -108,6 +124,7 @@ export interface RegistryVersion {
   version: string;
   manifest: SkillManifest;
   contentHash: string;
+  snapshot: SkillSnapshot;
   review: ReviewReport;
   evaluation?: FunctionalEvaluationReport;
   status: ReviewVerdict;
