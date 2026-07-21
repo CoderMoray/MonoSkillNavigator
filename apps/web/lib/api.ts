@@ -2,6 +2,8 @@ import type {
   FunctionalEvaluationReport,
   PublicUser,
   RegistryContributor,
+  RegistryIssue,
+  RegistryRating,
   RegistrySkill,
   ReviewReport,
   SkillSearchResult
@@ -107,6 +109,46 @@ export async function addSkillContributor(
     }
   );
   return data.contributor;
+}
+
+export async function createSkillIssue(
+  token: string,
+  skillSlug: string,
+  input: {
+    type: RegistryIssue["type"];
+    severity?: RegistryIssue["severity"];
+    title: string;
+    body?: string;
+  }
+): Promise<RegistryIssue> {
+  const data = await request<{ issue: RegistryIssue }>(
+    new URL(`/skills/${encodeURIComponent(skillSlug)}/issues`, API_BASE_URL),
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(input)
+    }
+  );
+  return data.issue;
+}
+
+export async function addSkillRating(
+  token: string,
+  skillSlug: string,
+  input: {
+    score: number;
+    version?: string;
+    comment?: string;
+  }
+): Promise<{ rating: RegistryRating; averageRating: number; ratingCount: number }> {
+  return request<{ rating: RegistryRating; averageRating: number; ratingCount: number }>(
+    new URL(`/skills/${encodeURIComponent(skillSlug)}/ratings`, API_BASE_URL),
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(input)
+    }
+  );
 }
 
 interface AuthResponse {

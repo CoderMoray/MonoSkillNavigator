@@ -22,15 +22,16 @@ import {
   Plus,
   ShieldCheck,
   Star,
-  Users
+  Users,
+  X
 } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { ScoreBars } from "../../../components/ScoreBars";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
-import { addSkillContributor, getCurrentUser, getSkill } from "../../../lib/api";
+import { addSkillContributor, addSkillRating, createSkillIssue, getCurrentUser, getSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { formatDateTime, formatNumber } from "../../../lib/format";
-import type { PublicUser, RegistryContributor, RegistrySkill } from "../../../lib/types";
+import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill } from "../../../lib/types";
 
 type DetailPanel =
   | "skill-md"
@@ -85,6 +86,20 @@ export default function SkillDetailPage() {
   const [contributorMessage, setContributorMessage] = useState<string | null>(null);
   const [contributorError, setContributorError] = useState<string | null>(null);
   const [addingContributor, setAddingContributor] = useState(false);
+  const [issueType, setIssueType] = useState<RegistryIssue["type"]>("bug");
+  const [issueSeverity, setIssueSeverity] = useState<RegistryIssue["severity"]>("medium");
+  const [issueTitle, setIssueTitle] = useState("");
+  const [issueBody, setIssueBody] = useState("");
+  const [issueMessage, setIssueMessage] = useState<string | null>(null);
+  const [issueError, setIssueError] = useState<string | null>(null);
+  const [submittingIssue, setSubmittingIssue] = useState(false);
+  const [ratingScore, setRatingScore] = useState(0);
+  const [ratingComment, setRatingComment] = useState("");
+  const [ratingMessage, setRatingMessage] = useState<string | null>(null);
+  const [ratingError, setRatingError] = useState<string | null>(null);
+  const [submittingRating, setSubmittingRating] = useState(false);
+  const [issueModalOpen, setIssueModalOpen] = useState(false);
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,6 +137,24 @@ export default function SkillDetailPage() {
       cancelled = true;
     };
   }, [skillSlug]);
+
+  useEffect(() => {
+    if (!issueModalOpen && !ratingModalOpen) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIssueModalOpen(false);
+        setRatingModalOpen(false);
+        setIssueError(null);
+        setRatingError(null);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [issueModalOpen, ratingModalOpen]);
 
   const currentVersion = useMemo(() => {
     if (!skill) {
@@ -237,6 +270,26 @@ export default function SkillDetailPage() {
   ];
   const installCommand = `npm run skill -- install ${skill.slug}`;
 
+  function openIssueModal() {
+    setIssueError(null);
+    setIssueModalOpen(true);
+  }
+
+  function closeIssueModal() {
+    setIssueModalOpen(false);
+    setIssueError(null);
+  }
+
+  function openRatingModal() {
+    setRatingError(null);
+    setRatingModalOpen(true);
+  }
+
+  function closeRatingModal() {
+    setRatingModalOpen(false);
+    setRatingError(null);
+  }
+
   async function handleAddContributor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setContributorError(null);
@@ -282,6 +335,105 @@ export default function SkillDetailPage() {
       setContributorError(err instanceof Error ? err.message : "添加 contributor 失败");
     } finally {
       setAddingContributor(false);
+    }
+  }
+
+  async function handleSubmitIssue(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIssueError(null);
+    setIssueMessage(null);
+
+    const token = getAuthToken();
+    if (!token) {
+      setIssueError("请先登录后再提交 Issue。");
+      return;
+    }
+    if (!skill) {
+      setIssueError("Skill 数据尚未加载完成。");
+      return;
+    }
+
+    const title = issueTitle.trim();
+    if (!title) {
+      setIssueError("请填写 Issue 标题。");
+      return;
+    }
+
+    setSubmittingIssue(true);
+    try {
+      const issue = await createSkillIssue(token, skill.slug, {
+        type: issueType,
+        severity: issueSeverity,
+        title,
+        body: issueBody.trim() || undefined
+      });
+      setSkill((current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          issues: [issue, ...current.issues]
+        };
+      });
+      setIssueTitle("");
+      setIssueBody("");
+      setIssueType("bug");
+      setIssueSeverity("medium");
+      setIssueModalOpen(false);
+      setIssueMessage("Issue 已提交。");
+    } catch (err) {
+      setIssueError(err instanceof Error ? err.message : "提交 Issue 失败");
+    } finally {
+      setSubmittingIssue(false);
+    }
+  }
+
+  async function handleSubmitRating(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setRatingError(null);
+    setRatingMessage(null);
+
+    const token = getAuthToken();
+    if (!token) {
+      setRatingError("请先登录后再评分。");
+      return;
+    }
+    if (!skill || !currentVersion) {
+      setRatingError("Skill 数据尚未加载完成。");
+      return;
+    }
+    if (ratingScore < 1 || ratingScore > 5) {
+      setRatingError("请选择 1 到 5 星的评分。");
+      return;
+    }
+
+    setSubmittingRating(true);
+    try {
+      const result = await addSkillRating(token, skill.slug, {
+        score: ratingScore,
+        version: currentVersion.version,
+        comment: ratingComment.trim() || undefined
+      });
+      setSkill((current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          ratings: [result.rating, ...current.ratings],
+          averageRating: result.averageRating,
+          ratingCount: result.ratingCount
+        };
+      });
+      setRatingScore(0);
+      setRatingComment("");
+      setRatingModalOpen(false);
+      setRatingMessage("评分已提交。");
+    } catch (err) {
+      setRatingError(err instanceof Error ? err.message : "提交评分失败");
+    } finally {
+      setSubmittingRating(false);
     }
   }
 
@@ -791,7 +943,7 @@ export default function SkillDetailPage() {
                 <div>
                   <span className="eyebrow">Community feedback</span>
                   <h2>Issue 与评分</h2>
-                  <p className="description">集中查看用户提交的问题与对 Skill 的评分反馈。</p>
+                  <p className="description">登录后可提交 Issue 与评分，并查看社区反馈。</p>
                 </div>
                 <span className="badge">
                   <Star size={13} /> {skill.averageRating ? skill.averageRating.toFixed(1) : "暂无评分"} · {skill.ratingCount}
@@ -801,8 +953,18 @@ export default function SkillDetailPage() {
                 <div className="detail-section">
                   <div className="card-head">
                     <h3>Issues</h3>
-                    <span className="badge">{skill.issues.length}</span>
+                    <div className="card-head-actions">
+                      <span className="badge">{skill.issues.length}</span>
+                      {viewer ? (
+                        <button className="button secondary compact" onClick={openIssueModal} type="button">
+                          <Plus size={14} /> 提交 Issue
+                        </button>
+                      ) : (
+                        <Link className="button secondary compact" href="/login">登录后提交</Link>
+                      )}
+                    </div>
                   </div>
+                  {issueMessage ? <div className="notice">{issueMessage}</div> : null}
                   {skill.issues.length === 0 ? (
                     <div className="empty detail-empty">暂无 issue。</div>
                   ) : (
@@ -827,8 +989,18 @@ export default function SkillDetailPage() {
                 <aside className="detail-side-section">
                   <div className="card-head">
                     <h3>Ratings</h3>
-                    <span className="badge">{skill.ratingCount}</span>
+                    <div className="card-head-actions">
+                      <span className="badge">{skill.ratingCount}</span>
+                      {viewer ? (
+                        <button className="button secondary compact" onClick={openRatingModal} type="button">
+                          <Star size={14} /> 提交评分
+                        </button>
+                      ) : (
+                        <Link className="button secondary compact" href="/login">登录后提交</Link>
+                      )}
+                    </div>
                   </div>
+                  {ratingMessage ? <div className="notice">{ratingMessage}</div> : null}
                   {skill.ratings.length === 0 ? (
                     <div className="empty detail-empty">暂无评分。</div>
                   ) : (
@@ -852,6 +1024,157 @@ export default function SkillDetailPage() {
             </>
           ) : null}
         </section>
+
+        {issueModalOpen ? (
+          <div
+            className="modal-overlay"
+            onClick={closeIssueModal}
+            role="presentation"
+          >
+            <div
+              aria-labelledby="issue-modal-title"
+              aria-modal="true"
+              className="modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+            >
+              <div className="modal-head">
+                <div>
+                  <span className="eyebrow">Submit issue</span>
+                  <h3 id="issue-modal-title">提交 Issue</h3>
+                </div>
+                <button aria-label="关闭" className="modal-close" onClick={closeIssueModal} type="button">
+                  <X size={18} />
+                </button>
+              </div>
+              <form className="modal-form" onSubmit={handleSubmitIssue}>
+                <div className="publish-form-grid">
+                  <label className="field">
+                    <span>类型</span>
+                    <select
+                      className="contributor-select"
+                      onChange={(event) => setIssueType(event.target.value as RegistryIssue["type"])}
+                      value={issueType}
+                    >
+                      <option value="bug">bug</option>
+                      <option value="security">security</option>
+                      <option value="compatibility">compatibility</option>
+                      <option value="feature">feature</option>
+                      <option value="docs">docs</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>严重程度</span>
+                    <select
+                      className="contributor-select"
+                      onChange={(event) => setIssueSeverity(event.target.value as RegistryIssue["severity"])}
+                      value={issueSeverity}
+                    >
+                      <option value="low">low</option>
+                      <option value="medium">medium</option>
+                      <option value="high">high</option>
+                      <option value="critical">critical</option>
+                    </select>
+                  </label>
+                </div>
+                <label className="field">
+                  <span>标题</span>
+                  <input
+                    maxLength={256}
+                    onChange={(event) => setIssueTitle(event.target.value)}
+                    placeholder="简要描述问题"
+                    required
+                    value={issueTitle}
+                  />
+                </label>
+                <label className="field">
+                  <span>详情 <i>选填</i></span>
+                  <textarea
+                    maxLength={4096}
+                    onChange={(event) => setIssueBody(event.target.value)}
+                    placeholder="补充复现步骤、期望行为或影响范围"
+                    rows={4}
+                    value={issueBody}
+                  />
+                </label>
+                {issueError ? <div className="error compact-error">{issueError}</div> : null}
+                <div className="modal-actions">
+                  <button className="button secondary" onClick={closeIssueModal} type="button">
+                    取消
+                  </button>
+                  <button className="button primary" disabled={submittingIssue} type="submit">
+                    {submittingIssue ? "提交中..." : "确认提交"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
+
+        {ratingModalOpen ? (
+          <div
+            className="modal-overlay"
+            onClick={closeRatingModal}
+            role="presentation"
+          >
+            <div
+              aria-labelledby="rating-modal-title"
+              aria-modal="true"
+              className="modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+            >
+              <div className="modal-head">
+                <div>
+                  <span className="eyebrow">Submit rating</span>
+                  <h3 id="rating-modal-title">提交评分</h3>
+                </div>
+                <button aria-label="关闭" className="modal-close" onClick={closeRatingModal} type="button">
+                  <X size={18} />
+                </button>
+              </div>
+              <form className="modal-form" onSubmit={handleSubmitRating}>
+                <label className="field">
+                  <span>评分</span>
+                  <div aria-label="选择 1 到 5 星" className="rating-stars" role="group">
+                    {[1, 2, 3, 4, 5].map((score) => (
+                      <button
+                        aria-label={`${score} 星`}
+                        aria-pressed={ratingScore === score}
+                        className={`rating-star ${ratingScore >= score ? "active" : ""}`}
+                        key={score}
+                        onClick={() => setRatingScore(score)}
+                        type="button"
+                      >
+                        <Star fill={ratingScore >= score ? "currentColor" : "none"} size={24} />
+                      </button>
+                    ))}
+                  </div>
+                  <small>当前版本：v{currentVersion.version}</small>
+                </label>
+                <label className="field">
+                  <span>评论 <i>选填</i></span>
+                  <textarea
+                    maxLength={1024}
+                    onChange={(event) => setRatingComment(event.target.value)}
+                    placeholder="分享使用体验或改进建议"
+                    rows={4}
+                    value={ratingComment}
+                  />
+                </label>
+                {ratingError ? <div className="error compact-error">{ratingError}</div> : null}
+                <div className="modal-actions">
+                  <button className="button secondary" onClick={closeRatingModal} type="button">
+                    取消
+                  </button>
+                  <button className="button primary" disabled={submittingRating || ratingScore === 0} type="submit">
+                    {submittingRating ? "提交中..." : "确认提交"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
       </div>
     </AppShell>
   );
