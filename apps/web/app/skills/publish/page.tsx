@@ -30,6 +30,7 @@ const CATEGORY_OPTIONS = [
 
 const MAX_CATEGORIES = 3;
 
+const SEMVER_PATTERN =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
 export default function PublishSkillPage() {
