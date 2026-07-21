@@ -2354,6 +2354,117 @@ button {
   font-weight: 650;
 }
 
+.publish-notice-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  width: min(calc(100vw - 48px), 380px);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-md);
+  padding: 16px;
+  animation: publish-notice-toast-in 220ms ease;
+}
+
+.publish-notice-toast.published {
+  border-color: rgba(24, 128, 56, 0.22);
+}
+
+.publish-notice-toast.needs-review {
+  border-color: rgba(234, 134, 0, 0.24);
+}
+
+.publish-notice-toast.rejected {
+  border-color: rgba(217, 48, 37, 0.22);
+}
+
+.publish-notice-toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.publish-notice-toast.published .publish-notice-toast-icon {
+  color: var(--green);
+}
+
+.publish-notice-toast.needs-review .publish-notice-toast-icon {
+  color: #b06000;
+}
+
+.publish-notice-toast.rejected .publish-notice-toast-icon {
+  color: var(--red);
+}
+
+.publish-notice-toast-body {
+  display: grid;
+  gap: 6px;
+}
+
+.publish-notice-toast-body strong {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.publish-notice-toast-body p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.publish-notice-toast-link {
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 650;
+  width: fit-content;
+}
+
+.publish-notice-toast-link:hover {
+  text-decoration: underline;
+}
+
+.publish-notice-toast-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-strong);
+  cursor: pointer;
+  padding: 4px;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.publish-notice-toast-close:hover {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+@keyframes publish-notice-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+:root[data-theme="dark"] .publish-notice-toast {
+  background: rgba(24, 26, 36, 0.96);
+}
+
 .text-link {
   color: var(--blue);
   font-weight: 700;

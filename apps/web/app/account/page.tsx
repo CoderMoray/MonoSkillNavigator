@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BadgeCheck, KeyRound, LogOut, ShieldCheck, UserCircle } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
+import { PublishNoticeToast } from "../../components/PublishNoticeToast";
 import { SkillCard } from "../../components/SkillCard";
+import { clearPublishNotice, readPublishNotice, type PublishNotice } from "../../lib/publish-notice";
 import { getCurrentUser, getLeaderboard, logoutUser } from "../../lib/api";
 import { clearAuthToken, getAuthToken } from "../../lib/auth-token";
 import { aggregateCreators, normalizeHandle } from "../../lib/creators";
@@ -16,6 +18,16 @@ export default function AccountPage() {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [creator, setCreator] = useState<CreatorSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [publishNotice, setPublishNotice] = useState<PublishNotice | null>(null);
+
+  const dismissPublishNotice = useCallback(() => {
+    clearPublishNotice();
+    setPublishNotice(null);
+  }, []);
+
+  useEffect(() => {
+    setPublishNotice(readPublishNotice());
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +76,9 @@ export default function AccountPage() {
 
   return (
     <AppShell title="Profile">
+      {publishNotice ? (
+        <PublishNoticeToast notice={publishNotice} onClose={dismissPublishNotice} />
+      ) : null}
       <div className="market-stack">
         <section className="section-head">
           <div>

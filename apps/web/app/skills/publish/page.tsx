@@ -1,19 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChangeEvent, DragEvent, FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, CheckCircle2, ChevronDown, KeyRound, UploadCloud } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, KeyRound, UploadCloud } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
-import { ScoreBars } from "../../../components/ScoreBars";
-import { EvaluationBadge, VerdictBadge } from "../../../components/StatusBadge";
 import {
   getCurrentUser,
   getSkill,
   publishSkillArchive,
-  type PublishSkillMetadata,
-  type PublishSkillResponse
+  type PublishSkillMetadata
 } from "../../../lib/api";
+import { savePublishNotice } from "../../../lib/publish-notice";
 import { getAuthToken } from "../../../lib/auth-token";
 import type { PublicUser, RegistrySkill } from "../../../lib/types";
 
@@ -71,7 +69,7 @@ function PublishSkillPageContent() {
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<PublishSkillResponse | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     let cancelled = false;
@@ -206,7 +204,6 @@ function PublishSkillPageContent() {
   );
 
   function selectArchive(fileToUpload: File | null) {
-    setResult(null);
     if (!fileToUpload) {
       setError(null);
       setFile(null);
@@ -282,7 +279,6 @@ function PublishSkillPageContent() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setResult(null);
 
     const token = getAuthToken();
     if (!token || !user) {
@@ -324,7 +320,14 @@ function PublishSkillPageContent() {
     try {
       const archiveBase64 = await readFileAsBase64(file);
       const published = await publishSkillArchive(token, archiveBase64, metadata, isNewVersion ? changelog : undefined);
-      setResult(published);
+      savePublishNotice({
+        slug: published.slug,
+        name: published.name,
+        version: published.version,
+        verdict: published.review.verdict,
+        isNewVersion
+      });
+      router.push("/account");
     } catch (err) {
       setError(err instanceof Error ? err.message : "发布失败");
     } finally {
@@ -563,48 +566,6 @@ $ npm run skill -- publish ./my-skill.zip --token <token>`}</pre>
           </section>
         )}
 
-        {result ? (
-          <section className="market-panel">
-            <div className="section-head">
-              <div>
-                <span className="eyebrow">
-                  <CheckCircle2 size={14} />
-                  Published
-                </span>
-                <h2 style={{ marginTop: 14 }}>{result.name}@{result.version}</h2>
-                <p className="description">slug：<span className="mono">{result.slug}</span></p>
-                <p className="description">Release Tags：{result.releaseTags.join(", ")}</p>
-                <p>内容 hash：<span className="mono">{result.contentHash.slice(0, 16)}...</span></p>
-              </div>
-              <VerdictBadge verdict={result.review.verdict} />
-            </div>
-
-            <div className="two-column" style={{ marginTop: 18 }}>
-              <div className="card">
-                <h2>审查分数</h2>
-                <ScoreBars scores={result.review.scores} />
-              </div>
-              <div className="card">
-                <h2>功能评估</h2>
-                {result.evaluation ? (
-                  <>
-                    <EvaluationBadge status={result.evaluation.status} />
-                    <p className="description">
-                      Score {result.evaluation.score} · Tasks {result.evaluation.tasksPassed}/{result.evaluation.tasksTotal}
-                    </p>
-                  </>
-                ) : (
-                  <p className="description">暂无功能评估。</p>
-                )}
-                <div className="hero-actions">
-                  <Link className="button secondary" href={`/skills/${encodeURIComponent(result.slug)}`}>
-                    查看详情
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </section>
-        ) : null}
       </div>
     </AppShell>
   );
