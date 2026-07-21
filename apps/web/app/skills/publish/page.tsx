@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ChangeEvent, DragEvent, FormEvent, Suspense, useEffect, useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, KeyRound, UploadCloud } from "lucide-react";
+import { ChangeEvent, DragEvent, FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Check, CheckCircle2, ChevronDown, KeyRound, UploadCloud } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { ScoreBars } from "../../../components/ScoreBars";
 import { EvaluationBadge, VerdictBadge } from "../../../components/StatusBadge";
@@ -28,7 +28,8 @@ const CATEGORY_OPTIONS = [
   "Communication"
 ];
 
-const SEMVER_PATTERN =
+const MAX_CATEGORIES = 3;
+
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
 export default function PublishSkillPage() {
@@ -56,6 +57,8 @@ function PublishSkillPageContent() {
   const [slug, setSlug] = useState("");
   const [summary, setSummary] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
   const [topics, setTopics] = useState("");
   const [version, setVersion] = useState("1.0.0");
   const [releaseTags, setReleaseTags] = useState("latest");
@@ -120,7 +123,7 @@ function PublishSkillPageContent() {
         setDisplayName(skill.name);
         setSlug(skill.slug);
         setSummary(skill.description);
-        setCategories(latest?.manifest.categories ?? []);
+        setCategories((latest?.manifest.categories ?? []).slice(0, MAX_CATEGORIES));
         setTopics((latest?.manifest.topics ?? []).join(", "));
         setVersion(suggestNextPatchVersion(skill.latestVersion));
         setReleaseTags(latest?.releaseTags.join(", ") || "latest");
@@ -141,6 +144,31 @@ function PublishSkillPageContent() {
       cancelled = true;
     };
   }, [sourceSlug]);
+
+  useEffect(() => {
+    if (!categoryMenuOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!categoryMenuRef.current?.contains(event.target as Node)) {
+        setCategoryMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setCategoryMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [categoryMenuOpen]);
 
   const isOwner = Boolean(
     user &&
@@ -220,9 +248,18 @@ function PublishSkillPageContent() {
     selectArchive(event.dataTransfer.files.item(0));
   }
 
-  function handleCategoryChange(event: ChangeEvent<HTMLSelectElement>) {
+  function toggleCategory(option: string) {
     setError(null);
-    setCategories(Array.from(event.currentTarget.selectedOptions, (option) => option.value));
+    setCategories((current) => {
+      if (current.includes(option)) {
+        return current.filter((item) => item !== option);
+      }
+      if (current.length >= MAX_CATEGORIES) {
+        setError(`最多只能选择 ${MAX_CATEGORIES} 个分类。`);
+        return current;
+      }
+      return [...current, option];
+    });
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -377,21 +414,50 @@ function PublishSkillPageContent() {
                 </label>
 
                 <div className="publish-form-grid">
-                  <label className="field">
+                  <div className="field publish-category-field" ref={categoryMenuRef}>
                     <span>Categories <em>必填</em></span>
-                    <select
-                      className="publish-category-select"
-                      multiple
-                      onChange={handleCategoryChange}
-                      required
-                      value={categories}
+                    <button
+                      aria-expanded={categoryMenuOpen}
+                      aria-haspopup="listbox"
+                      className={`publish-category-trigger ${categoryMenuOpen ? "open" : ""}`}
+                      onClick={() => setCategoryMenuOpen((open) => !open)}
+                      type="button"
                     >
-                      {CATEGORY_OPTIONS.map((category) => (
-                        <option key={category} value={category}>{category}</option>
-                      ))}
-                    </select>
-                    <small>可选择多个分类；Windows 使用 Ctrl，macOS 使用 Command。</small>
-                  </label>
+                      {categories.length > 0 ? (
+                        <span className="publish-category-selected">
+                          {categories.map((item) => (
+                            <span className="badge" key={item}>{item}</span>
+                          ))}
+                        </span>
+                      ) : (
+                        <span className="publish-category-placeholder">请选择分类</span>
+                      )}
+                      <ChevronDown className={`publish-category-chevron ${categoryMenuOpen ? "open" : ""}`} size={16} />
+                    </button>
+                    {categoryMenuOpen ? (
+                      <div aria-multiselectable="true" className="publish-category-menu" role="listbox">
+                        {CATEGORY_OPTIONS.map((option) => {
+                          const selected = categories.includes(option);
+                          const disabled = !selected && categories.length >= MAX_CATEGORIES;
+                          return (
+                            <button
+                              aria-selected={selected}
+                              className={`publish-category-option ${selected ? "selected" : ""}`}
+                              disabled={disabled}
+                              key={option}
+                              onClick={() => toggleCategory(option)}
+                              role="option"
+                              type="button"
+                            >
+                              <span>{option}</span>
+                              {selected ? <Check size={15} /> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                    <small>最多可选择 {MAX_CATEGORIES} 个分类。</small>
+                  </div>
 
                   <label className="field">
                     <span>Topics <i>选填</i></span>
@@ -534,7 +600,7 @@ function createPublishMetadata(input: {
     displayName: input.displayName.trim(),
     slug: input.slug.trim(),
     summary: input.summary.trim(),
-    categories: [...new Set(input.categories.map((category) => category.trim()).filter(Boolean))],
+    categories: [...new Set(input.categories.map((item) => item.trim()).filter(Boolean))].slice(0, MAX_CATEGORIES),
     topics: splitList(input.topics),
     version: input.version.trim(),
     releaseTags: splitList(input.releaseTags).map((tag) => tag.toLowerCase())
@@ -553,6 +619,9 @@ function validatePublishMetadata(metadata: PublishSkillMetadata): string | undef
   }
   if (metadata.categories.length === 0) {
     return "请至少选择一个 Category。";
+  }
+  if (metadata.categories.length > MAX_CATEGORIES) {
+    return `Category 最多选择 ${MAX_CATEGORIES} 个。`;
   }
   if (metadata.topics.length > 20 || metadata.topics.some((topic) => topic.length > 64)) {
     return "Topics 最多 20 个，且每项最长 64 个字符。";
