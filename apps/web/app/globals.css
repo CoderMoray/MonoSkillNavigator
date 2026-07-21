@@ -1291,6 +1291,7 @@ button {
   place-items: center;
   border: 1.5px dashed var(--border-strong);
   border-radius: 26px;
+  cursor: pointer;
   background: rgba(255, 255, 255, 0.56);
   color: var(--muted-strong);
   padding: 36px 22px;
@@ -1302,6 +1303,13 @@ button {
 .upload-dropzone.selected {
   border-color: rgba(26, 115, 232, 0.42);
   background: var(--blue-soft);
+  transform: translateY(-1px);
+}
+
+.upload-dropzone.dragging {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.12);
   transform: translateY(-1px);
 }
 

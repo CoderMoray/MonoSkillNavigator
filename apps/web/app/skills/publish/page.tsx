@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { ArrowRight, CheckCircle2, KeyRound, UploadCloud } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { ScoreBars } from "../../../components/ScoreBars";
@@ -60,6 +60,7 @@ function PublishSkillPageContent() {
   const [version, setVersion] = useState("1.0.0");
   const [releaseTags, setReleaseTags] = useState("latest");
   const [changelog, setChangelog] = useState("");
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [loadingUser, setLoadingUser] = useState(true);
   const [loadingSource, setLoadingSource] = useState(Boolean(sourceSlug));
   const [sourceError, setSourceError] = useState<string | null>(null);
@@ -174,10 +175,49 @@ function PublishSkillPageContent() {
     [categories.length, displayName, file, isNewVersion, isOwner, releaseTags, slug, summary, version]
   );
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+  function selectArchive(fileToUpload: File | null) {
     setResult(null);
+    if (!fileToUpload) {
+      setError(null);
+      setFile(null);
+      return;
+    }
+    if (!fileToUpload.name.toLowerCase().endsWith(".zip")) {
+      setError("当前页面仅支持上传 .zip 包。文件夹发布可使用 CLI。");
+      setFile(null);
+      return;
+    }
+
     setError(null);
-    setFile(event.target.files?.[0] ?? null);
+    setFile(fileToUpload);
+  }
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    selectArchive(event.target.files?.[0] ?? null);
+  }
+
+  function handleFileDragEnter(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    if (event.dataTransfer.types.includes("Files")) {
+      setIsDraggingFile(true);
+    }
+  }
+
+  function handleFileDragOver(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  function handleFileDragLeave(event: DragEvent<HTMLLabelElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsDraggingFile(false);
+    }
+  }
+
+  function handleFileDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setIsDraggingFile(false);
+    selectArchive(event.dataTransfer.files.item(0));
   }
 
   function handleCategoryChange(event: ChangeEvent<HTMLSelectElement>) {
@@ -402,10 +442,16 @@ function PublishSkillPageContent() {
                   </label>
                 ) : null}
 
-                <label className={`upload-dropzone ${file ? "selected" : ""}`}>
+                <label
+                  className={`upload-dropzone ${file ? "selected" : ""} ${isDraggingFile ? "dragging" : ""}`}
+                  onDragEnter={handleFileDragEnter}
+                  onDragLeave={handleFileDragLeave}
+                  onDragOver={handleFileDragOver}
+                  onDrop={handleFileDrop}
+                >
                   <UploadCloud size={28} />
                   <strong>{fileLabel}</strong>
-                  <span>选择包含根目录 `SKILL.md` 的 zip 包。以上发布信息会写入包内 frontmatter，再进行审查和归档。</span>
+                  <span>拖拽 .zip 包到此处，或点击选择。压缩包根目录须包含 `SKILL.md`，随后会写入发布信息并进行审查和归档。</span>
                   <input accept=".zip,application/zip" onChange={handleFileChange} required type="file" />
                 </label>
 
