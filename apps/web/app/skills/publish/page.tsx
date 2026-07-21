@@ -60,6 +60,7 @@ function PublishSkillPageContent() {
   const [categories, setCategories] = useState<string[]>([]);
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [topics, setTopics] = useState("");
   const [version, setVersion] = useState("1.0.0");
   const [releaseTags, setReleaseTags] = useState("latest");
@@ -209,16 +210,31 @@ function PublishSkillPageContent() {
     if (!fileToUpload) {
       setError(null);
       setFile(null);
+      syncFileInput(null);
       return;
     }
     if (!fileToUpload.name.toLowerCase().endsWith(".zip")) {
       setError("当前页面仅支持上传 .zip 包。文件夹发布可使用 CLI。");
       setFile(null);
+      syncFileInput(null);
       return;
     }
 
     setError(null);
     setFile(fileToUpload);
+    syncFileInput(fileToUpload);
+  }
+
+  function syncFileInput(fileToUpload: File | null) {
+    const input = fileInputRef.current;
+    if (!input) {
+      return;
+    }
+    const transfer = new DataTransfer();
+    if (fileToUpload) {
+      transfer.items.add(fileToUpload);
+    }
+    input.files = transfer.files;
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -521,7 +537,13 @@ function PublishSkillPageContent() {
                   <UploadCloud size={28} />
                   <strong>{fileLabel}</strong>
                   <span>拖拽 .zip 包到此处，或点击选择。压缩包根目录须包含 `SKILL.md`，随后会写入发布信息并进行审查和归档。</span>
-                  <input accept=".zip,application/zip" onChange={handleFileChange} required type="file" />
+                  <input
+                    accept=".zip,application/zip"
+                    onChange={handleFileChange}
+                    ref={fileInputRef}
+                    required
+                    type="file"
+                  />
                 </label>
 
                 {error ? <div className="error compact-error">{error}</div> : null}
