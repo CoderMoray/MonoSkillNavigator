@@ -344,21 +344,23 @@ function PublishSkillPageContent() {
                     />
                   </label>
 
-                  <label className="field">
-                    <span>Slug <em>必填</em></span>
-                    <input
-                      maxLength={64}
-                      onChange={(event) => setSlug(event.target.value)}
-                      pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?"
-                      placeholder="例如 github-issue-triage"
-                      readOnly={isNewVersion}
-                      required
-                      value={slug}
-                    />
+                  <div className="publish-field-with-hint">
+                    <label className="field">
+                      <span>Slug <em>必填</em></span>
+                      <input
+                        maxLength={64}
+                        onChange={(event) => setSlug(event.target.value)}
+                        pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?"
+                        placeholder="例如 github-issue-triage"
+                        readOnly={isNewVersion}
+                        required
+                        value={slug}
+                      />
+                    </label>
                     <small>
                       {isNewVersion ? "新版本沿用原 Skill 的不可变 Slug。" : "仅小写字母、数字和短横线；发布后不可修改。"}
                     </small>
-                  </label>
+                  </div>
                 </div>
 
                 <label className="field">
