@@ -467,35 +467,44 @@ export default function SkillDetailPage() {
                     <h3>贡献者</h3>
                     <span className="badge">{skill.contributors.length}</span>
                   </div>
-                  <form className="contributor-form" onSubmit={handleAddContributor}>
-                    <label className="field">
-                      <span>用户名</span>
-                      <input
-                        onChange={(event) => setContributorName(event.target.value)}
-                        placeholder="输入已注册用户名，例如 bob"
-                        value={contributorName}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>角色</span>
-                      <select
-                        className="select contributor-select"
-                        onChange={(event) => setContributorRole(event.target.value as RegistryContributor["role"])}
-                        value={contributorRole}
-                      >
-                        <option value="contributor">contributor</option>
-                        <option value="reviewer">reviewer</option>
-                        <option value="maintainer">maintainer</option>
-                        <option value="owner">owner</option>
-                      </select>
-                    </label>
-                    {contributorMessage ? <div className="notice">{contributorMessage}</div> : null}
-                    {contributorError ? <div className="error compact-error">{contributorError}</div> : null}
-                    <button className="button primary" disabled={addingContributor} type="submit">
-                      <Plus size={15} />
-                      {addingContributor ? "添加中..." : "添加 contributor"}
-                    </button>
-                  </form>
+                  {viewer ? (
+                    <form className="contributor-form" onSubmit={handleAddContributor}>
+                      <label className="field">
+                        <span>用户名</span>
+                        <input
+                          onChange={(event) => setContributorName(event.target.value)}
+                          placeholder="输入已注册用户名，例如 bob"
+                          value={contributorName}
+                        />
+                      </label>
+                      <label className="field">
+                        <span>角色</span>
+                        <select
+                          className="select contributor-select"
+                          onChange={(event) => setContributorRole(event.target.value as RegistryContributor["role"])}
+                          value={contributorRole}
+                        >
+                          <option value="contributor">contributor</option>
+                          <option value="reviewer">reviewer</option>
+                          <option value="maintainer">maintainer</option>
+                          <option value="owner">owner</option>
+                        </select>
+                      </label>
+                      {contributorMessage ? <div className="notice">{contributorMessage}</div> : null}
+                      {contributorError ? <div className="error compact-error">{contributorError}</div> : null}
+                      <button className="button primary" disabled={addingContributor} type="submit">
+                        <Plus size={15} />
+                        {addingContributor ? "添加中..." : "添加 contributor"}
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="empty detail-empty">
+                      <p className="description">添加 contributor 需要先登录。</p>
+                      <div className="hero-actions">
+                        <Link className="button primary" href="/login">登录</Link>
+                      </div>
+                    </div>
+                  )}
                   {skill.contributors.length === 0 ? (
                     <div className="empty detail-empty">暂无贡献者信息。</div>
                   ) : (

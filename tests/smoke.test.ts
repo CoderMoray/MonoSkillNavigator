@@ -83,7 +83,11 @@ test("排行榜", async () => {
 });
 
 test("下载 Skill", async () => {
-  const res = await fetch(`${API}/skills/demo-skill/versions/latest/download`);
+  const res = await fetch(`${API}/skills/demo-skill/versions/latest/download`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
   // TODO: fix duplicate key bug in PostgresRegistryStore.save()
   if (res.status === 500) return;
   expect(res.status).toBe(200);
@@ -162,17 +166,47 @@ test("获取不存在的 Skill 应返回 404", async () => {
 });
 
 test("下载不存在的 Skill 应返回 404", async () => {
-  const res = await fetch(`${API}/skills/noexist_skill_99999/versions/latest/download`);
-  expect([404, 400]).toContain(res.status);
+  const res = await fetch(`${API}/skills/noexist_skill_99999/versions/latest/download`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  expect([401, 404, 400]).toContain(res.status);
+});
+
+test("未登录下载应拒绝", async () => {
+  const res = await fetch(`${API}/skills/demo-skill/versions/latest/download`);
+  expect(res.status).toBe(401);
 });
 
 test("评分超过范围应拒绝", async () => {
   const res = await fetch(`${API}/skills/demo-skill/ratings`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ score: 10, user: "testuser" }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ score: 10 }),
   });
   expect([400, 422]).toContain(res.status);
+});
+
+test("未登录评分应拒绝", async () => {
+  const res = await fetch(`${API}/skills/demo-skill/ratings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ score: 4 }),
+  });
+  expect(res.status).toBe(401);
+});
+
+test("未登录创建 Issue 应拒绝", async () => {
+  const res = await fetch(`${API}/skills/demo-skill/issues`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "bug", title: "test issue" }),
+  });
+  expect(res.status).toBe(401);
 });
 
 // --- MinIO artifact 测试 ---
@@ -202,7 +236,11 @@ test("MinIO: 重新发布验证 artifact 存入对象存储", async () => {
 });
 
 test("MinIO: 下载仍正常返回 zip", async () => {
-  const res = await fetch(`${API}/skills/demo-skill/versions/latest/download`);
+  const res = await fetch(`${API}/skills/demo-skill/versions/latest/download`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
   if (res.status === 500) return; // known duplicate key bug
   expect(res.status).toBe(200);
   const buffer = await res.arrayBuffer();

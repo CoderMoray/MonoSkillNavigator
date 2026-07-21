@@ -70,7 +70,7 @@ program
     }>(`${options.registry}/skills/publish`, {
       archiveBase64: archive.toString("base64"),
       version: options.version
-    }, resolveAuthToken(options.token));
+    }, requireAuthToken(options.token));
 
     if (response.status >= 400) {
       printJson(response.body);
@@ -153,14 +153,16 @@ program
   .argument("[targetDir]", "Target directory")
   .option("--version <version>", "Version to install", "latest")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
+  .option("--token <token>", "Bearer token, defaults to SKILL_AUTH_TOKEN")
   .action(
     async (
       slug: string,
       targetDir: string | undefined,
-      options: { version: string; registry: string }
+      options: { version: string; registry: string; token?: string }
     ) => {
+      const authToken = requireAuthToken(options.token);
       const endpoint = `${options.registry}/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(options.version)}/download`;
-      const response = await getBinary(endpoint);
+      const response = await getBinary(endpoint, authToken);
 
       if (response.status >= 400) {
         console.error(response.error ?? `Download failed: ${response.status}`);
@@ -183,9 +185,11 @@ program
   .argument("[output]", "Output zip path")
   .option("--version <version>", "Version to download", "latest")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
-  .action(async (slug: string, output: string | undefined, options: { version: string; registry: string }) => {
+  .option("--token <token>", "Bearer token, defaults to SKILL_AUTH_TOKEN")
+  .action(async (slug: string, output: string | undefined, options: { version: string; registry: string; token?: string }) => {
+    const authToken = requireAuthToken(options.token);
     const endpoint = `${options.registry}/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(options.version)}/download`;
-    const response = await getBinary(endpoint);
+    const response = await getBinary(endpoint, authToken);
 
     if (response.status >= 400) {
       console.error(response.error ?? `Download failed: ${response.status}`);
@@ -202,24 +206,25 @@ program
   .command("rate")
   .description("Rate a skill in the registry")
   .argument("<slug>", "Skill slug")
-  .requiredOption("--user <user>", "User or contributor name")
   .requiredOption("--score <score>", "Score from 1 to 5")
   .option("--version <version>", "Version being rated")
   .option("--comment <comment>", "Optional rating comment")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
+  .option("--token <token>", "Bearer token, defaults to SKILL_AUTH_TOKEN")
   .action(
     async (
       slug: string,
-      options: { user: string; score: string; version?: string; comment?: string; registry: string }
+      options: { score: string; version?: string; comment?: string; registry: string; token?: string }
     ) => {
+      const authToken = requireAuthToken(options.token);
       const response = await postJson<Record<string, unknown>>(
         `${options.registry}/skills/${encodeURIComponent(slug)}/ratings`,
         {
-        user: options.user,
         score: Number(options.score),
         version: options.version,
         comment: options.comment
-        }
+        },
+        authToken
       );
       printJson(response.body);
     }
@@ -233,8 +238,8 @@ program
   .option("--type <type>", "bug, security, compatibility, feature, docs", "bug")
   .option("--severity <severity>", "low, medium, high, critical", "medium")
   .option("--body <body>", "Issue body")
-  .option("--created-by <createdBy>", "Reporter name")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
+  .option("--token <token>", "Bearer token, defaults to SKILL_AUTH_TOKEN")
   .action(
     async (
       slug: string,
@@ -243,19 +248,20 @@ program
         type: string;
         severity: string;
         body?: string;
-        createdBy?: string;
         registry: string;
+        token?: string;
       }
     ) => {
+      const authToken = requireAuthToken(options.token);
       const response = await postJson<Record<string, unknown>>(
         `${options.registry}/skills/${encodeURIComponent(slug)}/issues`,
         {
         title: options.title,
         type: options.type,
         severity: options.severity,
-        body: options.body,
-        createdBy: options.createdBy
-        }
+        body: options.body
+        },
+        authToken
       );
       printJson(response.body);
     }
@@ -292,7 +298,7 @@ program
         name: options.person,
         role: options.role
       },
-      resolveAuthToken(options.token)
+      requireAuthToken(options.token)
     );
     printJson(response.body);
   });
@@ -325,8 +331,13 @@ async function getJson<T>(url: string): Promise<ApiResponse<T>> {
   };
 }
 
-async function getBinary(url: string): Promise<BinaryResponse> {
-  const response = await fetch(url);
+async function getBinary(url: string, token?: string): Promise<BinaryResponse> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, { headers });
   const body = Buffer.from(await response.arrayBuffer());
   const contentType = response.headers.get("content-type") ?? "";
   const error = !response.ok && contentType.includes("application/json")
@@ -414,4 +425,13 @@ function resolveUserPath(value: string): string {
 
 function resolveAuthToken(token: string | undefined): string | undefined {
   return token ?? process.env.SKILL_AUTH_TOKEN;
+}
+
+function requireAuthToken(token: string | undefined): string {
+  const resolved = resolveAuthToken(token);
+  if (!resolved) {
+    console.error("Authentication required. Pass --token or set SKILL_AUTH_TOKEN.");
+    process.exit(1);
+  }
+  return resolved;
 }

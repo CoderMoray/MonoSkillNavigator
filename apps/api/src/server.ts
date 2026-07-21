@@ -1,5 +1,5 @@
 import cors from "@fastify/cors";
-import Fastify from "fastify";
+import Fastify, { type FastifyReply } from "fastify";
 import { pathToFileURL } from "node:url";
 import { evaluateSkillSnapshot } from "@skill-platform/evaluator";
 import { reviewSkillSnapshot } from "@skill-platform/review-engine";
@@ -55,7 +55,7 @@ interface IssueBody {
 
 interface RatingBody {
   version?: string;
-  user: string;
+  user?: string;
   score: number;
   comment?: string;
 }
@@ -120,11 +120,13 @@ export function buildServer() {
     }
   });
 
-  app.post("/auth/logout", async (request) => {
+  app.post("/auth/logout", async (request, reply) => {
     const token = readBearerToken(request.headers.authorization);
-    if (token) {
-      await authStore.logout(token);
+    if (!token) {
+      return reply.code(401).send({ error: "Unauthorized" });
     }
+
+    await authStore.logout(token);
     return { ok: true };
   });
 
@@ -224,7 +226,15 @@ export function buildServer() {
     };
   });
 
-  app.post("/reviews/rebuild", async () => {
+  app.post("/reviews/rebuild", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+    if (user.role !== "admin") {
+      return reply.code(403).send({ error: "Forbidden" });
+    }
+
     const reviewed = await store.reviewAll(
       (snapshot, version) => reviewSkillSnapshot(snapshot, version),
       (snapshot) => evaluateSkillSnapshot(snapshot)
@@ -277,8 +287,16 @@ export function buildServer() {
   });
 
   app.post<{ Params: SkillParams; Body: IssueBody }>("/skills/:slug/issues", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
     try {
-      const issue = await store.createIssue(request.params.slug, request.body);
+      const issue = await store.createIssue(request.params.slug, {
+        ...request.body,
+        createdBy: user.username
+      });
       return reply.code(201).send({ issue });
     } catch {
       return reply.code(404).send({ error: "skill_not_found" });
@@ -300,8 +318,16 @@ export function buildServer() {
   );
 
   app.post<{ Params: SkillParams; Body: RatingBody }>("/skills/:slug/ratings", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
     try {
-      const rating = await store.addRating(request.params.slug, request.body);
+      const rating = await store.addRating(request.params.slug, {
+        ...request.body,
+        user: user.username
+      });
       const skill = await store.getSkill(request.params.slug);
       return reply.code(201).send({
         rating,
@@ -334,6 +360,11 @@ export function buildServer() {
   });
 
   app.get<{ Params: VersionParams }>("/skills/:slug/versions/:version/download", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
     const snapshot = await store.downloadSnapshot(request.params.slug, request.params.version);
     if (!snapshot) {
       return reply.code(404).send({ error: "version_not_found" });
@@ -366,6 +397,19 @@ async function getAuthenticatedUser(
 ): Promise<PublicUser | undefined> {
   const token = readBearerToken(authorization);
   return token ? authStore.getUserByToken(token) : undefined;
+}
+
+async function requireAuthenticatedUser(
+  authorization: string | undefined,
+  authStore: ReturnType<typeof createAuthStoreFromEnv>,
+  reply: FastifyReply
+): Promise<PublicUser | undefined> {
+  const user = await getAuthenticatedUser(authorization, authStore);
+  if (!user) {
+    reply.code(401).send({ error: "Unauthorized" });
+    return undefined;
+  }
+  return user;
 }
 
 function readSkillFromBody(body: PublishBody | ReviewBody): { snapshot: SkillSnapshot; version?: string } {
