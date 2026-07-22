@@ -1,8 +1,14 @@
-# Skill 包规范
+# Skill 包规范（ClawHub 格式参考）
+
+本平台的 Skill 包结构参考 [ClawHub Skill format](https://github.com/openclaw/clawhub/blob/main/docs/skill-format.md) 的通用约定。平台保留自己的 `slug`、`categories`、`allowed-tools` 等字段，**不要求** ClawHub/OpenClaw 专有的 `metadata.openclaw` runtime 声明。
 
 ## 目录结构
 
-每个 Skill 是一个目录，必须包含 `SKILL.md`：
+每个 Skill 是一个目录，必须包含以下入口文件之一：
+
+- `SKILL.md`（推荐）
+- `skill.md`
+- `skills.md`（legacy）
 
 ```text
 skill-name/
@@ -12,87 +18,80 @@ skill-name/
   scripts/
   assets/
   tests/
+  .clawhubignore   # 可选，发布忽略规则（legacy: .clawdhubignore）
+  .gitignore       # 可选
 ```
-
-可选目录说明：
-
-- `references/`：按需加载的长文档、规范、背景资料。
-- `examples/`：示例输入、示例输出、使用案例。
-- `scripts/`：Skill 指令中可能调用的辅助脚本。发布时会被重点审查。
-- `assets/`：模板、图片、字体等静态资源。
-- `tests/`：功能性评估任务和期望行为。
 
 ## SKILL.md frontmatter
 
-`SKILL.md` 必须以 YAML frontmatter 开头：
+入口文件必须以 YAML frontmatter 开头：
 
 ```yaml
 ---
-slug: skill-name
-name: Skill Display Name
-description: What the skill does and when to use it.
-version: 0.1.0
+slug: demo-plugin
+name: Demo Plugin
+description: Short summary of what this skill does and when to use it.
+version: 1.0.0
 categories:
   - Developer Tools
-topics:
-  - github
-  - automation
 release-tags:
   - latest
 author: example-user
-license: MIT
+license: MIT-0
 tags:
   - productivity
 supportedAgents:
   - cursor
 allowed-tools:
   - Read
-disallowed-tools:
-  - Shell
 ---
 ```
 
-必填字段：
+### 必填字段
 
-- `slug`：Skill 的唯一标识与 URL/CLI 参数；仅允许小写字母、数字、短横线，最长 64 字符，发布后不可修改。
-- `name`：面向用户展示的名称，最长 128 字符；可以在后续版本中更新。
-- `description`：说明能力和触发场景，最长 1024 字符。
+| 字段 | 规则 |
+| --- | --- |
+| `name` | 展示名称，1–128 字符。Portable Agent Skills 建议使用 1–64 位小写字母、数字、短横线。 |
+| `description` | Skill 摘要，1–1024 字符。 |
+| `version` | SemVer，例如 `1.0.0`。 |
 
-建议字段：
+### 平台字段
 
-- `version`：语义化版本，例如 `1.0.0`。CLI 发布时也可通过参数覆盖。
-- `categories`：平台分类。Web 发布必须至少选择一项，支持多选。
-- `topics`：可选的主题关键词列表。
-- `release-tags`：版本别名列表，例如 `latest`、`beta`。Web 发布默认 `latest`，首个版本必须包含它；同一 Skill 中一个 tag 同时只指向一个版本。
-- `author`：作者或组织标识。
-- `license`：许可证。
-- `tags`：分类标签。
-- `supportedAgents`：兼容的 Agent 平台。
-- `allowed-tools`：Skill 激活时预授权工具，必须最小权限。
-- `disallowed-tools`：Skill 激活时禁止工具。
+| 字段 | 规则 |
+| --- | --- |
+| `slug` | 不可变唯一标识；npm-safe 小写，支持 `@scope/skill-name`；无 slug 时可从符合规则的 `name` 推导。 |
+| `categories` | Web 发布必填，至少 1 项。 |
+| `release-tags` | 版本别名，例如 `latest`；首个版本必须包含 `latest`。 |
+| `topics`, `author`, `license`, `tags`, `supportedAgents` | 可选。 |
+| `allowed-tools`, `disallowed-tools` | 可选，平台权限模型使用。 |
+
+Frontmatter 中的其他未知字段会通过 `.passthrough()` 保留，但平台不会校验 OpenClaw 专有 runtime 块。
+
+## Slug 规则
+
+- 无 scope：`demo-plugin`（小写、数字、短横线，最长 64）
+- 有 scope：`@example.tools/demo-plugin`
+
+## 版本与标签
+
+- 同一 `slug@version` 不可变。
+- 每次发布创建新版本（SemVer）。
+- `latest` 等 tag 指向特定版本。
 
 ## 文件限制
 
-- 单个文本文件建议小于 256 KB。
-- `SKILL.md` 建议少于 500 行。
-- 不允许路径逃逸，例如 `../secret`。
-- 不允许 symlink、隐藏二进制、可疑压缩包绕过审查。
-- 外部 URL、动态下载、遥测、上传逻辑必须在描述中明确说明。
+- 单文件文本审查上限：1 MB。
+- 整包上限：50 MB。
+- 不允许路径逃逸（`../`）。
+- 隐藏路径（除 `.gitignore` / `.clawhubignore`）与 `.clawhub/` CLI 元数据会被跳过。
 
 ## 权限模型
 
-平台将权限解析为以下风险能力：
+平台将 `allowed-tools` / `disallowed-tools` 解析为风险能力，并结合静态内容扫描做审查。能力越高，审查阈值越严格。
 
-- `network`：联网、下载、上传、webhook、遥测。
-- `filesystem-read`：读取用户文件、项目文件、敏感目录。
-- `filesystem-write`：写入、删除、覆盖、批量修改。
-- `code-execution`：Shell、Python、Node、PowerShell、脚本执行。
-- `credential-access`：环境变量、token、密钥文件、浏览器凭证。
+## 发布路径差异
 
-Skill 可以请求这些能力，但必须与 `description` 和正文目的一致。能力越高，审查阈值越严格。
-
-## 版本规则
-
-- 同一个 `slug` + `version` 一经发布不可变。
-- 每个版本保存内容 hash，用于安装前校验。
-- `latest` 指向最新发布版本，后续可增加 `stable`、`deprecated`、`yanked` 标签。
+| 路径 | 校验 |
+| --- | --- |
+| Web 发布（带 metadata） | `skillPublishMetadataSchema` + zip 包结构 |
+| CLI / API zip-only | frontmatter + 包结构；version 必须在 manifest 中为 SemVer |

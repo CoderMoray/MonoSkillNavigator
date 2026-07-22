@@ -4,35 +4,47 @@ import path from "node:path";
 import AdmZip from "adm-zip";
 import yaml from "js-yaml";
 import { z } from "zod";
+import {
+  findSkillEntryFile,
+  findSkillEntryPath,
+  isValidSkillIdentifierName,
+  isValidSkillSlug,
+  releaseTagSchema,
+  semverSchema,
+  skillPublishMetadataSchema,
+  skillSlugSchema,
+  SKILL_ENTRY_BASENAMES,
+  type SkillPublishMetadata,
+  type SkillValidationIssue
+} from "./skill-format.js";
+
+export {
+  findSkillEntryFile,
+  findSkillEntryPath,
+  formatPublishMetadataError,
+  isSkillEntryBasename,
+  isSkillEntryPath,
+  isValidSkillIdentifierName,
+  isValidSkillSlug,
+  releaseTagSchema,
+  semverSchema,
+  skillIdentifierNameSchema,
+  skillPublishMetadataSchema,
+  skillSlugSchema,
+  SKILL_ENTRY_BASENAMES,
+  validatePublishMetadataInput,
+  type SkillPublishMetadata,
+  type SkillValidationIssue
+} from "./skill-format.js";
 
 const frontmatterPattern = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
-
-export const skillSlugSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/);
-
-export const semverSchema = z
-  .string()
-  .regex(
-    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/,
-    "Version must be valid SemVer, for example 1.0.0"
-  );
-
-export const releaseTagSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(64)
-  .regex(/^[a-z0-9][a-z0-9._-]*$/, "Release tags must use lowercase letters, numbers, dots, underscores, or hyphens");
 
 export const skillManifestSchema = z
   .object({
     slug: skillSlugSchema.optional(),
     name: z.string().trim().min(1).max(128),
-    description: z.string().min(20).max(1024),
-    version: z.string().optional(),
+    description: z.string().trim().min(1).max(1024),
+    version: semverSchema.optional(),
     categories: z.array(z.string().trim().min(1).max(64)).optional(),
     topics: z.array(z.string().trim().min(1).max(64)).optional(),
     "release-tags": z.array(releaseTagSchema).optional(),
@@ -47,18 +59,6 @@ export const skillManifestSchema = z
 
 export type SkillManifest = z.infer<typeof skillManifestSchema>;
 
-export const skillPublishMetadataSchema = z.object({
-  displayName: z.string().trim().min(1).max(128),
-  slug: skillSlugSchema,
-  summary: z.string().trim().min(20).max(1024),
-  categories: z.array(z.string().trim().min(1).max(64)).min(1).max(10),
-  topics: z.array(z.string().trim().min(1).max(64)).max(20).optional().default([]),
-  version: semverSchema,
-  releaseTags: z.array(releaseTagSchema).min(1).max(10)
-});
-
-export type SkillPublishMetadata = z.infer<typeof skillPublishMetadataSchema>;
-
 export interface SkillFile {
   path: string;
   content: string;
@@ -72,12 +72,7 @@ export interface SkillSnapshot {
   files: SkillFile[];
   contentHash: string;
   createdAt: string;
-}
-
-export interface SkillValidationIssue {
-  code: string;
-  message: string;
-  path?: string;
+  entryPath?: string;
 }
 
 export interface ParsedSkillMarkdown {
@@ -89,7 +84,7 @@ export interface ParsedSkillMarkdown {
 export function parseSkillMarkdown(markdown: string): ParsedSkillMarkdown {
   const match = frontmatterPattern.exec(markdown);
   if (!match) {
-    throw new Error("SKILL.md must start with YAML frontmatter delimited by ---");
+    throw new Error("Skill entry file must start with YAML frontmatter delimited by ---");
   }
 
   const rawFrontmatter = yaml.load(match[1] ?? "") as Record<string, unknown>;
@@ -106,20 +101,24 @@ export function parseSkillMarkdown(markdown: string): ParsedSkillMarkdown {
 }
 
 export function getSkillSlug(manifest: Pick<SkillManifest, "name" | "slug">): string {
-  const explicitSlug = skillSlugSchema.safeParse(manifest.slug);
-  if (explicitSlug.success) {
-    return explicitSlug.data;
-  }
-
-  if (manifest.slug === undefined) {
-    const legacyName = skillSlugSchema.safeParse(manifest.name);
-    if (legacyName.success) {
-      return legacyName.data;
+  if (manifest.slug !== undefined) {
+    if (isValidSkillSlug(manifest.slug)) {
+      return manifest.slug;
     }
-    throw new Error("slug is required when the display name is not a legacy kebab-case identifier");
+    throw new Error("slug must be npm-safe lowercase, for example demo-plugin or @scope/demo-plugin");
   }
 
-  throw new Error("slug must contain 1-64 lowercase letters, numbers, or hyphens");
+  if (isValidSkillSlug(manifest.name)) {
+    return manifest.name;
+  }
+
+  if (isValidSkillIdentifierName(manifest.name)) {
+    return manifest.name;
+  }
+
+  throw new Error(
+    "slug is required when name is not a portable lowercase identifier; add slug or rename name to match ClawHub format"
+  );
 }
 
 export function applySkillPublishMetadata(
@@ -127,12 +126,12 @@ export function applySkillPublishMetadata(
   input: SkillPublishMetadata
 ): SkillSnapshot {
   const metadata = normalizePublishMetadata(input);
-  const skillMd = snapshot.files.find((file) => file.path === "SKILL.md");
-  if (!skillMd) {
-    throw new Error("Skill package must include SKILL.md");
+  const skillEntry = findSkillEntryFile(snapshot.files);
+  if (!skillEntry) {
+    throw new Error(`Skill package must include one of: ${SKILL_ENTRY_BASENAMES.join(", ")}`);
   }
 
-  const parsed = parseSkillMarkdown(skillMd.content);
+  const parsed = parseSkillMarkdown(skillEntry.content);
   const frontmatter = {
     ...parsed.rawFrontmatter,
     slug: metadata.slug,
@@ -146,7 +145,7 @@ export function applySkillPublishMetadata(
   const manifest = skillManifestSchema.parse(frontmatter);
   const content = `---\n${yaml.dump(frontmatter, { lineWidth: -1, noRefs: true })}---\n${parsed.body}`;
   const files = snapshot.files.map((file) =>
-    file.path === "SKILL.md"
+    file.path === skillEntry.path
       ? {
           ...file,
           content,
@@ -164,15 +163,15 @@ export function applySkillPublishMetadata(
     readme: parsed.body,
     files,
     contentHash: hashSnapshotFiles(files),
-    createdAt: snapshot.createdAt
+    createdAt: snapshot.createdAt,
+    entryPath: skillEntry.path
   };
 }
 
 export async function readSkillDirectory(rootDir: string): Promise<SkillSnapshot> {
   const absoluteRoot = path.resolve(rootDir);
-  const skillMdPath = path.join(absoluteRoot, "SKILL.md");
-  const skillMarkdown = await readFile(skillMdPath, "utf8");
-  const parsed = parseSkillMarkdown(skillMarkdown);
+  const skillEntry = await resolveSkillEntryOnDisk(absoluteRoot);
+  const parsed = parseSkillMarkdown(skillEntry.content);
   const files = await readTextFiles(absoluteRoot);
   const contentHash = hashSnapshotFiles(files);
 
@@ -181,7 +180,8 @@ export async function readSkillDirectory(rootDir: string): Promise<SkillSnapshot
     readme: parsed.body,
     files,
     contentHash,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    entryPath: skillEntry.path
   };
 }
 
@@ -226,18 +226,21 @@ export async function writeSkillZip(snapshot: SkillSnapshot, outputPath: string)
 export function readSkillZipBuffer(buffer: Buffer): SkillSnapshot {
   const zip = new AdmZip(buffer);
   const files = readZipTextFiles(zip);
-  const skillMd = files.find((file) => file.path === "SKILL.md");
-  if (!skillMd) {
-    throw new Error("Skill zip must include SKILL.md at the root, or inside a single top-level folder");
+  const skillEntry = findSkillEntryFile(files);
+  if (!skillEntry) {
+    throw new Error(
+      `Skill zip must include one of ${SKILL_ENTRY_BASENAMES.join(", ")} at the root, or inside a single top-level folder`
+    );
   }
 
-  const parsed = parseSkillMarkdown(skillMd.content);
+  const parsed = parseSkillMarkdown(skillEntry.content);
   return {
     manifest: parsed.manifest,
     readme: parsed.body,
     files,
     contentHash: hashSnapshotFiles(files),
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    entryPath: skillEntry.path
   };
 }
 
@@ -247,13 +250,13 @@ export function skillSnapshotToZipBuffer(snapshot: SkillSnapshot): Buffer {
 
 export function validateSkillSnapshot(snapshot: SkillSnapshot): SkillValidationIssue[] {
   const issues: SkillValidationIssue[] = [];
-  const skillMd = snapshot.files.find((file) => file.path === "SKILL.md");
+  const skillEntry = findSkillEntryFile(snapshot.files);
 
-  if (!skillMd) {
+  if (!skillEntry) {
     issues.push({
-      code: "missing-skill-md",
-      message: "Skill package must include SKILL.md",
-      path: "SKILL.md"
+      code: "missing-skill-entry",
+      message: `Skill package must include one of: ${SKILL_ENTRY_BASENAMES.join(", ")}`,
+      path: SKILL_ENTRY_BASENAMES[0]
     });
   }
 
@@ -271,9 +274,17 @@ export function validateSkillSnapshot(snapshot: SkillSnapshot): SkillValidationI
       getSkillSlug(parsed.data);
     } catch (error) {
       issues.push({
-        code: "invalid-frontmatter",
+        code: "invalid-slug",
         message: error instanceof Error ? error.message : "Invalid slug",
         path: "slug"
+      });
+    }
+
+    if (!parsed.data.version) {
+      issues.push({
+        code: "version-missing",
+        message: "Frontmatter must declare a SemVer version",
+        path: "version"
       });
     }
   }
@@ -339,6 +350,30 @@ export function sha256(content: string): string {
   return createHash("sha256").update(content).digest("hex");
 }
 
+async function resolveSkillEntryOnDisk(rootDir: string): Promise<{ path: string; content: string }> {
+  for (const basename of SKILL_ENTRY_BASENAMES) {
+    const candidate = path.join(rootDir, basename);
+    try {
+      const content = await readFile(candidate, "utf8");
+      return { path: basename, content };
+    } catch {
+      continue;
+    }
+  }
+
+  const entries = await readdir(rootDir);
+  for (const basename of SKILL_ENTRY_BASENAMES) {
+    const match = entries.find((entry) => entry.toLowerCase() === basename.toLowerCase());
+    if (!match) {
+      continue;
+    }
+    const content = await readFile(path.join(rootDir, match), "utf8");
+    return { path: match, content };
+  }
+
+  throw new Error(`Skill package must include one of: ${SKILL_ENTRY_BASENAMES.join(", ")}`);
+}
+
 async function readTextFiles(rootDir: string, currentDir = rootDir): Promise<SkillFile[]> {
   const entries = await readdir(currentDir, { withFileTypes: true });
   const files: SkillFile[] = [];
@@ -361,8 +396,12 @@ async function readTextFiles(rootDir: string, currentDir = rootDir): Promise<Ski
       continue;
     }
 
+    if (stats.size > 50 * 1024 * 1024) {
+      throw new Error(`File exceeds the 50MB bundle limit: ${relativePath}`);
+    }
+
     if (stats.size > 1024 * 1024) {
-      throw new Error(`File is too large for Phase 1 review: ${relativePath}`);
+      throw new Error(`File is too large for text review: ${relativePath}`);
     }
 
     const content = await readFile(absolutePath, "utf8");
@@ -378,7 +417,15 @@ async function readTextFiles(rootDir: string, currentDir = rootDir): Promise<Ski
 }
 
 function shouldSkipEntry(name: string): boolean {
-  return [".git", "node_modules", ".data", "dist"].includes(name);
+  if (name === ".git" || name === "node_modules" || name === ".data" || name === "dist") {
+    return true;
+  }
+
+  if (name === ".clawhub" || name === ".clawdhub") {
+    return true;
+  }
+
+  return false;
 }
 
 function readZipTextFiles(zip: AdmZip): SkillFile[] {
@@ -393,6 +440,7 @@ function readZipTextFiles(zip: AdmZip): SkillFile[] {
 
   const prefix = resolveZipRootPrefix(entries.map((item) => item.path));
   const files: SkillFile[] = [];
+  let totalBytes = 0;
 
   for (const item of entries) {
     const relativePath = stripZipPrefix(item.path, prefix);
@@ -400,11 +448,21 @@ function readZipTextFiles(zip: AdmZip): SkillFile[] {
       continue;
     }
 
-    const content = item.entry.getData().toString("utf8");
+    const buffer = item.entry.getData();
+    totalBytes += buffer.byteLength;
+    if (totalBytes > 50 * 1024 * 1024) {
+      throw new Error("Skill zip exceeds the 50MB bundle limit");
+    }
+
+    if (buffer.byteLength > 1024 * 1024) {
+      throw new Error(`File is too large for text review: ${relativePath}`);
+    }
+
+    const content = buffer.toString("utf8");
     files.push({
       path: relativePath,
       content,
-      size: Buffer.byteLength(content, "utf8"),
+      size: buffer.byteLength,
       sha256: sha256(content)
     });
   }
@@ -432,11 +490,24 @@ function shouldSkipZipPath(value: string): boolean {
     throw new Error(`Unsafe zip entry path: ${value}`);
   }
 
-  return value.split("/").some((segment) => shouldSkipEntry(segment));
+  const segments = value.split("/");
+  if (segments.some((segment) => shouldSkipEntry(segment))) {
+    return true;
+  }
+
+  if (segments.some((segment) => segment.startsWith(".") && !isClawHubIgnoreFile(segment))) {
+    return true;
+  }
+
+  return false;
+}
+
+function isClawHubIgnoreFile(segment: string): boolean {
+  return segment === ".clawhubignore" || segment === ".clawdhubignore" || segment === ".gitignore";
 }
 
 function resolveZipRootPrefix(paths: string[]): string {
-  if (paths.includes("SKILL.md")) {
+  if (findSkillEntryPath(paths.filter((item) => !item.includes("/")))) {
     return "";
   }
 
@@ -446,7 +517,11 @@ function resolveZipRootPrefix(paths: string[]): string {
   }
 
   const [prefix] = [...firstSegments];
-  return paths.includes(`${prefix}/SKILL.md`) ? `${prefix}/` : "";
+  if (!prefix) {
+    return "";
+  }
+  const prefixedPaths = paths.filter((item) => item.startsWith(`${prefix}/`));
+  return findSkillEntryPath(prefixedPaths.map((item) => item.slice(prefix.length + 1))) ? `${prefix}/` : "";
 }
 
 function stripZipPrefix(value: string, prefix: string): string {

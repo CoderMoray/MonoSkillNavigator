@@ -1,4 +1,5 @@
 import {
+  findSkillEntryFile,
   getSkillSlug,
   normalizeTools,
   type SkillSnapshot,
@@ -135,8 +136,8 @@ export function reviewSkillSnapshot(snapshot: SkillSnapshot, versionOverride?: s
     findings.push({
       id: `spec-${issue.code}`,
       category: "compliance",
-      severity: issue.code === "missing-skill-md" ? "high" : "medium",
-      title: "Skill package does not match platform spec",
+      severity: issue.code === "missing-skill-entry" ? "high" : "medium",
+      title: "Skill package does not match ClawHub format",
       message: issue.message,
       path: issue.path,
       recommendation: "Update the package to follow docs/rules/skill-spec.md."
@@ -178,25 +179,23 @@ function reviewManifest(snapshot: SkillSnapshot, findings: ReviewFinding[]): voi
     });
   }
 
-  if (!manifest.version) {
+  if (manifest.license && !/^MIT(-0)?$/i.test(manifest.license.trim())) {
     findings.push({
-      id: "version-missing",
+      id: "license-not-mit0",
       category: "compliance",
       severity: "low",
-      title: "Version is missing",
-      message: "The manifest does not declare a version.",
-      recommendation: "Add a semantic version to frontmatter."
+      title: "Non-default license declared",
+      message: `ClawHub publishes all skills under MIT-0. This manifest declares ${manifest.license}.`,
+      recommendation: "Remove conflicting license terms from SKILL.md or align with MIT-0 redistribution terms."
     });
-  }
-
-  if (!manifest.license) {
+  } else if (!manifest.license) {
     findings.push({
       id: "license-missing",
       category: "compliance",
       severity: "low",
       title: "License is missing",
-      message: "The manifest does not declare a license.",
-      recommendation: "Add a license so users understand redistribution terms."
+      message: "ClawHub skills are published under MIT-0.",
+      recommendation: "Add license: MIT-0 to frontmatter for clarity."
     });
   }
 
@@ -226,16 +225,17 @@ function reviewManifest(snapshot: SkillSnapshot, findings: ReviewFinding[]): voi
     }
   }
 
-  const skillMd = snapshot.files.find((file) => file.path === "SKILL.md");
-  if (skillMd && skillMd.content.split(/\r?\n/).length > 500) {
+  const skillEntry = findSkillEntryFile(snapshot.files);
+  const skillEntryPath = skillEntry?.path ?? "SKILL.md";
+  if (skillEntry && skillEntry.content.split(/\r?\n/).length > 500) {
     findings.push({
       id: "skill-md-too-long",
       category: "compliance",
       severity: "low",
-      title: "SKILL.md is long",
-      message: "SKILL.md exceeds the recommended 500 line limit.",
-      path: "SKILL.md",
-      recommendation: "Move detailed reference material into references/ and link it from SKILL.md."
+      title: "Skill entry file is long",
+      message: `${skillEntryPath} exceeds the recommended 500 line limit.`,
+      path: skillEntryPath,
+      recommendation: "Move detailed reference material into references/ and link it from the skill entry file."
     });
   }
 
@@ -246,7 +246,7 @@ function reviewManifest(snapshot: SkillSnapshot, findings: ReviewFinding[]): voi
       severity: "medium",
       title: "Skill instructions are too short",
       message: "The instruction body is too short to guide reliable agent behavior.",
-      path: "SKILL.md",
+      path: skillEntryPath,
       recommendation: "Add clear workflow steps, expected outputs, and constraints."
     });
   }

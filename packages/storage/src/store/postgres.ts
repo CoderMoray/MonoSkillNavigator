@@ -4,6 +4,7 @@ import {
   getSkillSlug,
   parseSkillMarkdown,
   readSkillZipBuffer,
+  findSkillEntryFile,
   skillSnapshotToZipBuffer,
   type SkillManifest,
   type SkillSnapshot
@@ -270,7 +271,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         .where(and(eq(schema.skillVersionFiles.skillSlug, slug), eq(schema.skillVersionFiles.version, v.version)))
         .orderBy(schema.skillVersionFiles.path);
       const parsedManifest = (() => {
-        const skillMd = files.find((file) => file.path === "SKILL.md");
+        const skillMd = findSkillEntryFile(files);
         if (!skillMd) return undefined;
         try {
           return parseSkillMarkdown(skillMd.content).manifest;

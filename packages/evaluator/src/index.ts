@@ -1,4 +1,5 @@
 import type { SkillFile, SkillSnapshot } from "@skill-platform/skill-spec";
+import { isSkillEntryPath } from "@skill-platform/skill-spec/skill-format";
 
 export type EvaluationProvider = "static-taskset" | "halucatch-adapter";
 export type EvaluationStatus = "passed" | "partial" | "failed" | "not-configured";
@@ -135,7 +136,7 @@ function evaluateTask(snapshot: SkillSnapshot, task: FunctionalTestTask): Functi
   }
 
   const searchableContent = snapshot.files
-    .filter((file) => file.path === "SKILL.md" || file.path.startsWith("examples/"))
+    .filter((file) => isSkillEntryPath(file.path) || file.path.startsWith("examples/"))
     .map((file) => file.content)
     .join("\n")
     .toLowerCase();

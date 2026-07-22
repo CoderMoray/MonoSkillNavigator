@@ -14,6 +14,7 @@ import {
 import { savePublishNotice } from "../../../lib/publish-notice";
 import { getAuthToken } from "../../../lib/auth-token";
 import type { PublicUser, RegistrySkill } from "../../../lib/types";
+import { SKILL_ENTRY_BASENAMES, validatePublishMetadataInput } from "@skill-platform/skill-spec/skill-format";
 
 const CATEGORY_OPTIONS = [
   "Automation",
@@ -27,9 +28,6 @@ const CATEGORY_OPTIONS = [
 ];
 
 const MAX_CATEGORIES = 3;
-
-const SEMVER_PATTERN =
-  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
 export default function PublishSkillPage() {
   return (
@@ -188,20 +186,33 @@ function PublishSkillPageContent() {
     return `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
   }, [file]);
 
-  const canPublish = useMemo(
-    () =>
-      Boolean(
-        file &&
-          displayName.trim() &&
-          slug.trim() &&
-          summary.trim().length >= 20 &&
-          categories.length > 0 &&
-          SEMVER_PATTERN.test(version.trim()) &&
-          splitList(releaseTags).length > 0 &&
-          (!isNewVersion || isOwner)
-      ),
-    [categories.length, displayName, file, isNewVersion, isOwner, releaseTags, slug, summary, version]
-  );
+  const canPublish = useMemo(() => {
+    if (!file || (isNewVersion && !isOwner)) {
+      return false;
+    }
+
+    const metadata = createPublishMetadata({
+      displayName,
+      slug,
+      summary,
+      categories,
+      topics,
+      version,
+      releaseTags
+    });
+    return !validatePublishMetadata(metadata);
+  }, [
+    categories,
+    displayName,
+    file,
+    isNewVersion,
+    isOwner,
+    releaseTags,
+    slug,
+    summary,
+    topics,
+    version
+  ]);
 
   function selectArchive(fileToUpload: File | null) {
     if (!fileToUpload) {
@@ -539,7 +550,7 @@ function PublishSkillPageContent() {
                 >
                   <UploadCloud size={28} />
                   <strong>{fileLabel}</strong>
-                  <span>拖拽 .zip 包到此处，或点击选择。压缩包根目录须包含 `SKILL.md`，随后会写入发布信息并进行审查和归档。</span>
+                  <span>拖拽 .zip 包到此处，或点击选择。压缩包根目录须包含 {SKILL_ENTRY_BASENAMES.join("、")} 之一，随后会写入发布信息并进行审查和归档。</span>
                   <input
                     accept=".zip,application/zip"
                     onChange={handleFileChange}
@@ -592,32 +603,12 @@ function createPublishMetadata(input: {
 }
 
 function validatePublishMetadata(metadata: PublishSkillMetadata): string | undefined {
-  if (!metadata.displayName) {
-    return "请填写 Display Name。";
-  }
-  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(metadata.slug) || metadata.slug.length > 64) {
-    return "Slug 仅可包含小写字母、数字和短横线，且最长为 64 个字符。";
-  }
-  if (metadata.summary.length < 20) {
-    return "Summary 至少需要 20 个字符。";
-  }
-  if (metadata.categories.length === 0) {
-    return "请至少选择一个 Category。";
+  const sharedError = validatePublishMetadataInput(metadata);
+  if (sharedError) {
+    return sharedError;
   }
   if (metadata.categories.length > MAX_CATEGORIES) {
     return `Category 最多选择 ${MAX_CATEGORIES} 个。`;
-  }
-  if (metadata.topics.length > 20 || metadata.topics.some((topic) => topic.length > 64)) {
-    return "Topics 最多 20 个，且每项最长 64 个字符。";
-  }
-  if (!SEMVER_PATTERN.test(metadata.version)) {
-    return "Version 必须采用 SemVer 格式，例如 1.0.0。";
-  }
-  if (metadata.releaseTags.length === 0) {
-    return "请至少填写一个 Release Tag。";
-  }
-  if (metadata.releaseTags.some((tag) => !/^[a-z0-9][a-z0-9._-]*$/.test(tag) || tag.length > 64)) {
-    return "Release Tags 仅可包含小写字母、数字、点、下划线和短横线。";
   }
   return undefined;
 }

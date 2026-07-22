@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import type { LucideIcon } from "lucide-react";
+import { isSkillEntryPath } from "@skill-platform/skill-spec/skill-format";
 import {
   ArrowLeft,
   BookOpen,
@@ -190,7 +190,8 @@ export default function SkillDetailPage() {
 
   const snapshot = currentVersion.snapshot;
   const files = snapshot?.files ?? [];
-  const skillMdFile = files.find((file) => file.path === "SKILL.md");
+  const skillMdFile = files.find((file) => isSkillEntryPath(file.path));
+  const skillEntryLabel = skillMdFile?.path ?? "SKILL.md";
   const markdownContent = snapshot?.readme?.trim() || stripFrontmatter(skillMdFile?.content ?? "");
   const selectedFile = files.find((file) => file.path === selectedFilePath) ?? files[0];
   const isOwner = Boolean(
@@ -225,7 +226,7 @@ export default function SkillDetailPage() {
   const detailCards: DetailCard[] = [
     {
       id: "skill-md",
-      title: "SKILL.md",
+      title: skillEntryLabel,
       icon: BookOpen,
       meta: markdownContent ? `${markdownContent.split(/\r?\n/).length} 行` : "暂无内容"
     },
@@ -551,7 +552,7 @@ export default function SkillDetailPage() {
               <div className="detail-panel-head">
                 <div>
                   <span className="eyebrow">Document</span>
-                  <h2>SKILL.md</h2>
+                  <h2>{skillEntryLabel}</h2>
                   <p className="description">渲染当前版本的 Skill 说明文档。</p>
                 </div>
                 {skillMdFile ? <span className="badge mono">{formatFileSize(skillMdFile.size)}</span> : null}
@@ -561,7 +562,7 @@ export default function SkillDetailPage() {
                   <ReactMarkdown>{markdownContent}</ReactMarkdown>
                 </div>
               ) : (
-                <div className="empty detail-empty">当前版本没有可渲染的 SKILL.md 内容。</div>
+                <div className="empty detail-empty">当前版本没有可渲染的 Skill 入口文件内容。</div>
               )}
             </>
           ) : null}
@@ -677,7 +678,7 @@ export default function SkillDetailPage() {
                 <div className="card-head">
                   <div>
                     <h3>Requirements</h3>
-                    <p className="description">此版本在 SKILL.md frontmatter 中声明的运行边界。</p>
+                    <p className="description">此版本在 Skill 入口文件 frontmatter 中声明的运行边界。</p>
                   </div>
                   <span className="badge">
                     {requirementGroups.filter((group) => group.values.length > 0).length}/{requirementGroups.length} 已声明

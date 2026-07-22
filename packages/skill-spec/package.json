@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "type": "module",
   "main": "./src/index.ts",
-  "exports": {
-    ".": "./src/index.ts"
+    "exports": {
+    ".": "./src/index.ts",
+    "./skill-format": "./src/skill-format.ts"
   },
   "dependencies": {
-    "adm-zip": "^0.6.0"
+    "adm-zip": "^0.6.0",
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8"

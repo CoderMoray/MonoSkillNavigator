@@ -14,6 +14,9 @@
       "@skill-platform/skill-spec": [
         "packages/skill-spec/src/index.ts"
       ],
+      "@skill-platform/skill-spec/skill-format": [
+        "packages/skill-spec/src/skill-format.ts"
+      ],
       "@skill-platform/review-engine": [
         "packages/review-engine/src/index.ts"
       ],
