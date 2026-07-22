@@ -1,0 +1,37 @@
+{
+  "name": "HaluCatch",
+  "version": "1.8.8",
+  "required_files": [
+    "halucatch/SKILL.md",
+    "halucatch/halucatch_core.py",
+    "halucatch/halucatch/"
+  ],
+  "skillhub_files": [
+    "halucatch/SKILL.md",
+    "halucatch/halucatch_core.py",
+    "halucatch/halucatch/",
+    "README.md",
+    "docs/CHANGELOG.md",
+    "halucatch/FAQ.md"
+  ],
+  "version_sync": [
+    "halucatch/SKILL.md",
+    "config.yaml",
+    "docs/index.html"
+  ],
+  "clawhub_exclude": [
+    "tests/",
+    "docs/",
+    "reports/",
+    "reports_zh/",
+    "scripts/",
+    "outputs/",
+    ".workbuddy/",
+    ".github/",
+    "__pycache__/",
+    "*.pyc",
+    "*.zip"
+  ],
+  "category": "engineering",
+  "language": "zh-CN"
+}

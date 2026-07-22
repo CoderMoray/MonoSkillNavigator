@@ -40,7 +40,8 @@ program
   .option("--json", "Print raw JSON report")
   .action(async (input: string, options: { version?: string; json?: boolean }) => {
     const snapshot = await readSkillPackage(resolveUserPath(input));
-    const report = reviewSkillSnapshot(snapshot, options.version);
+    const evaluation = await evaluateSkillSnapshot(snapshot);
+    const report = await reviewSkillSnapshot(snapshot, options.version, evaluation);
 
     if (options.json) {
       printJson(report);
@@ -89,12 +90,12 @@ program
 
 program
   .command("evaluate")
-  .description("Run functional task-set evaluation for a local skill directory")
+  .description("Run HaluCatch reliability and quality evaluation for a local Skill package")
   .argument("<package>", "Skill directory or .zip package")
   .option("--json", "Print raw JSON report")
   .action(async (input: string, options: { json?: boolean }) => {
     const snapshot = await readSkillPackage(resolveUserPath(input));
-    const evaluation = evaluateSkillSnapshot(snapshot);
+    const evaluation = await evaluateSkillSnapshot(snapshot);
 
     if (options.json) {
       printJson(evaluation);

@@ -201,8 +201,8 @@ export function buildServer() {
         return reply.code(403).send({ error: "Only skill contributors can publish new versions" });
       }
 
-      const evaluation = evaluateSkillSnapshot(snapshot);
-      const review = reviewSkillSnapshot(snapshot, version);
+      const evaluation = await evaluateSkillSnapshot(snapshot);
+      const review = await reviewSkillSnapshot(snapshot, version, evaluation);
       const registryVersion = await store.publishSnapshot(snapshot, review, evaluation, {
         owner: {
           userId: user.id,
@@ -231,16 +231,17 @@ export function buildServer() {
 
   app.post<{ Body: ReviewBody }>("/reviews/run", async (request) => {
     const { snapshot, version } = readSkillFromBody(request.body);
+    const evaluation = await evaluateSkillSnapshot(snapshot);
     return {
-      review: reviewSkillSnapshot(snapshot, version),
-      evaluation: evaluateSkillSnapshot(snapshot)
+      review: await reviewSkillSnapshot(snapshot, version, evaluation),
+      evaluation
     };
   });
 
   app.post<{ Body: ReviewBody }>("/evaluations/run", async (request) => {
     const { snapshot } = readSkillFromBody(request.body);
     return {
-      evaluation: evaluateSkillSnapshot(snapshot)
+      evaluation: await evaluateSkillSnapshot(snapshot)
     };
   });
 
@@ -253,9 +254,20 @@ export function buildServer() {
       return reply.code(403).send({ error: "Forbidden" });
     }
 
+    const evaluationCache = new Map<string, ReturnType<typeof evaluateSkillSnapshot>>();
+    const getEvaluation = (snapshot: SkillSnapshot) => {
+      const cached = evaluationCache.get(snapshot.contentHash);
+      if (cached) {
+        return cached;
+      }
+
+      const evaluation = evaluateSkillSnapshot(snapshot);
+      evaluationCache.set(snapshot.contentHash, evaluation);
+      return evaluation;
+    };
     const reviewed = await store.reviewAll(
-      (snapshot, version) => reviewSkillSnapshot(snapshot, version),
-      (snapshot) => evaluateSkillSnapshot(snapshot)
+      async (snapshot, version) => reviewSkillSnapshot(snapshot, version, await getEvaluation(snapshot)),
+      (snapshot) => getEvaluation(snapshot)
     );
     return {
       reviewed: reviewed.length,

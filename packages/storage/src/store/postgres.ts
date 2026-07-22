@@ -773,11 +773,11 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       const rv = skill?.versions[version];
       if (!rv) continue;
 
-      const review = reviewFn(rv.snapshot, version);
+      const review = await reviewFn(rv.snapshot, version);
       await this.upsertReview(slug, version, review);
 
       if (evaluationFn) {
-        const evaluation = evaluationFn(rv.snapshot);
+        const evaluation = await evaluationFn(rv.snapshot);
         await this.upsertEvaluation(slug, version, evaluation);
       }
 

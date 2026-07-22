@@ -222,6 +222,7 @@ export default function SkillDetailPage() {
   const tags = currentVersion.manifest.tags ?? [];
   const openIssues = skill.issues.filter((issue) => issue.status !== "closed");
   const reviewFindings = currentVersion.review?.findings ?? [];
+  const isHaluCatchEvaluation = currentVersion.evaluation?.provider === "halucatch-adapter";
   const requirementGroups = [
     {
       title: "支持的 Agent",
@@ -272,10 +273,12 @@ export default function SkillDetailPage() {
     },
     {
       id: "evaluation",
-      title: "功能评估",
+      title: "质量评估",
       icon: Gauge,
       meta: currentVersion.evaluation
-        ? `${currentVersion.evaluation.tasksPassed}/${currentVersion.evaluation.tasksTotal} 通过`
+        ? isHaluCatchEvaluation
+          ? `${currentVersion.evaluation.tasksPassed}/${currentVersion.evaluation.tasksTotal} 维通过`
+          : `${currentVersion.evaluation.tasksPassed}/${currentVersion.evaluation.tasksTotal} 通过`
         : "未配置"
     },
     {
@@ -1030,9 +1033,13 @@ export default function SkillDetailPage() {
             <>
               <div className="detail-panel-head">
                 <div>
-                  <span className="eyebrow">Functional check</span>
-                  <h2>功能评估</h2>
-                  <p className="description">查看功能性任务集的完成情况与发现。</p>
+                  <span className="eyebrow">{isHaluCatchEvaluation ? "HaluCatch reliability" : "Functional check"}</span>
+                  <h2>{isHaluCatchEvaluation ? "HaluCatch 质量与功能评估" : "功能评估"}</h2>
+                  <p className="description">
+                    {isHaluCatchEvaluation
+                      ? "基于五维静态可靠性检查，评估 Skill 的可复现性、规则清晰度与执行护栏。"
+                      : "查看功能性任务集的完成情况与发现。"}
+                  </p>
                 </div>
                 {currentVersion.evaluation ? <EvaluationBadge status={currentVersion.evaluation.status} /> : null}
               </div>
@@ -1041,7 +1048,7 @@ export default function SkillDetailPage() {
                   <div className="evaluation-summary">
                     <div>
                       <span>Provider</span>
-                      <strong>{currentVersion.evaluation.provider}</strong>
+                      <strong>{isHaluCatchEvaluation ? "HaluCatch" : currentVersion.evaluation.provider}</strong>
                     </div>
                     <div>
                       <span>Score</span>
@@ -1060,7 +1067,7 @@ export default function SkillDetailPage() {
                   </div>
                   {currentVersion.evaluation.taskResults.length > 0 ? (
                     <div className="detail-subsection">
-                      <h3>任务结果</h3>
+                      <h3>{isHaluCatchEvaluation ? "五维可靠性结果" : "任务结果"}</h3>
                       <ul className="list">
                         {currentVersion.evaluation.taskResults.map((task) => (
                           <li className="list-item" key={task.name}>
@@ -1080,7 +1087,7 @@ export default function SkillDetailPage() {
                   ) : null}
                   {currentVersion.evaluation.findings.length > 0 ? (
                     <div className="detail-subsection">
-                      <h3>总体发现</h3>
+                      <h3>{isHaluCatchEvaluation ? "HaluCatch 发现" : "总体发现"}</h3>
                       <ul className="list">
                         {currentVersion.evaluation.findings.map((finding) => (
                           <li className={`list-item finding ${finding.severity}`} key={finding.id}>

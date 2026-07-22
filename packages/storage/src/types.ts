@@ -168,7 +168,7 @@ export interface RegistryStore {
   unpublishSkill(slug: string): Promise<RegistrySkill>;
   deleteSkill(slug: string): Promise<void>;
   reviewAll(
-    reviewFn: (snapshot: SkillSnapshot, version: string) => ReviewReport,
-    evaluationFn?: (snapshot: SkillSnapshot) => FunctionalEvaluationReport
+    reviewFn: (snapshot: SkillSnapshot, version: string) => ReviewReport | Promise<ReviewReport>,
+    evaluationFn?: (snapshot: SkillSnapshot) => FunctionalEvaluationReport | Promise<FunctionalEvaluationReport>
   ): Promise<RegistryVersion[]>;
 }

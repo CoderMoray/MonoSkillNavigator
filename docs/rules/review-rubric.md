@@ -4,10 +4,10 @@
 
 审查报告包含四个主分：
 
-- `qualityScore`：格式、结构、描述质量、可维护性。
+- `qualityScore`：格式、结构、描述质量、可维护性，以及 HaluCatch 静态可靠性分。
 - `securityScore`：危险命令、联网、持久化、供应链、prompt injection。
 - `privacyScore`：敏感文件、环境变量、凭证、日志和数据外传。
-- `functionalScore`：是否有任务集、示例、可复现说明和初步功能证据。
+- `functionalScore`：HaluCatch 的执行可靠性结论，结合任务集、示例和可复现性证据。
 
 `overallScore` 使用加权平均：
 
@@ -70,11 +70,14 @@ overallScore = quality * 0.30 + security * 0.35 + privacy * 0.25 + functional * 
 
 ## 功能性评分
 
-一期只做轻量静态功能性评分：
+默认通过 HaluCatch 对发布快照执行五维静态可靠性评分：
 
-- 是否存在 `tests/` 或 examples。
-- 是否描述了输入、输出和验收标准。
-- 是否提供可复现任务。
-- 是否有禁止行为或边界条件。
+- 地基与数据管线：脚本固化、输入验证、依赖和路径可移植性。
+- 代码风险：常见错误处理、硬编码、超时和危险模式。
+- 规则与方法论：步骤、边界、输出与自洽性。
+- 解读护栏：验证、错误回退、确认与输出确定性。
+- 复杂度与可维护性：文档/脚本复杂度、引用链和指令密度。
 
-后续接入 HaluCatch/AgentHallu 类评估时，报告需要包含 trace、任务通过率、幻觉归因和 judge 解释。
+HaluCatch 结果会映射到统一的 `taskResults` 结构，并参与 `qualityScore` 与
+`functionalScore`。这项检查是静态的，不执行 Skill 脚本；未来引入需要实际运行 Agent
+的动态评估时，应补充 trace、任务通过率、幻觉归因和 judge 解释。

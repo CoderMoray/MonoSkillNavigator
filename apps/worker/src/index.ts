@@ -1,13 +1,25 @@
 import { evaluateSkillSnapshot } from "@skill-platform/evaluator";
 import { reviewSkillSnapshot } from "@skill-platform/review-engine";
+import type { SkillSnapshot } from "@skill-platform/skill-spec";
 import { createRegistryStoreFromEnv, loadDotEnvIfPresent } from "@skill-platform/storage";
 
 loadDotEnvIfPresent();
 const store = createRegistryStoreFromEnv();
+const evaluationCache = new Map<string, ReturnType<typeof evaluateSkillSnapshot>>();
+const getEvaluation = (snapshot: SkillSnapshot) => {
+  const cached = evaluationCache.get(snapshot.contentHash);
+  if (cached) {
+    return cached;
+  }
+
+  const evaluation = evaluateSkillSnapshot(snapshot);
+  evaluationCache.set(snapshot.contentHash, evaluation);
+  return evaluation;
+};
 
 const reviewed = await store.reviewAll(
-  (snapshot, version) => reviewSkillSnapshot(snapshot, version),
-  (snapshot) => evaluateSkillSnapshot(snapshot)
+  async (snapshot, version) => reviewSkillSnapshot(snapshot, version, await getEvaluation(snapshot)),
+  (snapshot) => getEvaluation(snapshot)
 );
 
 console.log(`Reviewed ${reviewed.length} skill versions`);

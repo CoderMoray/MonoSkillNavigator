@@ -5,7 +5,7 @@ import {
   type SkillSnapshot,
   validateSkillSnapshot
 } from "@skill-platform/skill-spec";
-import { evaluateSkillSnapshot } from "@skill-platform/evaluator";
+import { evaluateSkillSnapshot, type FunctionalEvaluationReport } from "@skill-platform/evaluator";
 
 export type ReviewCategory = "compliance" | "leakage" | "privacy" | "security" | "functional";
 export type ReviewSeverity = "low" | "medium" | "high" | "critical";
@@ -128,7 +128,11 @@ const contentRules: PatternRule[] = [
   }
 ];
 
-export function reviewSkillSnapshot(snapshot: SkillSnapshot, versionOverride?: string): ReviewReport {
+export async function reviewSkillSnapshot(
+  snapshot: SkillSnapshot,
+  versionOverride?: string,
+  evaluationOverride?: FunctionalEvaluationReport
+): Promise<ReviewReport> {
   const findings: ReviewFinding[] = [];
   const version = versionOverride ?? snapshot.manifest.version ?? "0.1.0";
 
@@ -148,7 +152,8 @@ export function reviewSkillSnapshot(snapshot: SkillSnapshot, versionOverride?: s
   reviewContent(snapshot, findings);
   reviewFunctionalEvidence(snapshot, findings);
 
-  const scores = calculateScores(findings, snapshot);
+  const evaluation = evaluationOverride ?? await evaluateSkillSnapshot(snapshot);
+  const scores = calculateScores(findings, snapshot, evaluation);
   const verdict = calculateVerdict(findings);
 
   return {
@@ -315,11 +320,18 @@ function reviewFunctionalEvidence(snapshot: SkillSnapshot, findings: ReviewFindi
   }
 }
 
-function calculateScores(findings: ReviewFinding[], snapshot: SkillSnapshot): ReviewScores {
-  const qualityScore = clampScore(100 - penalty(findings, ["compliance"]));
+function calculateScores(
+  findings: ReviewFinding[],
+  snapshot: SkillSnapshot,
+  evaluation: FunctionalEvaluationReport
+): ReviewScores {
+  const staticQualityScore = clampScore(100 - penalty(findings, ["compliance"]));
+  // HaluCatch measures execution reliability, which is a quality signal but
+  // must not replace the platform's format/compliance checks.
+  const qualityScore = Math.round(staticQualityScore * 0.65 + evaluation.score * 0.35);
   const securityScore = clampScore(100 - penalty(findings, ["security", "leakage"]));
   const privacyScore = clampScore(100 - penalty(findings, ["privacy"]));
-  const functionalScore = calculateFunctionalScore(findings, snapshot);
+  const functionalScore = calculateFunctionalScore(findings, snapshot, evaluation);
   const overallScore = Math.round(
     qualityScore * 0.3 + securityScore * 0.35 + privacyScore * 0.25 + functionalScore * 0.1
   );
@@ -333,8 +345,11 @@ function calculateScores(findings: ReviewFinding[], snapshot: SkillSnapshot): Re
   };
 }
 
-function calculateFunctionalScore(findings: ReviewFinding[], snapshot: SkillSnapshot): number {
-  const evaluation = evaluateSkillSnapshot(snapshot);
+function calculateFunctionalScore(
+  findings: ReviewFinding[],
+  snapshot: SkillSnapshot,
+  evaluation: FunctionalEvaluationReport
+): number {
   const staticEvidenceBonus = snapshot.files.some((file) => file.path.startsWith("examples/")) ? 5 : 0;
   return clampScore(evaluation.score + staticEvidenceBonus - penalty(findings, ["functional"]) / 2);
 }

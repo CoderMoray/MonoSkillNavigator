@@ -6,8 +6,8 @@
 
 - 读取本地 Skill 目录或 zip 包并生成内容快照。
 - 校验 `SKILL.md` frontmatter 和目录结构。
-- 执行合规性、泄露风险、隐私风险、安全风险和轻量功能性评分。
-- 基于 `tests/*.json` 运行功能性任务集评估，并保留 HaluCatch 适配入口。
+- 执行合规性、泄露风险、隐私风险、安全风险、功能性和质量评分。
+- 使用内置 HaluCatch 对每个发布包进行五维静态可靠性评估：地基、代码风险、规则、护栏与复杂度；无 Python 运行时时回退到 `tests/*.json` 任务集检查。
 - 登录后发布 Skill 到本地注册表，上传内容会绑定发布用户。
 - 搜索、查看、下载 zip 包和安装 Skill。
 - contributor、issue、rating、榜单等社区协作能力，支持多个 contributor 共同维护同一个 Skill。
@@ -53,6 +53,19 @@ npx drizzle-kit migrate    # 执行迁移
 
 `skills.slug` 是稳定唯一标识，`skills.name` 是展示名称。
 
+## HaluCatch 质量评估
+
+发布、`POST /evaluations/run`、`POST /reviews/run` 和 Worker 重审都会调用
+`packages/halucatch-1.8.8`。平台先将上传快照写入临时目录，再仅运行 HaluCatch
+自身的静态扫描器；**不会执行 Skill 包中的任何脚本**，也不会将 HaluCatch 报告写回
+Skill artifact。
+
+- 需要 Python 3.8+；Windows 默认调用 `python`，Unix 默认调用 `python3`。
+- 可用 `HALUCATCH_PYTHON` 指定解释器、`HALUCATCH_DIR` 指定 HaluCatch 目录、
+  `HALUCATCH_TIMEOUT_MS` 调整超时（默认 30 秒）。
+- 设定 `HALUCATCH_ENABLED=false` 可临时禁用 HaluCatch，改用原有 `tests/*.json`
+  静态任务集评估。
+
 ## 测试
 
 ```bash
@@ -66,13 +79,13 @@ npm run test:watch     # watch 模式，改代码自动重跑
 - `docs/rules/skill-spec.md`：Skill 包规范。
 - `docs/rules/review-rubric.md`：审查与评分规则。
 - `packages/skill-spec`：Skill 解析、校验、快照、安装。
-- `packages/evaluator`：功能性任务集评估与 HaluCatch 适配入口。
+- `packages/evaluator`：HaluCatch 五维可靠性/质量评估，及任务集回退评估。
 - `packages/review-engine`：审查规则引擎。
 - `packages/storage`：注册表存储（PostgreSQL + Drizzle ORM），支持 MinIO artifact。
 - `apps/api`：HTTP API。
 - `apps/cli`：命令行工具。
 - `apps/worker`：审查 Worker。
-- `apps/web`：Web 可视化界面，展示 Skill 广场、详情、审查报告、功能评估、社区信息和榜单。
+- `apps/web`：Web 可视化界面，展示 Skill 广场、详情、审查报告、HaluCatch 质量评估、社区信息和榜单。
 
 ## API
 
@@ -110,5 +123,5 @@ Maintainers: [@chrismoray](https://github.com/chrismoray) [@JShiu0915](https://g
 ## 后续方向
 
 - 将 Worker 替换为 Redis/BullMQ 队列消费者。
-- 接入 HaluCatch/AgentHallu 类功能性评估。
+- 在隔离队列 Worker 中加入需要实际执行 Agent 的动态评估。
 - 增加 Web 管理台、MCP Server、CI/CD 插件和多源同步。

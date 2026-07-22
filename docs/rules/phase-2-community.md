@@ -14,7 +14,13 @@ Phase 2 使用 `tests/*.json` 作为轻量任务集格式：
 }
 ```
 
-当前评估器是 `static-taskset`，用于检查任务集完整性、验收标准和安全边界是否在 Skill 文档中可追踪。后续接入 HaluCatch 时，保持相同输出结构：`status`、`score`、`tasksTotal`、`tasksPassed`、`taskResults`、`findings`。
+默认评估器为 `halucatch-adapter`：它将发布快照写入临时目录，调用内置
+HaluCatch 的五维静态检查（地基、代码风险、规则、护栏、复杂度），并将五个维度
+映射为 `taskResults`。这项检查不执行 Skill 内脚本，也不会把报告写入 Skill 包。
+
+`tests/*.json` 的 `static-taskset` 仍保留为 HaluCatch 被显式禁用或 Python 运行时不可用
+时的回退评估。两个 provider 保持相同输出结构：`status`、`score`、`tasksTotal`、
+`tasksPassed`、`taskResults`、`findings`。
 
 ## Contributor
 
