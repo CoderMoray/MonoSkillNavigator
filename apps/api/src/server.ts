@@ -5,7 +5,9 @@ import { evaluateSkillSnapshot } from "@skill-platform/evaluator";
 import { reviewSkillSnapshot } from "@skill-platform/review-engine";
 import {
   applySkillPublishMetadata,
+  findSkillEntryFile,
   getSkillSlug,
+  parseSkillMarkdown,
   readSkillZipBuffer,
   skillSnapshotToZipBuffer,
   type SkillPublishMetadata,
@@ -162,6 +164,20 @@ export function buildServer() {
     return {
       items: await store.search(request.query.query ?? "")
     };
+  });
+
+  app.post<{ Body: PublishBody }>("/skills/publish/preview", async (request, reply) => {
+    const user = await getAuthenticatedUser(request.headers.authorization, authStore);
+    if (!user) {
+      return reply.code(401).send({ error: "Unauthorized" });
+    }
+
+    try {
+      const uploaded = readSkillFromBody(request.body);
+      return extractPublishPreview(uploaded.snapshot);
+    } catch (error) {
+      return reply.code(400).send({ error: errorMessage(error) });
+    }
   });
 
   app.post<{ Body: PublishBody }>("/skills/publish", async (request, reply) => {
@@ -410,6 +426,33 @@ async function requireAuthenticatedUser(
     return undefined;
   }
   return user;
+}
+
+function extractPublishPreview(snapshot: SkillSnapshot) {
+  const entry = findSkillEntryFile(snapshot.files);
+  if (!entry) {
+    throw new Error("Skill package must include SKILL.md, skill.md, or skills.md");
+  }
+
+  const parsed = parseSkillMarkdown(entry.content);
+  let slug: string | undefined;
+  try {
+    slug = getSkillSlug(parsed.manifest);
+  } catch {
+    slug = typeof parsed.manifest.slug === "string" ? parsed.manifest.slug : undefined;
+  }
+
+  return {
+    entryPath: entry.path,
+    frontmatter: {
+      name: parsed.manifest.name,
+      description: parsed.manifest.description,
+      slug,
+      version: parsed.manifest.version,
+      categories: parsed.manifest.categories,
+      topics: parsed.manifest.topics
+    }
+  };
 }
 
 function readSkillFromBody(body: PublishBody | ReviewBody): { snapshot: SkillSnapshot; version?: string } {

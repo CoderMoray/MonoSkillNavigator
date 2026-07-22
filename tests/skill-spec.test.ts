@@ -1,7 +1,10 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { readSkillFrontmatterFromZip } from "../apps/web/lib/parse-skill-archive.js";
 import {
   findSkillEntryPath,
   isValidSkillSlug,
+  parseSkillFrontmatterHints,
   validatePublishMetadataInput
 } from "../packages/skill-spec/src/skill-format.js";
 import { parseSkillMarkdown, readSkillZipBuffer, validateSkillSnapshot } from "../packages/skill-spec/src/index.js";
@@ -88,6 +91,30 @@ ${"x".repeat(80)}
     });
 
     expect(issues.some((issue) => issue.code === "version-missing")).toBe(true);
+  });
+});
+
+describe("Skill frontmatter hints", () => {
+  it("extracts description from SKILL.md frontmatter", () => {
+    const hints = parseSkillFrontmatterHints(`---
+name: demo-skill
+description: Reviews a short product idea and returns structured feedback.
+version: 1.0.0
+---
+# Body
+`);
+
+    expect(hints?.description).toBe("Reviews a short product idea and returns structured feedback.");
+  });
+});
+
+describe("Skill archive frontmatter", () => {
+  it("reads description from demo-skill.zip", async () => {
+    const buffer = readFileSync("examples/demo-skill.zip");
+    const file = new File([buffer], "demo-skill.zip", { type: "application/zip" });
+    const hints = await readSkillFrontmatterFromZip(file);
+
+    expect(hints?.description).toContain("Reviews a short product idea");
   });
 });
 

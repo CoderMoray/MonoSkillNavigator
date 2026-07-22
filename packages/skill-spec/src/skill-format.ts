@@ -139,3 +139,145 @@ export function validatePublishMetadataInput(input: SkillPublishMetadata): strin
   }
   return undefined;
 }
+
+const frontmatterPattern = /^---\r?\n([\s\S]*?)\r?\n---/;
+
+export interface SkillFrontmatterHints {
+  name?: string;
+  description?: string;
+  slug?: string;
+  version?: string;
+  categories?: string[];
+  topics?: string[];
+}
+
+export function parseSkillFrontmatterHints(markdown: string): SkillFrontmatterHints | null {
+  const match = frontmatterPattern.exec(markdown);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  const record = parseSimpleFrontmatter(match[1]);
+  const hints: SkillFrontmatterHints = {};
+
+  if (typeof record.name === "string" && record.name.trim()) {
+    hints.name = record.name.trim();
+  }
+  if (typeof record.description === "string" && record.description.trim()) {
+    hints.description = record.description.trim();
+  }
+  if (typeof record.slug === "string" && record.slug.trim()) {
+    hints.slug = record.slug.trim();
+  }
+  if (typeof record.version === "string" && record.version.trim()) {
+    hints.version = record.version.trim();
+  }
+  if (Array.isArray(record.categories)) {
+    hints.categories = record.categories
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .map((item) => item.trim());
+  }
+  if (Array.isArray(record.topics)) {
+    hints.topics = record.topics
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .map((item) => item.trim());
+  }
+
+  return hints;
+}
+
+function parseSimpleFrontmatter(yamlText: string): Record<string, string | string[]> {
+  const result: Record<string, string | string[]> = {};
+  const lines = yamlText.split(/\r?\n/);
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+    if (!line.trim() || /^\s*#/.test(line)) {
+      index += 1;
+      continue;
+    }
+
+    const keyMatch = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
+    if (!keyMatch?.[1]) {
+      index += 1;
+      continue;
+    }
+
+    const key = keyMatch[1];
+    const rawValue = keyMatch[2]?.trim() ?? "";
+
+    if (rawValue === "" && index + 1 < lines.length && /^\s+-\s/.test(lines[index + 1] ?? "")) {
+      index += 1;
+      const items: string[] = [];
+      while (index < lines.length && /^\s+-\s/.test(lines[index] ?? "")) {
+        items.push(unquoteYamlScalar((lines[index] ?? "").replace(/^\s+-\s+/, "").trim()));
+        index += 1;
+      }
+      result[key] = items;
+      continue;
+    }
+
+    if (rawValue === "|" || rawValue === ">") {
+      index += 1;
+      const block: string[] = [];
+      while (index < lines.length && /^\s+\S/.test(lines[index] ?? "")) {
+        block.push((lines[index] ?? "").replace(/^\s+/, ""));
+        index += 1;
+      }
+      result[key] = block.join("\n").trim();
+      continue;
+    }
+
+    result[key] = unquoteYamlScalar(rawValue);
+    index += 1;
+  }
+
+  return result;
+}
+
+function unquoteYamlScalar(value: string): string {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+export function resolveZipRootPrefix(paths: string[]): string {
+  if (findSkillEntryPath(paths.filter((item) => !item.includes("/")))) {
+    return "";
+  }
+
+  const firstSegments = new Set(paths.map((item) => item.split("/")[0]).filter(Boolean));
+  if (firstSegments.size !== 1) {
+    return "";
+  }
+
+  const [prefix] = [...firstSegments];
+  if (!prefix) {
+    return "";
+  }
+
+  const prefixedPaths = paths.filter((item) => item.startsWith(`${prefix}/`));
+  return findSkillEntryPath(prefixedPaths.map((item) => item.slice(prefix.length + 1))) ? `${prefix}/` : "";
+}
+
+export function resolveZipSkillEntryPath(paths: string[]): string | undefined {
+  const normalized = paths.map((item) => item.replace(/\\/g, "/").replace(/^\/+/, ""));
+  const prefix = resolveZipRootPrefix(normalized);
+  const relativePaths = normalized.map((item) =>
+    prefix && item.startsWith(prefix) ? item.slice(prefix.length) : item
+  );
+  const entryRelative = findSkillEntryPath(relativePaths);
+  if (!entryRelative) {
+    return undefined;
+  }
+
+  return normalized.find((item) => {
+    const relative = prefix && item.startsWith(prefix) ? item.slice(prefix.length) : item;
+    return relative === entryRelative;
+  });
+}

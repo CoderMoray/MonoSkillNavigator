@@ -1526,6 +1526,12 @@ button {
   display: none;
 }
 
+.publish-block-reason {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 13px;
+}
+
 .publish-cli-card {
   display: grid;
   gap: 10px;

@@ -8,11 +8,14 @@ import { AppShell } from "../../../components/AppShell";
 import {
   getCurrentUser,
   getSkill,
+  previewSkillArchive,
   publishSkillArchive,
+  type PublishSkillFrontmatter,
   type PublishSkillMetadata
 } from "../../../lib/api";
 import { savePublishNotice } from "../../../lib/publish-notice";
 import { getAuthToken } from "../../../lib/auth-token";
+import { readSkillFrontmatterFromZip } from "../../../lib/parse-skill-archive";
 import type { PublicUser, RegistrySkill } from "../../../lib/types";
 import { SKILL_ENTRY_BASENAMES, validatePublishMetadataInput } from "@skill-platform/skill-spec/skill-format";
 
@@ -67,6 +70,8 @@ function PublishSkillPageContent() {
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [archiveHint, setArchiveHint] = useState<string | null>(null);
+  const [parsingArchive, setParsingArchive] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -186,27 +191,37 @@ function PublishSkillPageContent() {
     return `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
   }, [file]);
 
-  const canPublish = useMemo(() => {
-    if (!file || (isNewVersion && !isOwner)) {
-      return false;
+  const publishBlockReason = useMemo(() => {
+    if (parsingArchive) {
+      return "正在解析 Skill 包…";
+    }
+    if (!file) {
+      return "请先上传 .zip Skill 包。";
+    }
+    if (isNewVersion && !isOwner) {
+      return "无权发布新版本。";
     }
 
-    const metadata = createPublishMetadata({
-      displayName,
-      slug,
-      summary,
-      categories,
-      topics,
-      version,
-      releaseTags
-    });
-    return !validatePublishMetadata(metadata);
+    return (
+      validatePublishMetadata(
+        createPublishMetadata({
+          displayName,
+          slug,
+          summary,
+          categories,
+          topics,
+          version,
+          releaseTags
+        })
+      ) ?? null
+    );
   }, [
     categories,
     displayName,
     file,
     isNewVersion,
     isOwner,
+    parsingArchive,
     releaseTags,
     slug,
     summary,
@@ -214,39 +229,55 @@ function PublishSkillPageContent() {
     version
   ]);
 
-  function selectArchive(fileToUpload: File | null) {
+  const canPublish = publishBlockReason === null;
+
+  async function selectArchive(fileToUpload: File | null) {
     if (!fileToUpload) {
       setError(null);
+      setArchiveHint(null);
       setFile(null);
-      syncFileInput(null);
       return;
     }
     if (!fileToUpload.name.toLowerCase().endsWith(".zip")) {
       setError("当前页面仅支持上传 .zip 包。文件夹发布可使用 CLI。");
       setFile(null);
-      syncFileInput(null);
       return;
     }
 
     setError(null);
+    setArchiveHint(null);
     setFile(fileToUpload);
-    syncFileInput(fileToUpload);
-  }
+    setParsingArchive(true);
 
-  function syncFileInput(fileToUpload: File | null) {
-    const input = fileInputRef.current;
-    if (!input) {
-      return;
+    try {
+      const frontmatter = await loadFrontmatterFromArchive(fileToUpload);
+      const filledFields = applyFrontmatterToForm(frontmatter, isNewVersion, {
+        setDisplayName,
+        setSlug,
+        setSummary,
+        setVersion,
+        setCategories,
+        setTopics
+      });
+
+      if (filledFields.length > 0) {
+        setArchiveHint(`已从 Skill 入口文件自动填入：${filledFields.join("、")}。`);
+      } else {
+        setArchiveHint("已上传 zip，但未读取到可用的 frontmatter 字段。");
+      }
+    } catch (err) {
+      setArchiveHint(
+        err instanceof Error ? `已上传 zip，但无法解析 Skill 入口文件：${err.message}` : "已上传 zip，但无法解析 Skill 入口文件。"
+      );
+    } finally {
+      setParsingArchive(false);
     }
-    const transfer = new DataTransfer();
-    if (fileToUpload) {
-      transfer.items.add(fileToUpload);
-    }
-    input.files = transfer.files;
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    selectArchive(event.target.files?.[0] ?? null);
+    const selected = event.target.files?.[0] ?? null;
+    void selectArchive(selected);
+    event.target.value = "";
   }
 
   function handleFileDragEnter(event: DragEvent<HTMLLabelElement>) {
@@ -270,7 +301,7 @@ function PublishSkillPageContent() {
   function handleFileDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
     setIsDraggingFile(false);
-    selectArchive(event.dataTransfer.files.item(0));
+    void selectArchive(event.dataTransfer.files.item(0));
   }
 
   function toggleCategory(option: string) {
@@ -435,13 +466,13 @@ function PublishSkillPageContent() {
                   <span>Summary <em>必填</em></span>
                   <textarea
                     maxLength={1024}
-                    minLength={20}
                     onChange={(event) => setSummary(event.target.value)}
-                    placeholder="说明 Skill 能做什么、适用于什么场景（至少 20 个字符）"
+                    placeholder="说明 Skill 能做什么、适用于什么场景"
                     required
                     rows={4}
                     value={summary}
                   />
+                  {archiveHint ? <div className="notice">{archiveHint}</div> : null}
                 </label>
 
                 <div className="publish-form-grid">
@@ -542,25 +573,28 @@ function PublishSkillPageContent() {
                 ) : null}
 
                 <label
-                  className={`upload-dropzone ${file ? "selected" : ""} ${isDraggingFile ? "dragging" : ""}`}
+                  className={`upload-dropzone ${file ? "selected" : ""} ${isDraggingFile ? "dragging" : ""} ${parsingArchive ? "dragging" : ""}`}
                   onDragEnter={handleFileDragEnter}
                   onDragLeave={handleFileDragLeave}
                   onDragOver={handleFileDragOver}
                   onDrop={handleFileDrop}
                 >
                   <UploadCloud size={28} />
-                  <strong>{fileLabel}</strong>
+                  <strong>{parsingArchive ? "正在解析 Skill 包…" : fileLabel}</strong>
                   <span>拖拽 .zip 包到此处，或点击选择。压缩包根目录须包含 {SKILL_ENTRY_BASENAMES.join("、")} 之一，随后会写入发布信息并进行审查和归档。</span>
                   <input
                     accept=".zip,application/zip"
                     onChange={handleFileChange}
                     ref={fileInputRef}
-                    required
                     type="file"
                   />
                 </label>
 
                 {error ? <div className="error compact-error">{error}</div> : null}
+
+                {!canPublish && publishBlockReason ? (
+                  <p className="description publish-block-reason">{publishBlockReason}</p>
+                ) : null}
 
                 <button className="button primary" disabled={submitting || !canPublish} type="submit">
                   {submitting ? "发布并审查中..." : isNewVersion ? "发布新版本" : "发布 Skill"}
@@ -635,4 +669,71 @@ function readFileAsBase64(file: File): Promise<string> {
     };
     reader.readAsDataURL(file);
   });
+}
+
+async function loadFrontmatterFromArchive(file: File): Promise<PublishSkillFrontmatter | null> {
+  const token = getAuthToken();
+  if (token) {
+    try {
+      const archiveBase64 = await readFileAsBase64(file);
+      const preview = await previewSkillArchive(token, archiveBase64);
+      return preview.frontmatter;
+    } catch {
+      // Fall back to browser parsing when API is unavailable.
+    }
+  }
+
+  const local = await readSkillFrontmatterFromZip(file);
+  return local;
+}
+
+interface FrontmatterSetters {
+  setDisplayName: (value: string) => void;
+  setSlug: (value: string) => void;
+  setSummary: (value: string) => void;
+  setVersion: (value: string) => void;
+  setCategories: (value: string[]) => void;
+  setTopics: (value: string) => void;
+}
+
+function applyFrontmatterToForm(
+  frontmatter: PublishSkillFrontmatter | null,
+  isNewVersion: boolean,
+  setters: FrontmatterSetters
+): string[] {
+  if (!frontmatter) {
+    return [];
+  }
+
+  const filledFields: string[] = [];
+
+  if (!isNewVersion) {
+    if (frontmatter.name) {
+      setters.setDisplayName(frontmatter.name);
+      filledFields.push("Display Name");
+    }
+    if (frontmatter.slug) {
+      setters.setSlug(frontmatter.slug);
+      filledFields.push("Slug");
+    }
+  }
+
+  if (frontmatter.description) {
+    setters.setSummary(frontmatter.description);
+    filledFields.push("Summary");
+  }
+  if (frontmatter.version) {
+    setters.setVersion(frontmatter.version);
+    filledFields.push("Version");
+  }
+  if (frontmatter.categories?.length) {
+    setters.setCategories(frontmatter.categories.slice(0, MAX_CATEGORIES));
+    filledFields.push("Categories");
+  }
+  if (frontmatter.topics?.length) {
+    setters.setTopics(frontmatter.topics.join(", "));
+    filledFields.push("Topics");
+  }
+
+  return filledFields;
 }

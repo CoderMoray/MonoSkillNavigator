@@ -33,6 +33,10 @@ export {
   skillSlugSchema,
   SKILL_ENTRY_BASENAMES,
   validatePublishMetadataInput,
+  parseSkillFrontmatterHints,
+  resolveZipRootPrefix,
+  resolveZipSkillEntryPath,
+  type SkillFrontmatterHints,
   type SkillPublishMetadata,
   type SkillValidationIssue
 } from "./skill-format.js";

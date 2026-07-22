@@ -77,6 +77,31 @@ export async function changePassword(
   return data.user;
 }
 
+export interface PublishSkillFrontmatter {
+  name?: string;
+  description?: string;
+  slug?: string;
+  version?: string;
+  categories?: string[];
+  topics?: string[];
+}
+
+export interface PublishPreviewResponse {
+  entryPath: string;
+  frontmatter: PublishSkillFrontmatter;
+}
+
+export async function previewSkillArchive(
+  token: string,
+  archiveBase64: string
+): Promise<PublishPreviewResponse> {
+  return request<PublishPreviewResponse>(new URL("/skills/publish/preview", API_BASE_URL), {
+    method: "POST",
+    token,
+    body: JSON.stringify({ archiveBase64 })
+  });
+}
+
 export async function publishSkillArchive(
   token: string,
   archiveBase64: string,

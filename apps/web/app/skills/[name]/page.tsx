@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import type { LucideIcon } from "lucide-react";
 import { isSkillEntryPath } from "@skill-platform/skill-spec/skill-format";
 import {
   ArrowLeft,
