@@ -23,7 +23,7 @@ flowchart TD
 - `apps/cli`：命令行入口，支持 `review`、`publish`、`search`、`info`、`install`。
 - `apps/worker`：审查 Worker，可对待审版本重新执行审查。
 - `packages/skill-spec`：Skill 包读取、frontmatter 解析、schema 校验、快照与 hash。
-- `packages/review-engine`：格式合规、泄露风险、隐私风险、安全风险与基础功能性评分。
+- `packages/review-engine`：合规、安全、隐私、质量与可靠性五维评分；不生成综合分。
 - `packages/storage`：注册表存储抽象。一期使用本地 JSON 文件，后续替换为 PostgreSQL + 对象存储。
 - `docs/rules`：平台规范与审查规则。
 
@@ -60,7 +60,7 @@ flowchart TD
 
 ## 安全边界
 
-API 进程不执行 Skill 内脚本。当前 HaluCatch 质量评估仅将快照写入临时目录，并运行
+API 进程不执行 Skill 内脚本。当前 HaluCatch 可靠性评估仅将快照写入临时目录，并运行
 平台自带的 Python 静态扫描器；它不执行 Skill 中的程序、不访问网络，并受进程超时
 限制。需要实际执行 Agent 或 Skill 代码的后续功能评估必须进入隔离 Worker 或沙箱，
 限制网络、文件系统、环境变量和命令执行权限。

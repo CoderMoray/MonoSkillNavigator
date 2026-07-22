@@ -6,7 +6,7 @@
 
 - 读取本地 Skill 目录或 zip 包并生成内容快照。
 - 校验 `SKILL.md` frontmatter 和目录结构。
-- 执行合规性、泄露风险、隐私风险、安全风险、功能性和质量评分。
+- 提供合规、安全、隐私、质量和可靠性五个独立评分维度，不计算综合分。
 - 使用内置 HaluCatch 对每个发布包进行五维静态可靠性评估：地基、代码风险、规则、护栏与复杂度；无 Python 运行时时回退到 `tests/*.json` 任务集检查。
 - 登录后发布 Skill 到本地注册表，上传内容会绑定发布用户。
 - 搜索、查看、下载 zip 包和安装 Skill。
@@ -53,7 +53,7 @@ npx drizzle-kit migrate    # 执行迁移
 
 `skills.slug` 是稳定唯一标识，`skills.name` 是展示名称。
 
-## HaluCatch 质量评估
+## HaluCatch 可靠性评估
 
 发布、`POST /evaluations/run`、`POST /reviews/run` 和 Worker 重审都会调用
 `packages/halucatch-1.8.8`。平台先将上传快照写入临时目录，再仅运行 HaluCatch
@@ -79,13 +79,13 @@ npm run test:watch     # watch 模式，改代码自动重跑
 - `docs/rules/skill-spec.md`：Skill 包规范。
 - `docs/rules/review-rubric.md`：审查与评分规则。
 - `packages/skill-spec`：Skill 解析、校验、快照、安装。
-- `packages/evaluator`：HaluCatch 五维可靠性/质量评估，及任务集回退评估。
+- `packages/evaluator`：HaluCatch 五维可靠性评估，及任务集回退评估。
 - `packages/review-engine`：审查规则引擎。
 - `packages/storage`：注册表存储（PostgreSQL + Drizzle ORM），支持 MinIO artifact。
 - `apps/api`：HTTP API。
 - `apps/cli`：命令行工具。
 - `apps/worker`：审查 Worker。
-- `apps/web`：Web 可视化界面，展示 Skill 广场、详情、审查报告、HaluCatch 质量评估、社区信息和榜单。
+- `apps/web`：Web 可视化界面，展示 Skill 广场、详情、审查报告、HaluCatch 可靠性评估、社区信息和榜单。
 
 ## API
 
@@ -100,7 +100,7 @@ npm run test:watch     # watch 模式，改代码自动重跑
 - `POST /reviews/run`
 - `POST /evaluations/run`
 - `POST /reviews/rebuild`
-- `GET /leaderboard?sort=functional`
+- `GET /leaderboard?sort=reliability`
 - `GET /skills/:slug`
 - `POST /skills/:slug/contributors`
 - `POST /skills/:slug/issues`

@@ -21,7 +21,7 @@ export async function getSkills(query = ""): Promise<SkillSearchResult[]> {
   return data.items;
 }
 
-export async function getLeaderboard(sort = "functional", limit = 8): Promise<SkillSearchResult[]> {
+export async function getLeaderboard(sort = "reliability", limit = 8): Promise<SkillSearchResult[]> {
   const url = new URL("/leaderboard", API_BASE_URL);
   url.searchParams.set("sort", sort);
   url.searchParams.set("limit", String(limit));

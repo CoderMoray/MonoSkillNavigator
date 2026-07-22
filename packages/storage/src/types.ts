@@ -6,7 +6,15 @@ export type ContributorRole = "owner" | "maintainer" | "reviewer" | "contributor
 export type IssueType = "bug" | "security" | "compatibility" | "feature" | "docs";
 export type IssueStatus = "open" | "triaged" | "closed";
 export type IssueSeverity = "low" | "medium" | "high" | "critical";
-export type LeaderboardSort = "downloads" | "rating" | "quality" | "security" | "functional" | "recent";
+export type LeaderboardSort =
+  | "downloads"
+  | "rating"
+  | "compliance"
+  | "quality"
+  | "security"
+  | "privacy"
+  | "reliability"
+  | "recent";
 export type ArtifactProvider = "minio";
 
 export interface ArtifactDescriptor {

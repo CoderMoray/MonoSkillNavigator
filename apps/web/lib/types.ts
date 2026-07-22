@@ -1,14 +1,20 @@
 export type ReviewVerdict = "published" | "needs-review" | "rejected";
 export type ReviewSeverity = "low" | "medium" | "high" | "critical";
-export type ReviewCategory = "compliance" | "leakage" | "privacy" | "security" | "functional";
+export type ReviewCategory =
+  | "compliance"
+  | "quality"
+  | "leakage"
+  | "privacy"
+  | "security"
+  | "reliability";
 export type EvaluationStatus = "passed" | "partial" | "failed" | "not-configured";
 
 export interface ReviewScores {
-  qualityScore: number;
+  complianceScore: number;
   securityScore: number;
   privacyScore: number;
-  functionalScore: number;
-  overallScore: number;
+  qualityScore: number;
+  reliabilityScore: number;
 }
 
 export interface ReviewFinding {

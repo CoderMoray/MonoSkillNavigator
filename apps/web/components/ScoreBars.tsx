@@ -1,11 +1,11 @@
 import type { ReviewScores } from "../lib/types";
 
 const rows: Array<[keyof ReviewScores, string]> = [
-  ["overallScore", "综合"],
-  ["qualityScore", "质量"],
+  ["complianceScore", "合规"],
   ["securityScore", "安全"],
   ["privacyScore", "隐私"],
-  ["functionalScore", "功能"]
+  ["qualityScore", "质量"],
+  ["reliabilityScore", "可靠性"]
 ];
 
 export function ScoreBars({ scores }: { scores: ReviewScores }) {

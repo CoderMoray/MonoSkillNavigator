@@ -8,11 +8,11 @@ export const skillReviews = pgTable("skill_reviews", {
   reportVersion: text("report_version").notNull(),
   contentHash: text("content_hash").notNull(),
   verdict: text("verdict").notNull(),
+  complianceScore: integer("compliance_score").notNull(),
   qualityScore: integer("quality_score").notNull(),
   securityScore: integer("security_score").notNull(),
   privacyScore: integer("privacy_score").notNull(),
-  functionalScore: integer("functional_score").notNull(),
-  overallScore: integer("overall_score").notNull(),
+  reliabilityScore: integer("reliability_score").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
   uniqueIndex("skill_reviews_pkey").on(table.skillSlug, table.version),

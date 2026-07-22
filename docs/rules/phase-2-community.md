@@ -1,6 +1,6 @@
-# Phase 2 功能评估与社区协作规则
+# Phase 2 可靠性评估与社区协作规则
 
-## 功能性评估
+## 可靠性评估
 
 Phase 2 使用 `tests/*.json` 作为轻量任务集格式：
 
@@ -61,7 +61,9 @@ Phase 2 只支持创建和查询，状态流转留到后续管理后台实现。
 
 - `downloads`：下载总量。
 - `rating`：平均用户评分，评分数作为次级排序。
+- `compliance`：最新版本合规分。
 - `quality`：最新版本质量分。
 - `security`：最新版本安全分。
-- `functional`：最新版本功能性分。
+- `privacy`：最新版本隐私分。
+- `reliability`：最新版本可靠性分（HaluCatch 或任务集回退）。
 - `recent`：最近更新时间。

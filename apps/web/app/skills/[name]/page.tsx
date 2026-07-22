@@ -273,7 +273,7 @@ export default function SkillDetailPage() {
     },
     {
       id: "evaluation",
-      title: "质量评估",
+      title: "可靠性评估",
       icon: Gauge,
       meta: currentVersion.evaluation
         ? isHaluCatchEvaluation
@@ -1033,12 +1033,12 @@ export default function SkillDetailPage() {
             <>
               <div className="detail-panel-head">
                 <div>
-                  <span className="eyebrow">{isHaluCatchEvaluation ? "HaluCatch reliability" : "Functional check"}</span>
-                  <h2>{isHaluCatchEvaluation ? "HaluCatch 质量与功能评估" : "功能评估"}</h2>
+                  <span className="eyebrow">{isHaluCatchEvaluation ? "HaluCatch reliability" : "Reliability check"}</span>
+                  <h2>{isHaluCatchEvaluation ? "HaluCatch 可靠性评估" : "可靠性评估"}</h2>
                   <p className="description">
                     {isHaluCatchEvaluation
                       ? "基于五维静态可靠性检查，评估 Skill 的可复现性、规则清晰度与执行护栏。"
-                      : "查看功能性任务集的完成情况与发现。"}
+                      : "查看可靠性任务集的完成情况与发现。"}
                   </p>
                 </div>
                 {currentVersion.evaluation ? <EvaluationBadge status={currentVersion.evaluation.status} /> : null}
@@ -1051,7 +1051,7 @@ export default function SkillDetailPage() {
                       <strong>{isHaluCatchEvaluation ? "HaluCatch" : currentVersion.evaluation.provider}</strong>
                     </div>
                     <div>
-                      <span>Score</span>
+                      <span>可靠性分</span>
                       <strong>{currentVersion.evaluation.score}</strong>
                     </div>
                     <div>
@@ -1092,7 +1092,7 @@ export default function SkillDetailPage() {
                         {currentVersion.evaluation.findings.map((finding) => (
                           <li className={`list-item finding ${finding.severity}`} key={finding.id}>
                             <div className="card-head">
-                              <strong>{finding.task ?? "功能性检查"}</strong>
+                              <strong>{finding.task ?? "可靠性检查"}</strong>
                               <SeverityBadge severity={finding.severity} />
                             </div>
                             <p className="description">{finding.message}</p>
@@ -1104,7 +1104,7 @@ export default function SkillDetailPage() {
                   ) : null}
                 </>
               ) : (
-                <div className="empty detail-empty">该版本暂无功能性评估报告。</div>
+                <div className="empty detail-empty">该版本暂无可靠性评估报告。</div>
               )}
             </>
           ) : null}

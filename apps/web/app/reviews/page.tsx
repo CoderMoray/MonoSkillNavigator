@@ -51,12 +51,14 @@ export default function ReviewsPage() {
     const findings = versions.flatMap((version) => version.review.findings);
     const blockers = findings.filter((finding) => finding.severity === "critical" || finding.severity === "high").length;
     const passed = versions.filter((version) => version.status === "published").length;
-    const average =
+    const averageReliability =
       versions.length === 0
         ? 0
-        : Math.round(versions.reduce((total, version) => total + version.review.scores.overallScore, 0) / versions.length);
+        : Math.round(
+            versions.reduce((total, version) => total + version.review.scores.reliabilityScore, 0) / versions.length
+          );
 
-    return { versions: versions.length, findings, blockers, passed, average };
+    return { versions: versions.length, findings, blockers, passed, averageReliability };
   }, [skills]);
 
   return (
@@ -68,9 +70,9 @@ export default function ReviewsPage() {
               <ShieldCheck size={14} />
               Review Center
             </span>
-            <h1>审查、评分和功能性评估集中视图。</h1>
+            <h1>审查、评分和可靠性评估集中视图。</h1>
             <p>
-              这里聚合最新版本的审查结果，帮助你快速定位高风险 finding、确认发布状态，并查看功能性任务集是否完善。
+              这里聚合最新版本的审查结果，帮助你快速定位高风险 finding、确认发布状态，并查看可靠性证据是否完善。
             </p>
           </div>
           <div className="stats-card hero-card">
@@ -78,7 +80,7 @@ export default function ReviewsPage() {
               <Stat label="版本数" value={reviewStats.versions} />
               <Stat label="已发布" value={reviewStats.passed} />
               <Stat label="阻断项" value={reviewStats.blockers} />
-              <Stat label="平均分" value={reviewStats.average} />
+              <Stat label="平均可靠性" value={reviewStats.averageReliability} />
             </div>
           </div>
         </section>
@@ -150,7 +152,7 @@ export default function ReviewsPage() {
           <div className="section-head">
             <div>
               <h2>审查规则摘要</h2>
-              <p>当前审查引擎以静态扫描为主，功能性评估来自 tests/*.json 任务集。</p>
+              <p>当前审查引擎以静态扫描为主，可靠性评估来自 HaluCatch，必要时回退到 tests/*.json 任务集。</p>
             </div>
             <ShieldAlert color="var(--amber)" />
           </div>
@@ -159,7 +161,7 @@ export default function ReviewsPage() {
               <ShieldCheck size={16} color="var(--green)" /> Critical / High finding 会阻断发布。
             </li>
             <li className="list-item">
-              <Activity size={16} color="var(--blue)" /> Functional score 来自任务输入、期望输出和禁止行为覆盖度。
+              <Activity size={16} color="var(--blue)" /> 可靠性分来自 HaluCatch 五维静态评估，并结合任务集、示例和验收证据。
             </li>
             <li className="list-item">
               <ShieldAlert size={16} color="var(--amber)" /> 网络、凭证、危险命令、持久化、混淆代码会被重点标记。

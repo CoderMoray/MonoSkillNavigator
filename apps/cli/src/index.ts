@@ -123,7 +123,7 @@ program
 program
   .command("top")
   .description("Show registry leaderboard")
-  .option("--sort <sort>", "downloads, rating, quality, security, functional, recent", "downloads")
+  .option("--sort <sort>", "downloads, rating, compliance, quality, security, privacy, reliability, recent", "downloads")
   .option("--limit <limit>", "Number of skills to show", "20")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
   .action(async (options: { sort: string; limit: string; registry: string }) => {
@@ -376,7 +376,7 @@ function printReview(report: ReviewReport): void {
   console.log(`Review: ${report.skillName}@${report.version}`);
   console.log(`Verdict: ${report.verdict}`);
   console.log(
-    `Scores: overall=${report.scores.overallScore}, quality=${report.scores.qualityScore}, security=${report.scores.securityScore}, privacy=${report.scores.privacyScore}, functional=${report.scores.functionalScore}`
+    `Scores: compliance=${report.scores.complianceScore}, security=${report.scores.securityScore}, privacy=${report.scores.privacyScore}, quality=${report.scores.qualityScore}, reliability=${report.scores.reliabilityScore}`
   );
 
   if (report.findings.length === 0) {

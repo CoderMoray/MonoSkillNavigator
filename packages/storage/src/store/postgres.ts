@@ -133,11 +133,11 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         description: schema.skills.description,
         latestVersion: schema.skills.latestVersion,
         status: schema.skillVersions.status,
+        complianceScore: schema.skillReviews.complianceScore,
         qualityScore: schema.skillReviews.qualityScore,
         securityScore: schema.skillReviews.securityScore,
         privacyScore: schema.skillReviews.privacyScore,
-        functionalScore: schema.skillReviews.functionalScore,
-        overallScore: schema.skillReviews.overallScore,
+        reliabilityScore: schema.skillReviews.reliabilityScore,
         averageRating: schema.skills.averageRating,
         ratingCount: schema.skills.ratingCount,
         totalDownloads: sql<number>`coalesce(sum(${schema.skillVersions.downloads}), 0)`.mapWith(Number),
@@ -178,9 +178,9 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       .groupBy(
         schema.skills.slug, schema.skills.name, schema.skills.description,
         schema.skills.latestVersion, schema.skillVersions.status,
-        schema.skillReviews.qualityScore, schema.skillReviews.securityScore,
-        schema.skillReviews.privacyScore, schema.skillReviews.functionalScore,
-        schema.skillReviews.overallScore, schema.skills.averageRating,
+        schema.skillReviews.complianceScore, schema.skillReviews.qualityScore,
+        schema.skillReviews.securityScore, schema.skillReviews.privacyScore,
+        schema.skillReviews.reliabilityScore, schema.skills.averageRating,
         schema.skills.ratingCount, schema.skills.updatedAt
       )
       .orderBy(desc(schema.skills.updatedAt));
@@ -215,11 +215,11 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       latestVersion: r.latestVersion,
       status: r.status as SkillSearchResult["status"],
       scores: {
+        complianceScore: Number(r.complianceScore),
         qualityScore: Number(r.qualityScore),
         securityScore: Number(r.securityScore),
         privacyScore: Number(r.privacyScore),
-        functionalScore: Number(r.functionalScore),
-        overallScore: Number(r.overallScore),
+        reliabilityScore: Number(r.reliabilityScore),
       },
       averageRating: Number(r.averageRating),
       ratingCount: Number(r.ratingCount),
@@ -392,9 +392,9 @@ export class PostgresRegistryStore extends JsonRegistryStore {
           version: review.reportVersion, contentHash: review.contentHash,
           verdict: review.verdict as RegistryVersion["status"],
           scores: {
-            qualityScore: Number(review.qualityScore), securityScore: Number(review.securityScore),
-            privacyScore: Number(review.privacyScore), functionalScore: Number(review.functionalScore),
-            overallScore: Number(review.overallScore),
+            complianceScore: Number(review.complianceScore), qualityScore: Number(review.qualityScore),
+            securityScore: Number(review.securityScore), privacyScore: Number(review.privacyScore),
+            reliabilityScore: Number(review.reliabilityScore),
           },
           findings: findings.map((f) => ({
             id: f.findingId, category: f.category as any, severity: f.severity as any,
@@ -561,17 +561,17 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     await this.db.insert(schema.skillReviews).values({
       skillSlug: slug, version, reviewId: review.id, reportVersion: review.version ?? "1.0",
       contentHash: review.contentHash ?? "", verdict: review.verdict,
-      qualityScore: review.scores.qualityScore, securityScore: review.scores.securityScore,
-      privacyScore: review.scores.privacyScore, functionalScore: review.scores.functionalScore,
-      overallScore: review.scores.overallScore, createdAt,
+      complianceScore: review.scores.complianceScore, qualityScore: review.scores.qualityScore,
+      securityScore: review.scores.securityScore, privacyScore: review.scores.privacyScore,
+      reliabilityScore: review.scores.reliabilityScore, createdAt,
     }).onConflictDoUpdate({
       target: [schema.skillReviews.skillSlug, schema.skillReviews.version],
       set: {
         reviewId: review.id, reportVersion: review.version ?? "1.0",
         contentHash: review.contentHash ?? "", verdict: review.verdict,
-        qualityScore: review.scores.qualityScore, securityScore: review.scores.securityScore,
-        privacyScore: review.scores.privacyScore, functionalScore: review.scores.functionalScore,
-        overallScore: review.scores.overallScore,
+        complianceScore: review.scores.complianceScore, qualityScore: review.scores.qualityScore,
+        securityScore: review.scores.securityScore, privacyScore: review.scores.privacyScore,
+        reliabilityScore: review.scores.reliabilityScore,
       },
     });
 
@@ -719,9 +719,9 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         skillSlug: slug, version, reviewId: review.id ?? `review_${Date.now()}`,
         reportVersion: review.version ?? "1.0", contentHash: review.contentHash ?? "",
         verdict: review.verdict,
-        qualityScore: review.scores.qualityScore, securityScore: review.scores.securityScore,
-        privacyScore: review.scores.privacyScore, functionalScore: review.scores.functionalScore,
-        overallScore: review.scores.overallScore, createdAt: now,
+        complianceScore: review.scores.complianceScore, qualityScore: review.scores.qualityScore,
+        securityScore: review.scores.securityScore, privacyScore: review.scores.privacyScore,
+        reliabilityScore: review.scores.reliabilityScore, createdAt: now,
       });
 
       if (review.findings?.length) {

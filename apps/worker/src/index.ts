@@ -25,6 +25,6 @@ const reviewed = await store.reviewAll(
 console.log(`Reviewed ${reviewed.length} skill versions`);
 for (const item of reviewed) {
   console.log(
-    `${item.review.skillSlug} (${item.manifest.name})@${item.version}: ${item.status} overall=${item.review.scores.overallScore} functional=${item.evaluation?.score ?? "n/a"}`
+    `${item.review.skillSlug} (${item.manifest.name})@${item.version}: ${item.status} reliability=${item.review.scores.reliabilityScore} evaluation=${item.evaluation?.score ?? "n/a"}`
   );
 }

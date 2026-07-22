@@ -7,10 +7,10 @@ export function VerdictBadge({ verdict }: { verdict: ReviewVerdict }) {
 
 export function EvaluationBadge({ status }: { status: EvaluationStatus }) {
   const labels: Record<EvaluationStatus, string> = {
-    passed: "功能通过",
+    passed: "可靠性通过",
     partial: "部分通过",
-    failed: "功能失败",
-    "not-configured": "未配置任务集"
+    failed: "可靠性失败",
+    "not-configured": "未配置可靠性评估"
   };
 
   return <span className={`badge ${status}`}>{labels[status]}</span>;

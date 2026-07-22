@@ -121,8 +121,10 @@ export default function SkillsPage() {
               <Trophy size={16} />
               <select className="select" disabled={Boolean(query.trim())} onChange={(event) => setSort(event.target.value)} value={sort}>
                 <option value="recent">New</option>
-                <option value="functional">Top</option>
+                <option value="reliability">Reliability</option>
+                <option value="compliance">Compliance</option>
                 <option value="security">Security</option>
+                <option value="privacy">Privacy</option>
                 <option value="quality">Quality</option>
                 <option value="rating">Rating</option>
                 <option value="downloads">Trending</option>

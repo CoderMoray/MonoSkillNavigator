@@ -97,7 +97,7 @@
 - [ ] Skill 产物 / 效果展示 Tab（可选上传 demo 截图、示例输出；不影响发布，有则展示）
 - [ ] 搜索：名称 / slug 精确匹配 + tag 过滤 + 切词 / 语义匹配（向量或全文索引）
 - [ ] 搜索支持多维度筛选（评分、发布时间、审查状态）
-- [ ] 排行榜：移除或替换「综合分」；按 functional / compliance / 单项维度排序
+- [x] 排行榜：移除「综合分」；按 reliability / compliance / security / privacy / quality 单项维度排序
 - [ ] 排行榜交互（切换排序维度、分页）
 - [ ] Keynote / 设计稿（`.docx`）中的前端视觉修改落地
 
@@ -121,7 +121,7 @@
 审查分两段：
 
 1. **平台静态检查**（合规、格式、隐私、安全）— 本地 `review-engine` + 可选外部扫描
-2. **HaluCatch 质量检查**（功能性 / 幻觉类）— 当前发布同步执行静态五维检查，后续迁入异步 Worker
+2. **HaluCatch 可靠性检查**（功能性 / 幻觉类）— 当前发布同步执行静态五维检查，后续迁入异步 Worker
 
 
 
@@ -144,7 +144,7 @@
 
 ### 2.3 质量可视化
 
-- [ ] 审查 / 评估维度雷达图：**当前 Skill vs 平台均值**（compliance、security、privacy、functional 等）
+- [ ] 审查 / 评估维度雷达图：**当前 Skill vs 平台均值**（compliance、security、privacy、quality、reliability）
 - [ ] 详情页与审查中心统一展示组件
 
 ---

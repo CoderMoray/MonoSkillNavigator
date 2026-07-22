@@ -23,7 +23,7 @@ import { getLeaderboard } from "../lib/api";
 import type { SkillSearchResult } from "../lib/types";
 
 const sortTabs = [
-  { value: "functional", label: "Top" },
+  { value: "reliability", label: "Top" },
   { value: "downloads", label: "Trending" },
   { value: "recent", label: "New" }
 ];
@@ -42,7 +42,7 @@ const appTiles = [
 export default function HomePage() {
   const router = useRouter();
   const [items, setItems] = useState<SkillSearchResult[]>([]);
-  const [sort, setSort] = useState("functional");
+  const [sort, setSort] = useState("reliability");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -95,7 +95,7 @@ export default function HomePage() {
           </span>
           <h1>Discover trusted skills from standout creators.</h1>
           <p>
-            搜索、审查、安装和分发适用于 AI Agent 的 Skill。每个包都经过格式、安全、隐私和功能性评估。
+            搜索、审查、安装和分发适用于 AI Agent 的 Skill。每个包都经过合规、安全、隐私、质量和可靠性评估。
           </p>
 
           <form className="hero-search" onSubmit={handleSearch}>

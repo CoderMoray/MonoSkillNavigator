@@ -7,7 +7,13 @@ import {
 } from "@skill-platform/skill-spec";
 import { evaluateSkillSnapshot, type FunctionalEvaluationReport } from "@skill-platform/evaluator";
 
-export type ReviewCategory = "compliance" | "leakage" | "privacy" | "security" | "functional";
+export type ReviewCategory =
+  | "compliance"
+  | "quality"
+  | "leakage"
+  | "privacy"
+  | "security"
+  | "reliability";
 export type ReviewSeverity = "low" | "medium" | "high" | "critical";
 export type ReviewVerdict = "published" | "needs-review" | "rejected";
 
@@ -23,11 +29,11 @@ export interface ReviewFinding {
 }
 
 export interface ReviewScores {
-  qualityScore: number;
+  complianceScore: number;
   securityScore: number;
   privacyScore: number;
-  functionalScore: number;
-  overallScore: number;
+  qualityScore: number;
+  reliabilityScore: number;
 }
 
 export interface ReviewReport {
@@ -150,7 +156,7 @@ export async function reviewSkillSnapshot(
 
   reviewManifest(snapshot, findings);
   reviewContent(snapshot, findings);
-  reviewFunctionalEvidence(snapshot, findings);
+  reviewQualityEvidence(snapshot, findings);
 
   const evaluation = evaluationOverride ?? await evaluateSkillSnapshot(snapshot);
   const scores = calculateScores(findings, snapshot, evaluation);
@@ -176,7 +182,7 @@ function reviewManifest(snapshot: SkillSnapshot, findings: ReviewFinding[]): voi
   if (!/\b(use when|when|用于|适用|触发|场景)\b/i.test(description)) {
     findings.push({
       id: "description-trigger-missing",
-      category: "compliance",
+      category: "quality",
       severity: "medium",
       title: "Description lacks trigger scenario",
       message: "Description should explain both what the skill does and when the agent should use it.",
@@ -207,7 +213,7 @@ function reviewManifest(snapshot: SkillSnapshot, findings: ReviewFinding[]): voi
   if (!manifest.tags?.length) {
     findings.push({
       id: "tags-missing",
-      category: "compliance",
+      category: "quality",
       severity: "low",
       title: "Tags are missing",
       message: "The manifest does not include tags.",
@@ -235,7 +241,7 @@ function reviewManifest(snapshot: SkillSnapshot, findings: ReviewFinding[]): voi
   if (skillEntry && skillEntry.content.split(/\r?\n/).length > 500) {
     findings.push({
       id: "skill-md-too-long",
-      category: "compliance",
+      category: "quality",
       severity: "low",
       title: "Skill entry file is long",
       message: `${skillEntryPath} exceeds the recommended 500 line limit.`,
@@ -247,7 +253,7 @@ function reviewManifest(snapshot: SkillSnapshot, findings: ReviewFinding[]): voi
   if (readme.trim().length < 80) {
     findings.push({
       id: "instructions-too-short",
-      category: "functional",
+      category: "quality",
       severity: "medium",
       title: "Skill instructions are too short",
       message: "The instruction body is too short to guide reliable agent behavior.",
@@ -279,7 +285,7 @@ function reviewContent(snapshot: SkillSnapshot, findings: ReviewFinding[]): void
   }
 }
 
-function reviewFunctionalEvidence(snapshot: SkillSnapshot, findings: ReviewFinding[]): void {
+function reviewQualityEvidence(snapshot: SkillSnapshot, findings: ReviewFinding[]): void {
   const hasTests = snapshot.files.some((file) => file.path.startsWith("tests/"));
   const hasExamples = snapshot.files.some((file) => file.path.startsWith("examples/"));
   const hasAcceptanceLanguage = snapshot.files.some((file) =>
@@ -289,7 +295,7 @@ function reviewFunctionalEvidence(snapshot: SkillSnapshot, findings: ReviewFindi
   if (!hasTests) {
     findings.push({
       id: "tests-missing",
-      category: "functional",
+      category: "quality",
       severity: "medium",
       title: "Functional tests are missing",
       message: "No tests/ directory was found.",
@@ -300,7 +306,7 @@ function reviewFunctionalEvidence(snapshot: SkillSnapshot, findings: ReviewFindi
   if (!hasExamples) {
     findings.push({
       id: "examples-missing",
-      category: "functional",
+      category: "quality",
       severity: "low",
       title: "Examples are missing",
       message: "No examples/ directory was found.",
@@ -311,7 +317,7 @@ function reviewFunctionalEvidence(snapshot: SkillSnapshot, findings: ReviewFindi
   if (!hasAcceptanceLanguage) {
     findings.push({
       id: "acceptance-criteria-missing",
-      category: "functional",
+      category: "quality",
       severity: "low",
       title: "Acceptance criteria are missing",
       message: "The skill does not describe expected outputs or forbidden behavior.",
@@ -322,36 +328,22 @@ function reviewFunctionalEvidence(snapshot: SkillSnapshot, findings: ReviewFindi
 
 function calculateScores(
   findings: ReviewFinding[],
-  snapshot: SkillSnapshot,
+  _snapshot: SkillSnapshot,
   evaluation: FunctionalEvaluationReport
 ): ReviewScores {
-  const staticQualityScore = clampScore(100 - penalty(findings, ["compliance"]));
-  // HaluCatch measures execution reliability, which is a quality signal but
-  // must not replace the platform's format/compliance checks.
-  const qualityScore = Math.round(staticQualityScore * 0.65 + evaluation.score * 0.35);
+  const complianceScore = clampScore(100 - penalty(findings, ["compliance"]));
+  const qualityScore = clampScore(100 - penalty(findings, ["quality"]));
   const securityScore = clampScore(100 - penalty(findings, ["security", "leakage"]));
   const privacyScore = clampScore(100 - penalty(findings, ["privacy"]));
-  const functionalScore = calculateFunctionalScore(findings, snapshot, evaluation);
-  const overallScore = Math.round(
-    qualityScore * 0.3 + securityScore * 0.35 + privacyScore * 0.25 + functionalScore * 0.1
-  );
+  const reliabilityScore = clampScore(evaluation.score);
 
   return {
-    qualityScore,
+    complianceScore,
     securityScore,
     privacyScore,
-    functionalScore,
-    overallScore
+    qualityScore,
+    reliabilityScore
   };
-}
-
-function calculateFunctionalScore(
-  findings: ReviewFinding[],
-  snapshot: SkillSnapshot,
-  evaluation: FunctionalEvaluationReport
-): number {
-  const staticEvidenceBonus = snapshot.files.some((file) => file.path.startsWith("examples/")) ? 5 : 0;
-  return clampScore(evaluation.score + staticEvidenceBonus - penalty(findings, ["functional"]) / 2);
 }
 
 function calculateVerdict(findings: ReviewFinding[]): ReviewVerdict {
