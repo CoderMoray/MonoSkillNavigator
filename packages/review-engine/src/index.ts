@@ -177,7 +177,7 @@ export async function reviewSkillSnapshot(
 
 function reviewManifest(snapshot: SkillSnapshot, findings: ReviewFinding[]): void {
   const { manifest, readme } = snapshot;
-  const description = manifest.description.trim();
+  const description = (manifest.description ?? "").trim();
 
   if (!/\b(use when|when|用于|适用|触发|场景)\b/i.test(description)) {
     findings.push({

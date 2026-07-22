@@ -351,36 +351,42 @@ export class PostgresRegistryStore extends JsonRegistryStore {
           }
         : undefined;
 
+      const manifest = {
+        slug,
+        name: v.manifestName,
+        description: v.manifestDescription,
+        version: v.manifestVersion ?? undefined,
+        author: v.manifestAuthor ?? undefined,
+        license: v.manifestLicense ?? undefined,
+        tags: tags.map((t) => t.tag),
+        ...(v.supportedAgentsDefined
+          ? { supportedAgents: v.supportedAgents }
+          : parsedManifest?.supportedAgents ? { supportedAgents: parsedManifest.supportedAgents } : {}),
+        ...(v.allowedToolsDefined
+          ? { "allowed-tools": v.allowedToolsIsScalar ? v.allowedTools[0] : v.allowedTools }
+          : parsedManifest?.["allowed-tools"] !== undefined
+            ? { "allowed-tools": parsedManifest["allowed-tools"] }
+            : {}),
+        ...(v.disallowedToolsDefined
+          ? { "disallowed-tools": v.disallowedToolsIsScalar ? v.disallowedTools[0] : v.disallowedTools }
+          : parsedManifest?.["disallowed-tools"] !== undefined
+            ? { "disallowed-tools": parsedManifest["disallowed-tools"] }
+            : {}),
+        categories: v.categories,
+        topics: v.topics,
+        "release-tags": v.releaseTags,
+      } as RegistryVersion["manifest"];
+
       versionMap[v.version] = {
         version: v.version,
-        manifest: {
-          slug, name: v.manifestName, description: v.manifestDescription,
-          version: v.manifestVersion ?? undefined,
-          author: v.manifestAuthor ?? undefined,
-          license: v.manifestLicense ?? undefined,
-          tags: tags.map((t) => t.tag),
-          ...(v.supportedAgentsDefined
-            ? { supportedAgents: v.supportedAgents }
-            : parsedManifest?.supportedAgents ? { supportedAgents: parsedManifest.supportedAgents } : {}),
-          ...(v.allowedToolsDefined
-            ? { "allowed-tools": v.allowedToolsIsScalar ? v.allowedTools[0] : v.allowedTools }
-            : parsedManifest?.["allowed-tools"] !== undefined
-              ? { "allowed-tools": parsedManifest["allowed-tools"] }
-              : {}),
-          ...(v.disallowedToolsDefined
-            ? { "disallowed-tools": v.disallowedToolsIsScalar ? v.disallowedTools[0] : v.disallowedTools }
-            : parsedManifest?.["disallowed-tools"] !== undefined
-              ? { "disallowed-tools": parsedManifest["disallowed-tools"] }
-              : {}),
-          categories: v.categories, topics: v.topics,
-          "release-tags": v.releaseTags,
-        } as RegistryVersion["manifest"],
+        manifest,
         contentHash: v.contentHash,
         snapshot: {
-          manifest: {} as RegistryVersion["manifest"],
+          manifest,
           readme: v.readme,
           files: files.map((f) => ({ path: f.path, content: f.content, size: f.size, sha256: f.sha256 })),
-          contentHash: v.contentHash, createdAt: String(v.snapshotCreatedAt),
+          contentHash: v.contentHash,
+          createdAt: String(v.snapshotCreatedAt),
         },
         artifact: v.artifactProvider ? {
           provider: v.artifactProvider as "minio", bucket: v.artifactBucket!,
