@@ -44,6 +44,10 @@ export class MinioArtifactStore implements ArtifactStore {
       : JSON.parse(body.toString("utf8")) as SkillSnapshot;
   }
 
+  async removeSnapshot(descriptor: ArtifactDescriptor): Promise<void> {
+    await this.client.removeObject(descriptor.bucket, descriptor.objectKey);
+  }
+
   private ensureBucket(): Promise<void> {
     this.bucketReady ??= (async () => {
       const exists = await this.client.bucketExists(this.options.bucket);

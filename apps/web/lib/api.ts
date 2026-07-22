@@ -30,8 +30,8 @@ export async function getLeaderboard(sort = "functional", limit = 8): Promise<Sk
   return data.items;
 }
 
-export async function getSkill(slug: string): Promise<RegistrySkill> {
-  return request<RegistrySkill>(new URL(`/skills/${encodeURIComponent(slug)}`, API_BASE_URL));
+export async function getSkill(slug: string, token?: string): Promise<RegistrySkill> {
+  return request<RegistrySkill>(new URL(`/skills/${encodeURIComponent(slug)}`, API_BASE_URL), { token });
 }
 
 export interface SkillDownloadResult {
@@ -222,6 +222,24 @@ export async function addSkillRating(
       body: JSON.stringify(input)
     }
   );
+}
+
+export async function unpublishSkill(token: string, slug: string): Promise<RegistrySkill> {
+  const data = await request<{ skill: RegistrySkill }>(
+    new URL(`/skills/${encodeURIComponent(slug)}/unpublish`, API_BASE_URL),
+    {
+      method: "POST",
+      token
+    }
+  );
+  return data.skill;
+}
+
+export async function deleteSkill(token: string, slug: string): Promise<void> {
+  await request<{ ok: boolean }>(new URL(`/skills/${encodeURIComponent(slug)}`, API_BASE_URL), {
+    method: "DELETE",
+    token
+  });
 }
 
 interface AuthResponse {

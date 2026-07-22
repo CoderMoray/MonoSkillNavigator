@@ -8,6 +8,7 @@ export const skills = pgTable("skills", {
   latestVersion: text("latest_version").notNull(),
   averageRating: numeric("average_rating", { precision: 3, scale: 1 }).notNull().default("0"),
   ratingCount: integer("rating_count").notNull().default(0),
+  published: boolean("published").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
 }, (table) => [

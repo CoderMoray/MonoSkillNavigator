@@ -17,6 +17,7 @@ import {
   createAuthStoreFromEnv,
   createRegistryStoreFromEnv,
   isSkillContributor,
+  isSkillOwner,
   loadDotEnvIfPresent,
   type ContributorRole,
   type IssueSeverity,
@@ -94,7 +95,8 @@ export function buildServer() {
   const authStore = createAuthStoreFromEnv();
 
   app.register(cors, {
-    origin: true
+    origin: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
   });
 
   app.get("/health", async () => ({
@@ -362,6 +364,13 @@ export function buildServer() {
       return reply.code(404).send({ error: "skill_not_found" });
     }
 
+    if (skill.published === false) {
+      const user = await getAuthenticatedUser(request.headers.authorization, authStore);
+      if (!user || !isSkillOwner(skill, user)) {
+        return reply.code(404).send({ error: "skill_not_found" });
+      }
+    }
+
     return skill;
   });
 
@@ -381,6 +390,14 @@ export function buildServer() {
       return;
     }
 
+    const skill = await store.getSkill(request.params.slug);
+    if (!skill) {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
+    if (skill.published === false && !isSkillOwner(skill, user)) {
+      return reply.code(404).send({ error: "skill_unpublished" });
+    }
+
     const snapshot = await store.downloadSnapshot(request.params.slug, request.params.version);
     if (!snapshot) {
       return reply.code(404).send({ error: "version_not_found" });
@@ -391,6 +408,50 @@ export function buildServer() {
       .header("content-type", "application/zip")
       .header("content-disposition", `attachment; filename="${fileName}"`)
       .send(skillSnapshotToZipBuffer(snapshot));
+  });
+
+  app.post<{ Params: SkillParams }>("/skills/:slug/unpublish", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
+    const skill = await store.getSkill(request.params.slug);
+    if (!skill) {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
+    if (!isSkillOwner(skill, user)) {
+      return reply.code(403).send({ error: "Forbidden" });
+    }
+
+    try {
+      const updated = await store.unpublishSkill(request.params.slug);
+      return { skill: updated };
+    } catch {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
+  });
+
+  app.delete<{ Params: SkillParams }>("/skills/:slug", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
+    const skill = await store.getSkill(request.params.slug);
+    if (!skill) {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
+    if (!isSkillOwner(skill, user)) {
+      return reply.code(403).send({ error: "Forbidden" });
+    }
+
+    try {
+      await store.deleteSkill(request.params.slug);
+      return { ok: true };
+    } catch {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
   });
 
   return app;

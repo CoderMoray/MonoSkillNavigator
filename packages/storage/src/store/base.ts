@@ -97,6 +97,7 @@ export abstract class JsonRegistryStore implements RegistryStore {
       ratings: existingSkill?.ratings ?? [],
       averageRating: existingSkill?.averageRating ?? 0,
       ratingCount: existingSkill?.ratingCount ?? 0,
+      published: true,
       createdAt: existingSkill?.createdAt ?? now,
       updatedAt: now,
     };
@@ -189,6 +190,7 @@ export abstract class JsonRegistryStore implements RegistryStore {
     const data = await this.load();
     const q = query.trim().toLowerCase();
     return Object.values(data.skills)
+      .filter((s) => s.published !== false)
       .filter((s) => !q || s.slug.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))
       .map(toSearchResult)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -232,6 +234,41 @@ export abstract class JsonRegistryStore implements RegistryStore {
     rv.updatedAt = new Date().toISOString();
     await this.save(data);
     return snapshot;
+  }
+
+  async unpublishSkill(slug: string): Promise<RegistrySkill> {
+    const data = await this.load();
+    const skill = data.skills[slug];
+    if (!skill) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+
+    const now = new Date().toISOString();
+    skill.published = false;
+    skill.updatedAt = now;
+    await this.save(data);
+    return skill;
+  }
+
+  async deleteSkill(slug: string): Promise<void> {
+    const data = await this.load();
+    const skill = data.skills[slug];
+    if (!skill) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+
+    if (this.artifactStore) {
+      for (const version of Object.values(skill.versions)) {
+        if (version.artifact && "removeSnapshot" in this.artifactStore) {
+          await (this.artifactStore as ArtifactStore & { removeSnapshot: (d: typeof version.artifact) => Promise<void> })
+            .removeSnapshot(version.artifact)
+            .catch(() => undefined);
+        }
+      }
+    }
+
+    delete data.skills[slug];
+    await this.save(data);
   }
 
   async reviewAll(

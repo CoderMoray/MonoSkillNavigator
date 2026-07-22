@@ -147,6 +147,7 @@ export interface RegistrySkill {
   ratings: RegistryRating[];
   averageRating: number;
   ratingCount: number;
+  published?: boolean;
   createdAt: string;
   updatedAt: string;
 }

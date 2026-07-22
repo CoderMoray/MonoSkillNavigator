@@ -535,6 +535,26 @@ button {
   color: var(--foreground);
 }
 
+.button.secondary.danger {
+  border-color: rgba(220, 38, 38, 0.28);
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.button.secondary.danger:hover {
+  border-color: rgba(220, 38, 38, 0.42);
+  background: rgba(254, 226, 226, 0.92);
+}
+
+:root[data-theme="dark"] .button.secondary.danger {
+  background: rgba(127, 29, 29, 0.28);
+  color: #fca5a5;
+}
+
+:root[data-theme="dark"] .button.secondary.danger:hover {
+  background: rgba(127, 29, 29, 0.42);
+}
+
 :root[data-theme="dark"] .button.secondary {
   background: rgba(24, 26, 36, 0.82);
 }

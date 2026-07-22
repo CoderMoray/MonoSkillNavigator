@@ -26,6 +26,7 @@ export function normalizeRegistryData(data: RegistryData): RegistryData {
     skill.issues ??= [];
     skill.ratings ??= [];
     skill.ratingCount ??= skill.ratings.length;
+    skill.published ??= true;
     skill.averageRating ??= calculateAverageRating(skill.ratings);
     updateRatingAggregate(skill);
 
@@ -133,6 +134,19 @@ export function resolveVersionReference(skill: RegistrySkill, version: string): 
     if (registryVersion.releaseTags.includes(version)) return versionKey;
   }
   return version;
+}
+
+export function isSkillOwner(
+  skill: RegistrySkill,
+  user: { id: string; username: string }
+): boolean {
+  if (skill.ownerUserId && skill.ownerUserId === user.id) {
+    return true;
+  }
+
+  return skill.contributors.some(
+    (contributor) => contributor.role === "owner" && matchesContributorUser(contributor, user.id, user.username)
+  );
 }
 
 export function isSkillContributor(

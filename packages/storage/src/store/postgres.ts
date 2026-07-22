@@ -164,13 +164,16 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         )
       )
       .where(
-        q
-          ? or(
-              ilike(schema.skills.slug, searchPattern),
-              ilike(schema.skills.name, searchPattern),
-              ilike(schema.skills.description, searchPattern)
-            )
-          : undefined
+        and(
+          eq(schema.skills.published, true),
+          q
+            ? or(
+                ilike(schema.skills.slug, searchPattern),
+                ilike(schema.skills.name, searchPattern),
+                ilike(schema.skills.description, searchPattern)
+              )
+            : undefined
+        )
       )
       .groupBy(
         schema.skills.slug, schema.skills.name, schema.skills.description,
@@ -425,6 +428,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         score: r.score, comment: r.comment ?? undefined, createdAt: String(r.createdAt),
       })),
       averageRating: Number(row.averageRating), ratingCount: Number(row.ratingCount),
+      published: row.published,
       createdAt: String(row.createdAt), updatedAt: String(row.updatedAt),
     };
   }
@@ -654,13 +658,14 @@ export class PostgresRegistryStore extends JsonRegistryStore {
             name,
             description,
             latestVersion: releaseTags.includes("latest") ? version : existingSkill.latestVersion,
+            published: true,
             updatedAt: now
           })
           .where(eq(schema.skills.slug, slug));
       } else {
         await tx.insert(schema.skills).values({
           slug, name, description, ownerUserId: options.owner?.userId ?? null,
-          latestVersion: version, createdAt: now, updatedAt: now,
+          latestVersion: version, published: true, createdAt: now, updatedAt: now,
         });
       }
 
@@ -802,6 +807,72 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     if (!skill) return undefined;
     const resolved = ver === "latest" ? skill.latestVersion : ver;
     return skill.versions[resolved];
+  }
+
+  async unpublishSkill(slug: string): Promise<RegistrySkill> {
+    await this.ensureSchema();
+    const now = new Date();
+    const updated = await this.db.update(schema.skills)
+      .set({ published: false, updatedAt: now })
+      .where(eq(schema.skills.slug, slug))
+      .returning({ slug: schema.skills.slug });
+
+    if (updated.length === 0) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+
+    const skill = await this.getSkill(slug);
+    if (!skill) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+    return skill;
+  }
+
+  async deleteSkill(slug: string): Promise<void> {
+    await this.ensureSchema();
+
+    const versions = await this.db.select({
+      artifactProvider: schema.skillVersions.artifactProvider,
+      artifactBucket: schema.skillVersions.artifactBucket,
+      artifactObjectKey: schema.skillVersions.artifactObjectKey,
+      artifactContentHash: schema.skillVersions.artifactContentHash,
+      artifactSize: schema.skillVersions.artifactSize,
+      artifactStoredAt: schema.skillVersions.artifactStoredAt,
+    }).from(schema.skillVersions).where(eq(schema.skillVersions.skillSlug, slug));
+
+    const artifacts: ArtifactDescriptor[] = versions
+      .filter((version) => version.artifactProvider && version.artifactObjectKey)
+      .map((version) => ({
+        provider: version.artifactProvider as ArtifactProvider,
+        bucket: version.artifactBucket!,
+        objectKey: version.artifactObjectKey!,
+        contentHash: version.artifactContentHash ?? "",
+        size: Number(version.artifactSize ?? 0),
+        storedAt: String(version.artifactStoredAt ?? ""),
+      }));
+
+    await this.db.transaction(async (tx) => {
+      await tx.delete(schema.skillEvaluationReportFindings).where(eq(schema.skillEvaluationReportFindings.skillSlug, slug));
+      await tx.delete(schema.skillEvaluationTaskFindings).where(eq(schema.skillEvaluationTaskFindings.skillSlug, slug));
+      await tx.delete(schema.skillEvaluationTasks).where(eq(schema.skillEvaluationTasks.skillSlug, slug));
+      await tx.delete(schema.skillEvaluations).where(eq(schema.skillEvaluations.skillSlug, slug));
+      await tx.delete(schema.skillReviewFindings).where(eq(schema.skillReviewFindings.skillSlug, slug));
+      await tx.delete(schema.skillReviews).where(eq(schema.skillReviews.skillSlug, slug));
+      await tx.delete(schema.skillVersionFiles).where(eq(schema.skillVersionFiles.skillSlug, slug));
+      await tx.delete(schema.skillVersionManifestProperties).where(eq(schema.skillVersionManifestProperties.skillSlug, slug));
+      await tx.delete(schema.skillVersionTags).where(eq(schema.skillVersionTags.skillSlug, slug));
+      await tx.delete(schema.skillVersions).where(eq(schema.skillVersions.skillSlug, slug));
+      await tx.delete(schema.skills).where(eq(schema.skills.slug, slug));
+    });
+
+    const artifactStore = (this as unknown as {
+      artifactStore?: ArtifactStore & { removeSnapshot?: (descriptor: ArtifactDescriptor) => Promise<void> };
+    }).artifactStore;
+    if (artifactStore?.removeSnapshot) {
+      for (const artifact of artifacts) {
+        await artifactStore.removeSnapshot(artifact).catch(() => undefined);
+      }
+    }
   }
 
 

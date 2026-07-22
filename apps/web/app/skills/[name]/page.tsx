@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { LucideIcon } from "lucide-react";
@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Copy,
   Download,
+  EyeOff,
   FileCode2,
   FileText,
   Files,
@@ -23,13 +24,14 @@ import {
   Plus,
   ShieldCheck,
   Star,
+  Trash2,
   Users,
   X
 } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { ScoreBars } from "../../../components/ScoreBars";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
-import { addSkillContributor, addSkillRating, createSkillIssue, downloadSkillVersion, getCurrentUser, getSkill, saveBlobAsFile } from "../../../lib/api";
+import { addSkillContributor, addSkillRating, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, saveBlobAsFile, unpublishSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { formatDateTime, formatNumber } from "../../../lib/format";
 import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill } from "../../../lib/types";
@@ -73,6 +75,7 @@ function stripFrontmatter(markdown: string): string {
 
 export default function SkillDetailPage() {
   const params = useParams<{ name: string }>();
+  const router = useRouter();
   const skillSlug = decodeURIComponent(params.name);
   const [skill, setSkill] = useState<RegistrySkill | null>(null);
   const [viewer, setViewer] = useState<PublicUser | null>(null);
@@ -104,6 +107,12 @@ export default function SkillDetailPage() {
   const [downloadingVersion, setDownloadingVersion] = useState<string | null>(null);
   const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [unpublishModalOpen, setUnpublishModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [manageMessage, setManageMessage] = useState<string | null>(null);
+  const [manageError, setManageError] = useState<string | null>(null);
+  const [unpublishingSkill, setUnpublishingSkill] = useState(false);
+  const [deletingSkill, setDeletingSkill] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,7 +123,7 @@ export default function SkillDetailPage() {
       try {
         const token = getAuthToken();
         const [data, currentUser] = await Promise.all([
-          getSkill(skillSlug),
+          getSkill(skillSlug, token ?? undefined),
           token ? getCurrentUser(token).catch(() => null) : Promise.resolve(null)
         ]);
         if (!cancelled) {
@@ -143,7 +152,7 @@ export default function SkillDetailPage() {
   }, [skillSlug]);
 
   useEffect(() => {
-    if (!issueModalOpen && !ratingModalOpen) {
+    if (!issueModalOpen && !ratingModalOpen && !unpublishModalOpen && !deleteModalOpen) {
       return;
     }
 
@@ -151,14 +160,17 @@ export default function SkillDetailPage() {
       if (event.key === "Escape") {
         setIssueModalOpen(false);
         setRatingModalOpen(false);
+        setUnpublishModalOpen(false);
+        setDeleteModalOpen(false);
         setIssueError(null);
         setRatingError(null);
+        setManageError(null);
       }
     }
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [issueModalOpen, ratingModalOpen]);
+  }, [issueModalOpen, ratingModalOpen, unpublishModalOpen, deleteModalOpen]);
 
   const currentVersion = useMemo(() => {
     if (!skill) {
@@ -273,6 +285,7 @@ export default function SkillDetailPage() {
       meta: `${openIssues.length} 个开放 Issue`
     }
   ];
+  const isUnpublished = skill.published === false;
   const installCommand = `npm run skill -- install ${skill.slug}`;
 
   function openIssueModal() {
@@ -456,13 +469,58 @@ export default function SkillDetailPage() {
     try {
       const { blob, fileName } = await downloadSkillVersion(token, skill.slug, version);
       saveBlobAsFile(blob, fileName);
-      const updated = await getSkill(skill.slug);
+      const updated = await getSkill(skill.slug, token);
       setSkill(updated);
       setDownloadMessage(`已下载 v${version}（${fileName}）`);
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : "下载失败");
     } finally {
       setDownloadingVersion(null);
+    }
+  }
+
+  async function handleUnpublish() {
+    setManageError(null);
+    setManageMessage(null);
+
+    const token = getAuthToken();
+    if (!token) {
+      setManageError("请先登录后再操作。");
+      return;
+    }
+
+    setUnpublishingSkill(true);
+    try {
+      const updated = await unpublishSkill(token, skill.slug);
+      setSkill(updated);
+      setUnpublishModalOpen(false);
+      setManageMessage("Skill 已下架，将不再出现在 Skill 广场与排行榜。");
+    } catch (err) {
+      setManageError(err instanceof Error ? err.message : "下架失败");
+    } finally {
+      setUnpublishingSkill(false);
+    }
+  }
+
+  async function handleDelete() {
+    setManageError(null);
+    setManageMessage(null);
+
+    const token = getAuthToken();
+    if (!token) {
+      setManageError("请先登录后再操作。");
+      return;
+    }
+
+    setDeletingSkill(true);
+    try {
+      await deleteSkill(token, skill.slug);
+      setDeleteModalOpen(false);
+      router.push("/account");
+    } catch (err) {
+      setManageError(err instanceof Error ? err.message : "删除失败");
+    } finally {
+      setDeletingSkill(false);
     }
   }
 
@@ -484,6 +542,7 @@ export default function SkillDetailPage() {
             <div className="tag-row">
               <span className="badge mono">{skill.slug}</span>
               <span className="badge">v{currentVersion.version}</span>
+              {isUnpublished ? <span className="badge">已下架</span> : null}
               <span className="badge">
                 <Star size={13} /> {skill.averageRating ? skill.averageRating.toFixed(1) : "暂无评分"}
               </span>
@@ -523,6 +582,14 @@ export default function SkillDetailPage() {
                 <Link className="button primary" href={`/skills/publish?skill=${encodeURIComponent(skill.slug)}`}>
                   <Plus size={16} /> 发布新版本
                 </Link>
+                {!isUnpublished ? (
+                  <button className="button secondary" onClick={() => setUnpublishModalOpen(true)} type="button">
+                    <EyeOff size={16} /> 下架
+                  </button>
+                ) : null}
+                <button className="button secondary danger" onClick={() => setDeleteModalOpen(true)} type="button">
+                  <Trash2 size={16} /> 删除
+                </button>
               </div>
             ) : (
               <div className="hero-actions">
@@ -545,6 +612,11 @@ export default function SkillDetailPage() {
             )}
             {downloadMessage ? <div className="notice">{downloadMessage}</div> : null}
             {downloadError ? <div className="error">{downloadError}</div> : null}
+            {manageMessage ? <div className="notice">{manageMessage}</div> : null}
+            {manageError ? <div className="error">{manageError}</div> : null}
+            {isOwner && isUnpublished ? (
+              <p className="description">此 Skill 已下架，仅你可见。发布新版本后将重新上架。</p>
+            ) : null}
           </div>
 
           <aside className="hero-card detail-summary-card">
@@ -1265,6 +1337,124 @@ export default function SkillDetailPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        ) : null}
+
+        {unpublishModalOpen ? (
+          <div
+            className="modal-overlay"
+            onClick={() => {
+              setUnpublishModalOpen(false);
+              setManageError(null);
+            }}
+            role="presentation"
+          >
+            <div
+              aria-labelledby="unpublish-modal-title"
+              aria-modal="true"
+              className="modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+            >
+              <div className="modal-head">
+                <div>
+                  <span className="eyebrow">Unpublish skill</span>
+                  <h3 id="unpublish-modal-title">下架 Skill</h3>
+                </div>
+                <button
+                  aria-label="关闭"
+                  className="modal-close"
+                  onClick={() => {
+                    setUnpublishModalOpen(false);
+                    setManageError(null);
+                  }}
+                  type="button"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="modal-form">
+                <p className="description">
+                  下架后，<strong>{skill.name}</strong> 将从 Skill 广场、排行榜和公开搜索中隐藏，其他用户无法访问或下载。
+                  你可以继续在此页面查看，或通过发布新版本重新上架。
+                </p>
+                {manageError ? <div className="error compact-error">{manageError}</div> : null}
+                <div className="modal-actions">
+                  <button
+                    className="button secondary"
+                    onClick={() => {
+                      setUnpublishModalOpen(false);
+                      setManageError(null);
+                    }}
+                    type="button"
+                  >
+                    取消
+                  </button>
+                  <button className="button primary" disabled={unpublishingSkill} onClick={() => void handleUnpublish()} type="button">
+                    {unpublishingSkill ? "下架中…" : "确认下架"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {deleteModalOpen ? (
+          <div
+            className="modal-overlay"
+            onClick={() => {
+              setDeleteModalOpen(false);
+              setManageError(null);
+            }}
+            role="presentation"
+          >
+            <div
+              aria-labelledby="delete-modal-title"
+              aria-modal="true"
+              className="modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+            >
+              <div className="modal-head">
+                <div>
+                  <span className="eyebrow">Delete skill</span>
+                  <h3 id="delete-modal-title">删除 Skill</h3>
+                </div>
+                <button
+                  aria-label="关闭"
+                  className="modal-close"
+                  onClick={() => {
+                    setDeleteModalOpen(false);
+                    setManageError(null);
+                  }}
+                  type="button"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="modal-form">
+                <p className="description">
+                  此操作不可恢复。将永久删除 <strong>{skill.name}</strong>（<span className="mono">{skill.slug}</span>）
+                  的所有版本、审查记录、评分与 Issue，并移除 MinIO 中的 artifact。
+                </p>
+                {manageError ? <div className="error compact-error">{manageError}</div> : null}
+                <div className="modal-actions">
+                  <button
+                    className="button secondary"
+                    onClick={() => {
+                      setDeleteModalOpen(false);
+                      setManageError(null);
+                    }}
+                    type="button"
+                  >
+                    取消
+                  </button>
+                  <button className="button secondary danger" disabled={deletingSkill} onClick={() => void handleDelete()} type="button">
+                    {deletingSkill ? "删除中…" : "确认删除"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         ) : null}

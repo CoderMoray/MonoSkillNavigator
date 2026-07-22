@@ -116,7 +116,8 @@ function PublishSkillPageContent() {
 
     async function loadSourceSkill() {
       try {
-        const skill = await getSkill(sourceSlug);
+        const token = getAuthToken();
+        const skill = await getSkill(sourceSlug, token ?? undefined);
         if (cancelled) {
           return;
         }

@@ -41,4 +41,5 @@ export type {
 
 export {
   isSkillContributor,
+  isSkillOwner,
 } from "./utils";

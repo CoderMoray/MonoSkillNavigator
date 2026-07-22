@@ -81,6 +81,7 @@ export interface RegistrySkill {
   ratings: RegistryRating[];
   averageRating: number;
   ratingCount: number;
+  published?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -164,6 +165,8 @@ export interface RegistryStore {
   getVersion(slug: string, version?: string): Promise<RegistryVersion | undefined>;
   leaderboard(sort?: LeaderboardSort, limit?: number): Promise<SkillSearchResult[]>;
   downloadSnapshot(slug: string, version?: string): Promise<SkillSnapshot | undefined>;
+  unpublishSkill(slug: string): Promise<RegistrySkill>;
+  deleteSkill(slug: string): Promise<void>;
   reviewAll(
     reviewFn: (snapshot: SkillSnapshot, version: string) => ReviewReport,
     evaluationFn?: (snapshot: SkillSnapshot) => FunctionalEvaluationReport
