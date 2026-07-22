@@ -191,12 +191,11 @@ function PublishSkillPageContent() {
     return `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
   }, [file]);
 
+  const showPublishForm = Boolean(file && !parsingArchive);
+
   const publishBlockReason = useMemo(() => {
-    if (parsingArchive) {
-      return "正在解析 Skill 包…";
-    }
-    if (!file) {
-      return "请先上传 .zip Skill 包。";
+    if (!showPublishForm) {
+      return null;
     }
     if (isNewVersion && !isOwner) {
       return "无权发布新版本。";
@@ -218,11 +217,10 @@ function PublishSkillPageContent() {
   }, [
     categories,
     displayName,
-    file,
     isNewVersion,
     isOwner,
-    parsingArchive,
     releaseTags,
+    showPublishForm,
     slug,
     summary,
     topics,
@@ -388,8 +386,8 @@ function PublishSkillPageContent() {
             </h2>
             <p>
               {isNewVersion
-                ? "上传新的 zip 包，可填写 Changelog；平台会自动解包、审查、评估并归档该版本。"
-                : "上传 zip 包后，平台会自动解包、审查、评估，并绑定到当前登录用户。"}
+                ? "先上传新的 zip 包，确认发布信息后再提交审查与归档。"
+                : "先上传 zip 包，平台会自动解析 Skill 入口文件并填入发布信息。"}
             </p>
           </div>
         </section>
@@ -431,147 +429,6 @@ function PublishSkillPageContent() {
           <section className="market-panel">
             <div className="profile-content publish-content">
               <form className="publish-form" onSubmit={handleSubmit}>
-                <div className="publish-form-grid">
-                  <label className="field">
-                    <span>Display Name <em>必填</em></span>
-                    <input
-                      maxLength={128}
-                      onChange={(event) => setDisplayName(event.target.value)}
-                      placeholder="例如 GitHub Issue Triage"
-                      required
-                      value={displayName}
-                    />
-                  </label>
-
-                  <div className="publish-field-with-hint">
-                    <label className="field">
-                      <span>Slug <em>必填</em></span>
-                      <input
-                        maxLength={64}
-                        onChange={(event) => setSlug(event.target.value)}
-                        pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?"
-                        placeholder="例如 github-issue-triage"
-                        readOnly={isNewVersion}
-                        required
-                        value={slug}
-                      />
-                    </label>
-                    <small>
-                      {isNewVersion ? "新版本沿用原 Skill 的不可变 Slug。" : "仅小写字母、数字和短横线；发布后不可修改。"}
-                    </small>
-                  </div>
-                </div>
-
-                <label className="field">
-                  <span>Summary <em>必填</em></span>
-                  <textarea
-                    maxLength={1024}
-                    onChange={(event) => setSummary(event.target.value)}
-                    placeholder="说明 Skill 能做什么、适用于什么场景"
-                    required
-                    rows={4}
-                    value={summary}
-                  />
-                  {archiveHint ? <div className="notice">{archiveHint}</div> : null}
-                </label>
-
-                <div className="publish-form-grid">
-                  <div className="field publish-category-field" ref={categoryMenuRef}>
-                    <span>Categories <em>必填</em></span>
-                    <button
-                      aria-expanded={categoryMenuOpen}
-                      aria-haspopup="listbox"
-                      className={`publish-category-trigger ${categoryMenuOpen ? "open" : ""}`}
-                      onClick={() => setCategoryMenuOpen((open) => !open)}
-                      type="button"
-                    >
-                      {categories.length > 0 ? (
-                        <span className="publish-category-selected">
-                          {categories.map((item) => (
-                            <span className="badge" key={item}>{item}</span>
-                          ))}
-                        </span>
-                      ) : (
-                        <span className="publish-category-placeholder">请选择分类</span>
-                      )}
-                      <ChevronDown className={`publish-category-chevron ${categoryMenuOpen ? "open" : ""}`} size={16} />
-                    </button>
-                    {categoryMenuOpen ? (
-                      <div aria-multiselectable="true" className="publish-category-menu" role="listbox">
-                        {CATEGORY_OPTIONS.map((option) => {
-                          const selected = categories.includes(option);
-                          const disabled = !selected && categories.length >= MAX_CATEGORIES;
-                          return (
-                            <button
-                              aria-selected={selected}
-                              className={`publish-category-option ${selected ? "selected" : ""}`}
-                              disabled={disabled}
-                              key={option}
-                              onClick={() => toggleCategory(option)}
-                              role="option"
-                              type="button"
-                            >
-                              <span>{option}</span>
-                              {selected ? <Check size={15} /> : null}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                    <small>最多可选择 {MAX_CATEGORIES} 个分类。</small>
-                  </div>
-
-                  <label className="field">
-                    <span>Topics <i>选填</i></span>
-                    <input
-                      maxLength={1024}
-                      onChange={(event) => setTopics(event.target.value)}
-                      placeholder="例如 github, issues, automation"
-                      value={topics}
-                    />
-                    <small>使用逗号分隔，每项最多 64 个字符。</small>
-                  </label>
-                </div>
-
-                <div className="publish-form-grid">
-                  <label className="field">
-                    <span>Version <em>必填</em></span>
-                    <input
-                      onChange={(event) => setVersion(event.target.value)}
-                      pattern="(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?"
-                      placeholder="1.0.0"
-                      required
-                      value={version}
-                    />
-                    <small>采用 SemVer 格式，例如 1.0.0。</small>
-                  </label>
-
-                  <label className="field">
-                    <span>Release Tags <em>必填</em></span>
-                    <input
-                      onChange={(event) => setReleaseTags(event.target.value)}
-                      placeholder="latest"
-                      required
-                      value={releaseTags}
-                    />
-                    <small>使用逗号分隔；新版本会接管同名 Release Tag。</small>
-                  </label>
-                </div>
-
-                {isNewVersion ? (
-                  <label className="field">
-                    <span>Changelog <i>选填</i></span>
-                    <textarea
-                      maxLength={10_000}
-                      onChange={(event) => setChangelog(event.target.value)}
-                      placeholder="说明此版本新增、变更、修复或不兼容的内容"
-                      rows={6}
-                      value={changelog}
-                    />
-                    <small>发布后会显示在该版本的详情中，最多 10,000 个字符。</small>
-                  </label>
-                ) : null}
-
                 <label
                   className={`upload-dropzone ${file ? "selected" : ""} ${isDraggingFile ? "dragging" : ""} ${parsingArchive ? "dragging" : ""}`}
                   onDragEnter={handleFileDragEnter}
@@ -581,7 +438,10 @@ function PublishSkillPageContent() {
                 >
                   <UploadCloud size={28} />
                   <strong>{parsingArchive ? "正在解析 Skill 包…" : fileLabel}</strong>
-                  <span>拖拽 .zip 包到此处，或点击选择。压缩包根目录须包含 {SKILL_ENTRY_BASENAMES.join("、")} 之一，随后会写入发布信息并进行审查和归档。</span>
+                  <span>
+                    拖拽 .zip 包到此处，或点击选择。压缩包根目录须包含 {SKILL_ENTRY_BASENAMES.join("、")} 之一。
+                    {file ? " 重新选择文件将覆盖当前包并重新解析。" : ""}
+                  </span>
                   <input
                     accept=".zip,application/zip"
                     onChange={handleFileChange}
@@ -592,14 +452,160 @@ function PublishSkillPageContent() {
 
                 {error ? <div className="error compact-error">{error}</div> : null}
 
-                {!canPublish && publishBlockReason ? (
-                  <p className="description publish-block-reason">{publishBlockReason}</p>
-                ) : null}
+                {showPublishForm ? (
+                  <div className="publish-form-fields">
+                    {archiveHint ? <div className="notice">{archiveHint}</div> : null}
 
-                <button className="button primary" disabled={submitting || !canPublish} type="submit">
-                  {submitting ? "发布并审查中..." : isNewVersion ? "发布新版本" : "发布 Skill"}
-                  <ArrowRight size={16} />
-                </button>
+                    <div className="publish-form-grid">
+                      <label className="field">
+                        <span>Display Name <em>必填</em></span>
+                        <input
+                          maxLength={128}
+                          onChange={(event) => setDisplayName(event.target.value)}
+                          placeholder="例如 GitHub Issue Triage"
+                          required
+                          value={displayName}
+                        />
+                      </label>
+
+                      <div className="publish-field-with-hint">
+                        <label className="field">
+                          <span>Slug <em>必填</em></span>
+                          <input
+                            maxLength={64}
+                            onChange={(event) => setSlug(event.target.value)}
+                            pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?"
+                            placeholder="例如 github-issue-triage"
+                            readOnly={isNewVersion}
+                            required
+                            value={slug}
+                          />
+                        </label>
+                        <small>
+                          {isNewVersion ? "新版本沿用原 Skill 的不可变 Slug。" : "仅小写字母、数字和短横线；发布后不可修改。"}
+                        </small>
+                      </div>
+                    </div>
+
+                    <label className="field">
+                      <span>Summary <em>必填</em></span>
+                      <textarea
+                        maxLength={1024}
+                        onChange={(event) => setSummary(event.target.value)}
+                        placeholder="说明 Skill 能做什么、适用于什么场景"
+                        required
+                        rows={4}
+                        value={summary}
+                      />
+                    </label>
+
+                    <div className="publish-form-grid">
+                      <div className="field publish-category-field" ref={categoryMenuRef}>
+                        <span>Categories <em>必填</em></span>
+                        <button
+                          aria-expanded={categoryMenuOpen}
+                          aria-haspopup="listbox"
+                          className={`publish-category-trigger ${categoryMenuOpen ? "open" : ""}`}
+                          onClick={() => setCategoryMenuOpen((open) => !open)}
+                          type="button"
+                        >
+                          {categories.length > 0 ? (
+                            <span className="publish-category-selected">
+                              {categories.map((item) => (
+                                <span className="badge" key={item}>{item}</span>
+                              ))}
+                            </span>
+                          ) : (
+                            <span className="publish-category-placeholder">请选择分类</span>
+                          )}
+                          <ChevronDown className={`publish-category-chevron ${categoryMenuOpen ? "open" : ""}`} size={16} />
+                        </button>
+                        {categoryMenuOpen ? (
+                          <div aria-multiselectable="true" className="publish-category-menu" role="listbox">
+                            {CATEGORY_OPTIONS.map((option) => {
+                              const selected = categories.includes(option);
+                              const disabled = !selected && categories.length >= MAX_CATEGORIES;
+                              return (
+                                <button
+                                  aria-selected={selected}
+                                  className={`publish-category-option ${selected ? "selected" : ""}`}
+                                  disabled={disabled}
+                                  key={option}
+                                  onClick={() => toggleCategory(option)}
+                                  role="option"
+                                  type="button"
+                                >
+                                  <span>{option}</span>
+                                  {selected ? <Check size={15} /> : null}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                        <small>最多可选择 {MAX_CATEGORIES} 个分类。</small>
+                      </div>
+
+                      <label className="field">
+                        <span>Topics <i>选填</i></span>
+                        <input
+                          maxLength={1024}
+                          onChange={(event) => setTopics(event.target.value)}
+                          placeholder="例如 github, issues, automation"
+                          value={topics}
+                        />
+                        <small>使用逗号分隔，每项最多 64 个字符。</small>
+                      </label>
+                    </div>
+
+                    <div className="publish-form-grid">
+                      <label className="field">
+                        <span>Version <em>必填</em></span>
+                        <input
+                          onChange={(event) => setVersion(event.target.value)}
+                          pattern="(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?"
+                          placeholder="1.0.0"
+                          required
+                          value={version}
+                        />
+                        <small>采用 SemVer 格式，例如 1.0.0。</small>
+                      </label>
+
+                      <label className="field">
+                        <span>Release Tags <em>必填</em></span>
+                        <input
+                          onChange={(event) => setReleaseTags(event.target.value)}
+                          placeholder="latest"
+                          required
+                          value={releaseTags}
+                        />
+                        <small>使用逗号分隔；新版本会接管同名 Release Tag。</small>
+                      </label>
+                    </div>
+
+                    {isNewVersion ? (
+                      <label className="field">
+                        <span>Changelog <i>选填</i></span>
+                        <textarea
+                          maxLength={10_000}
+                          onChange={(event) => setChangelog(event.target.value)}
+                          placeholder="说明此版本新增、变更、修复或不兼容的内容"
+                          rows={6}
+                          value={changelog}
+                        />
+                        <small>发布后会显示在该版本的详情中，最多 10,000 个字符。</small>
+                      </label>
+                    ) : null}
+
+                    {!canPublish && publishBlockReason ? (
+                      <p className="description publish-block-reason">{publishBlockReason}</p>
+                    ) : null}
+
+                    <button className="button primary" disabled={submitting || !canPublish} type="submit">
+                      {submitting ? "发布并审查中..." : isNewVersion ? "发布新版本" : "发布 Skill"}
+                      <ArrowRight size={16} />
+                    </button>
+                  </div>
+                ) : null}
               </form>
 
               <div className="publish-cli-card">
