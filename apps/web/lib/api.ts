@@ -34,6 +34,54 @@ export async function getSkill(slug: string): Promise<RegistrySkill> {
   return request<RegistrySkill>(new URL(`/skills/${encodeURIComponent(slug)}`, API_BASE_URL));
 }
 
+export interface SkillDownloadResult {
+  blob: Blob;
+  fileName: string;
+}
+
+export async function downloadSkillVersion(
+  token: string,
+  slug: string,
+  version: string
+): Promise<SkillDownloadResult> {
+  const url = new URL(
+    `/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}/download`,
+    API_BASE_URL
+  );
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      authorization: `Bearer ${token}`
+    },
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    const data = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+    throw new Error(data?.error ?? `Download failed: ${response.status} ${response.statusText}`);
+  }
+
+  const fileName =
+    parseContentDispositionFilename(response.headers.get("content-disposition")) ?? `${slug}-${version}.zip`;
+
+  return {
+    blob: await response.blob(),
+    fileName
+  };
+}
+
+export function saveBlobAsFile(blob: Blob, fileName: string): void {
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = fileName;
+  anchor.rel = "noopener";
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
 export function getApiBaseUrl(): string {
   return API_BASE_URL;
 }
@@ -208,6 +256,24 @@ interface RequestOptions {
   method?: string;
   body?: BodyInit;
   token?: string;
+}
+
+function parseContentDispositionFilename(header: string | null): string | undefined {
+  if (!header) {
+    return undefined;
+  }
+
+  const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+
+  const asciiMatch = header.match(/filename="([^"]+)"/i) ?? header.match(/filename=([^;]+)/i);
+  return asciiMatch?.[1]?.trim();
 }
 
 async function request<T>(url: URL, options: RequestOptions = {}): Promise<T> {

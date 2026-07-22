@@ -29,7 +29,7 @@ import {
 import { AppShell } from "../../../components/AppShell";
 import { ScoreBars } from "../../../components/ScoreBars";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
-import { addSkillContributor, addSkillRating, createSkillIssue, getCurrentUser, getSkill } from "../../../lib/api";
+import { addSkillContributor, addSkillRating, createSkillIssue, downloadSkillVersion, getCurrentUser, getSkill, saveBlobAsFile } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { formatDateTime, formatNumber } from "../../../lib/format";
 import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill } from "../../../lib/types";
@@ -101,6 +101,9 @@ export default function SkillDetailPage() {
   const [submittingRating, setSubmittingRating] = useState(false);
   const [issueModalOpen, setIssueModalOpen] = useState(false);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [downloadingVersion, setDownloadingVersion] = useState<string | null>(null);
+  const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -439,6 +442,30 @@ export default function SkillDetailPage() {
     }
   }
 
+  async function handleDownload(version: string) {
+    setDownloadError(null);
+    setDownloadMessage(null);
+
+    const token = getAuthToken();
+    if (!token) {
+      setDownloadError("请先登录后再下载 Skill。");
+      return;
+    }
+
+    setDownloadingVersion(version);
+    try {
+      const { blob, fileName } = await downloadSkillVersion(token, skill.slug, version);
+      saveBlobAsFile(blob, fileName);
+      const updated = await getSkill(skill.slug);
+      setSkill(updated);
+      setDownloadMessage(`已下载 v${version}（${fileName}）`);
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : "下载失败");
+    } finally {
+      setDownloadingVersion(null);
+    }
+  }
+
   return (
     <AppShell title={skill.name}>
       <div className="page-stack">
@@ -478,11 +505,46 @@ export default function SkillDetailPage() {
             ) : null}
             {isOwner ? (
               <div className="hero-actions">
+                {viewer ? (
+                  <button
+                    className="button secondary"
+                    disabled={downloadingVersion === currentVersion.version}
+                    onClick={() => void handleDownload(currentVersion.version)}
+                    type="button"
+                  >
+                    <Download size={16} />
+                    {downloadingVersion === currentVersion.version ? "下载中…" : "下载 Skill"}
+                  </button>
+                ) : (
+                  <Link className="button secondary" href="/login">
+                    登录后下载
+                  </Link>
+                )}
                 <Link className="button primary" href={`/skills/publish?skill=${encodeURIComponent(skill.slug)}`}>
                   <Plus size={16} /> 发布新版本
                 </Link>
               </div>
-            ) : null}
+            ) : (
+              <div className="hero-actions">
+                {viewer ? (
+                  <button
+                    className="button primary"
+                    disabled={downloadingVersion === currentVersion.version}
+                    onClick={() => void handleDownload(currentVersion.version)}
+                    type="button"
+                  >
+                    <Download size={16} />
+                    {downloadingVersion === currentVersion.version ? "下载中…" : "下载 Skill"}
+                  </button>
+                ) : (
+                  <Link className="button primary" href="/login">
+                    登录后下载
+                  </Link>
+                )}
+              </div>
+            )}
+            {downloadMessage ? <div className="notice">{downloadMessage}</div> : null}
+            {downloadError ? <div className="error">{downloadError}</div> : null}
           </div>
 
           <aside className="hero-card detail-summary-card">
@@ -507,6 +569,22 @@ export default function SkillDetailPage() {
                 <p className="stat-label">Ratings</p>
               </div>
             </div>
+            {viewer ? (
+              <button
+                className="button secondary"
+                disabled={downloadingVersion === currentVersion.version}
+                onClick={() => void handleDownload(currentVersion.version)}
+                style={{ width: "100%", marginTop: 18 }}
+                type="button"
+              >
+                <Download size={16} />
+                {downloadingVersion === currentVersion.version ? "下载中…" : `下载 v${currentVersion.version}`}
+              </button>
+            ) : (
+              <Link className="button secondary" href="/login" style={{ width: "100%", marginTop: 18 }}>
+                登录后下载
+              </Link>
+            )}
           </aside>
         </section>
 
@@ -779,40 +857,53 @@ export default function SkillDetailPage() {
                   const isExpanded = expandedVersionNames.has(version.version);
                   return (
                     <div className={`version-entry ${isExpanded ? "active" : ""}`} key={version.version}>
-                      <button
-                        aria-expanded={isExpanded}
-                        aria-pressed={isSelected}
-                        className={`version-row ${isSelected ? "active" : ""}`}
-                        onClick={() => {
-                          setSelectedVersionName(version.version);
-                          setSelectedFilePath(null);
-                          setExpandedVersionNames((expanded) => {
-                            const next = new Set(expanded);
-                            if (next.has(version.version)) {
-                              next.delete(version.version);
-                            } else {
-                              next.add(version.version);
-                            }
-                            return next;
-                          });
-                        }}
-                        type="button"
-                      >
-                        <span className="version-row-main">
-                          <span className="version-name-row">
-                            <strong>v{version.version}</strong>
-                            {version.version === skill.latestVersion ? <span className="badge">latest</span> : null}
+                      <div className="version-entry-head">
+                        <button
+                          aria-expanded={isExpanded}
+                          aria-pressed={isSelected}
+                          className={`version-row ${isSelected ? "active" : ""}`}
+                          onClick={() => {
+                            setSelectedVersionName(version.version);
+                            setSelectedFilePath(null);
+                            setExpandedVersionNames((expanded) => {
+                              const next = new Set(expanded);
+                              if (next.has(version.version)) {
+                                next.delete(version.version);
+                              } else {
+                                next.add(version.version);
+                              }
+                              return next;
+                            });
+                          }}
+                          type="button"
+                        >
+                          <span className="version-row-main">
+                            <span className="version-name-row">
+                              <strong>v{version.version}</strong>
+                              {version.version === skill.latestVersion ? <span className="badge">latest</span> : null}
+                            </span>
+                            <span>{formatDateTime(version.createdAt)}</span>
                           </span>
-                          <span>{formatDateTime(version.createdAt)}</span>
-                        </span>
-                        <span className="version-row-meta">
-                          <span>
-                            <Download size={13} /> {formatNumber(version.downloads)}
+                          <span className="version-row-meta">
+                            <span>
+                              <Download size={13} /> {formatNumber(version.downloads)}
+                            </span>
+                            <VerdictBadge verdict={version.status} />
+                            {isExpanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
                           </span>
-                          <VerdictBadge verdict={version.status} />
-                          {isExpanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
-                        </span>
-                      </button>
+                        </button>
+                        {viewer ? (
+                          <button
+                            className="button secondary compact version-download-action"
+                            disabled={downloadingVersion === version.version}
+                            onClick={() => void handleDownload(version.version)}
+                            type="button"
+                          >
+                            <Download size={13} />
+                            {downloadingVersion === version.version ? "下载中…" : "下载"}
+                          </button>
+                        ) : null}
+                      </div>
                       {isExpanded ? (
                         <div className="version-changelog">
                           <div className="changelog-content">{version.changelog?.trim() || "未提供 Changelog"}</div>

@@ -2153,6 +2153,22 @@ button {
   gap: 9px;
 }
 
+.version-entry-head {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.version-entry-head .version-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.version-download-action {
+  align-self: center;
+  flex-shrink: 0;
+}
+
 .version-row {
   display: flex;
   width: 100%;
@@ -2178,7 +2194,7 @@ button {
   box-shadow: 0 10px 22px rgba(26, 115, 232, 0.08);
 }
 
-.version-entry.active .version-row {
+.version-entry.active .version-entry-head .version-row {
   border-bottom-right-radius: 0;
   border-bottom-left-radius: 0;
   box-shadow: none;
