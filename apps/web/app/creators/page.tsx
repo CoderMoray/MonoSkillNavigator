@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, Download, Search, Sparkles, UserRound } from "lucide-react";
+import { Download, Search, Sparkles, UserRound } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
 import { getLeaderboard } from "../../lib/api";
 import { aggregateCreators, type CreatorSummary } from "../../lib/creators";
@@ -104,7 +104,6 @@ export default function CreatorsPage() {
                     <div className="publisher-title">
                       <strong>{creator.name}</strong>
                       <span>@{creator.handle}</span>
-                      {creator.published >= 2 ? <BadgeCheck size={15} color="var(--blue)" /> : null}
                     </div>
                     <p>{creator.skills.slice(0, 3).map((skill) => skill.name).join(" · ") || "Publisher on SkillHub."}</p>
                   </div>

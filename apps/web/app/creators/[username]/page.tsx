@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BadgeCheck, GitBranch, LinkIcon } from "lucide-react";
+import { ArrowLeft, GitBranch, LinkIcon } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { SkillCard } from "../../../components/SkillCard";
 import { getLeaderboard } from "../../../lib/api";
@@ -82,7 +82,6 @@ export default function CreatorProfilePage() {
             <div>
               <div className="profile-name-row">
                 <h1>{creator.name}</h1>
-                {creator.published >= 2 ? <BadgeCheck color="var(--blue)" size={20} /> : null}
               </div>
               <p>@{creator.handle}</p>
             </div>
