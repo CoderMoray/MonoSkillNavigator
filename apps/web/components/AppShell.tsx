@@ -24,7 +24,7 @@ export function AppShell({ children, title = "概览" }: { children: ReactNode; 
           <span className="brand-mark">
             <Sparkles size={18} />
           </span>
-          <span className="brand-title">SkillHub</span>
+          <span className="brand-title">MonoSkillNavigator</span>
         </Link>
 
         <nav aria-label="主导航" className="top-nav">
