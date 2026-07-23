@@ -862,6 +862,11 @@ button {
   color: #111827;
 }
 
+.category-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 :root[data-theme="dark"] .category-chip,
 :root[data-theme="dark"] .creator-card,
 :root[data-theme="dark"] .app-tile,

@@ -93,6 +93,23 @@ export function isNotFoundError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && (error as { code: string }).code === "ENOENT";
 }
 
+export const MAX_CATEGORY_FILTERS = 3;
+
+export function normalizeCategoryFilters(categories: string | string[] | undefined, max = MAX_CATEGORY_FILTERS): string[] {
+  const raw = categories === undefined ? [] : Array.isArray(categories) ? categories : [categories];
+  return [...new Set(raw.flatMap((item) => item.split(",")).map((item) => item.trim()).filter(Boolean))].slice(0, max);
+}
+
+export function skillMatchesCategoryFilters(skillCategories: string[] | undefined, selectedCategories: string[]): boolean {
+  if (selectedCategories.length === 0) {
+    return true;
+  }
+
+  const normalizedSelected = selectedCategories.map((item) => item.trim().toLowerCase());
+  const normalizedSkill = (skillCategories ?? []).map((item) => item.trim().toLowerCase());
+  return normalizedSelected.every((item) => normalizedSkill.includes(item));
+}
+
 export function toSearchResult(skill: RegistrySkill): SkillSearchResult {
   const latest = skill.versions[skill.latestVersion];
   if (!latest) {

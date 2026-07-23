@@ -19,6 +19,7 @@ import {
   isSkillContributor,
   isSkillOwner,
   loadDotEnvIfPresent,
+  normalizeCategoryFilters,
   type ContributorRole,
   type IssueSeverity,
   type IssueStatus,
@@ -164,9 +165,9 @@ export function buildServer() {
     }
   });
 
-  app.get<{ Querystring: { query?: string; category?: string } }>("/skills", async (request) => {
+  app.get<{ Querystring: { query?: string; category?: string | string[] } }>("/skills", async (request) => {
     return {
-      items: await store.search(request.query.query ?? "", request.query.category ?? "")
+      items: await store.search(request.query.query ?? "", normalizeCategoryFilters(request.query.category))
     };
   });
 
@@ -284,12 +285,12 @@ export function buildServer() {
     };
   });
 
-  app.get<{ Querystring: { sort?: LeaderboardQuerySort; limit?: string; category?: string } }>("/leaderboard", async (request) => {
+  app.get<{ Querystring: { sort?: LeaderboardQuerySort; limit?: string; category?: string | string[] } }>("/leaderboard", async (request) => {
     return {
       items: await store.leaderboard(
         normalizeLeaderboardSort(request.query.sort),
         Number(request.query.limit ?? 20),
-        request.query.category ?? ""
+        normalizeCategoryFilters(request.query.category)
       )
     };
   });

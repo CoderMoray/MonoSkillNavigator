@@ -1,33 +1,40 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Sparkles, Trophy, UploadCloud } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "../../components/AppShell";
 import { SkillCard } from "../../components/SkillCard";
 import { getLeaderboard, getSkills } from "../../lib/api";
-import { ALL_SKILL_CATEGORIES_LABEL, SKILL_CATEGORY_OPTIONS } from "../../lib/skill-categories";
+import {
+  MAX_SKILL_CATEGORY_FILTERS,
+  normalizeSkillCategoryFilters,
+  SKILL_CATEGORY_OPTIONS
+} from "../../lib/skill-categories";
 import type { SkillSearchResult } from "../../lib/types";
 
 const tabs = ["Skills", "Plugins"];
-const categoryFilters = [ALL_SKILL_CATEGORIES_LABEL, ...SKILL_CATEGORY_OPTIONS];
 
 export default function SkillsPage() {
   const [skills, setSkills] = useState<SkillSearchResult[]>([]);
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState(ALL_SKILL_CATEGORIES_LABEL);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [sort, setSort] = useState("recent");
   const [tab, setTab] = useState("Skills");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const activeCategory = category === ALL_SKILL_CATEGORIES_LABEL ? "" : category;
+  const activeCategories = useMemo(
+    () => normalizeSkillCategoryFilters(selectedCategories),
+    [selectedCategories]
+  );
 
   useEffect(() => {
     const url = new URL(window.location.href);
     setQuery(url.searchParams.get("query") ?? "");
-    setCategory(url.searchParams.get("category") ?? ALL_SKILL_CATEGORIES_LABEL);
+    const urlCategories = url.searchParams.getAll("category");
+    setSelectedCategories(normalizeSkillCategoryFilters(urlCategories));
   }, []);
 
   useEffect(() => {
@@ -50,8 +57,8 @@ export default function SkillsPage() {
       setError(null);
       try {
         const items = query.trim()
-          ? await getSkills(query, activeCategory)
-          : await getLeaderboard(sort, 50, activeCategory);
+          ? await getSkills(query, activeCategories)
+          : await getLeaderboard(sort, 50, activeCategories);
         if (!cancelled) {
           setSkills(items);
         }
@@ -71,7 +78,19 @@ export default function SkillsPage() {
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [query, sort, activeCategory]);
+  }, [query, sort, activeCategories]);
+
+  function toggleCategory(category: string) {
+    setSelectedCategories((current) => {
+      if (current.includes(category)) {
+        return current.filter((item) => item !== category);
+      }
+      if (current.length >= MAX_SKILL_CATEGORY_FILTERS) {
+        return current;
+      }
+      return [...current, category];
+    });
+  }
 
   return (
     <AppShell title="Skill 广场">
@@ -105,11 +124,13 @@ export default function SkillsPage() {
               ))}
             </div>
             <div className="category-row">
-              {categoryFilters.map((item) => (
+              {SKILL_CATEGORY_OPTIONS.map((item) => (
                 <button
-                  className={`category-chip ${category === item ? "active" : ""}`}
+                  aria-pressed={selectedCategories.includes(item)}
+                  className={`category-chip ${selectedCategories.includes(item) ? "active" : ""}`}
+                  disabled={!selectedCategories.includes(item) && selectedCategories.length >= MAX_SKILL_CATEGORY_FILTERS}
                   key={item}
-                  onClick={() => setCategory(item)}
+                  onClick={() => toggleCategory(item)}
                   type="button"
                 >
                   {item}
@@ -155,8 +176,8 @@ export default function SkillsPage() {
           </div>
         ) : skills.length === 0 ? (
           <div className="empty">
-            {activeCategory
-              ? `暂无 ${category} 分类下的 Skill。`
+            {activeCategories.length > 0
+              ? "暂无匹配所选分类的 Skill。"
               : "暂无匹配 Skill。可以先登录后运行 npm run skill -- publish examples/demo-skill。"}
           </div>
         ) : (

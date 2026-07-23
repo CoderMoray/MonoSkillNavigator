@@ -11,25 +11,29 @@ import type {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:3000";
 
-export async function getSkills(query = "", category = ""): Promise<SkillSearchResult[]> {
+export async function getSkills(query = "", categories: string[] = []): Promise<SkillSearchResult[]> {
   const url = new URL("/skills", API_BASE_URL);
   if (query.trim()) {
     url.searchParams.set("query", query.trim());
   }
-  if (category.trim()) {
-    url.searchParams.set("category", category.trim());
+  for (const category of categories) {
+    if (category.trim()) {
+      url.searchParams.append("category", category.trim());
+    }
   }
 
   const data = await request<{ items: SkillSearchResult[] }>(url);
   return data.items;
 }
 
-export async function getLeaderboard(sort = "reliability", limit = 8, category = ""): Promise<SkillSearchResult[]> {
+export async function getLeaderboard(sort = "reliability", limit = 8, categories: string[] = []): Promise<SkillSearchResult[]> {
   const url = new URL("/leaderboard", API_BASE_URL);
   url.searchParams.set("sort", sort);
   url.searchParams.set("limit", String(limit));
-  if (category.trim()) {
-    url.searchParams.set("category", category.trim());
+  for (const category of categories) {
+    if (category.trim()) {
+      url.searchParams.append("category", category.trim());
+    }
   }
 
   const data = await request<{ items: SkillSearchResult[] }>(url);

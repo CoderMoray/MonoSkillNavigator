@@ -137,10 +137,10 @@ export class PostgresRegistryStore extends JsonRegistryStore {
 
   // ==================== Read Operations ====================
 
-  async search(query = "", category = ""): Promise<SkillSearchResult[]> {
+  async search(query = "", categories: string[] = []): Promise<SkillSearchResult[]> {
     await this.ensureSchema();
     const q = query.trim();
-    const normalizedCategory = category.trim();
+    const selectedCategories = [...new Set(categories.map((item) => item.trim()).filter(Boolean))].slice(0, 3);
     const searchPattern = q ? `%${q}%` : "%";
 
     const rows = await this.db
@@ -189,8 +189,11 @@ export class PostgresRegistryStore extends JsonRegistryStore {
                 ilike(schema.skills.description, searchPattern)
               )
             : undefined,
-          normalizedCategory
-            ? sql`${normalizedCategory} = ANY(${schema.skillVersions.categories})`
+          selectedCategories.length > 0
+            ? sql`${schema.skillVersions.categories} @> ARRAY[${sql.join(
+                selectedCategories.map((item) => sql`${item}`),
+                sql`, `
+              )}]::text[]`
             : undefined
         )
       )

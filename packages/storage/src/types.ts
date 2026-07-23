@@ -167,10 +167,10 @@ export interface RegistryStore {
   createIssue(slug: string, issue: CreateIssueInput): Promise<RegistryIssue>;
   listIssues(slug: string, status?: IssueStatus): Promise<RegistryIssue[]>;
   addRating(slug: string, rating: CreateRatingInput): Promise<RegistryRating>;
-  search(query?: string, category?: string): Promise<SkillSearchResult[]>;
+  search(query?: string, categories?: string[]): Promise<SkillSearchResult[]>;
   getSkill(slug: string): Promise<RegistrySkill | undefined>;
   getVersion(slug: string, version?: string): Promise<RegistryVersion | undefined>;
-  leaderboard(sort?: LeaderboardSort, limit?: number, category?: string): Promise<SkillSearchResult[]>;
+  leaderboard(sort?: LeaderboardSort, limit?: number, categories?: string[]): Promise<SkillSearchResult[]>;
   downloadSnapshot(slug: string, version?: string): Promise<SkillSnapshot | undefined>;
   unpublishSkill(slug: string): Promise<RegistrySkill>;
   deleteSkill(slug: string): Promise<void>;

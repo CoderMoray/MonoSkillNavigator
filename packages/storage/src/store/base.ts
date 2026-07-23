@@ -24,6 +24,7 @@ import {
   matchesContributorUser,
   normalizeReleaseTags,
   resolveVersionReference,
+  skillMatchesCategoryFilters,
   toSearchResult,
   updateRatingAggregate,
 } from "../utils";
@@ -186,20 +187,16 @@ export abstract class JsonRegistryStore implements RegistryStore {
     return created;
   }
 
-  async search(query = "", category = ""): Promise<SkillSearchResult[]> {
+  async search(query = "", categories: string[] = []): Promise<SkillSearchResult[]> {
     const data = await this.load();
     const q = query.trim().toLowerCase();
-    const normalizedCategory = category.trim().toLowerCase();
+    const selectedCategories = [...new Set(categories.map((item) => item.trim()).filter(Boolean))].slice(0, 3);
     return Object.values(data.skills)
       .filter((s) => s.published !== false)
       .filter((s) => !q || s.slug.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))
       .filter((s) => {
-        if (!normalizedCategory) {
-          return true;
-        }
         const latest = s.versions[s.latestVersion];
-        const categories = latest?.manifest.categories ?? [];
-        return categories.some((item) => item.trim().toLowerCase() === normalizedCategory);
+        return skillMatchesCategoryFilters(latest?.manifest.categories, selectedCategories);
       })
       .map(toSearchResult)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -215,8 +212,8 @@ export abstract class JsonRegistryStore implements RegistryStore {
     return skill.versions[resolveVersionReference(skill, version)];
   }
 
-  async leaderboard(sort: LeaderboardSort = "downloads", limit = 20, category = ""): Promise<SkillSearchResult[]> {
-    const items = await this.search("", category);
+  async leaderboard(sort: LeaderboardSort = "downloads", limit = 20, categories: string[] = []): Promise<SkillSearchResult[]> {
+    const items = await this.search("", categories);
     return items.sort((a, b) => {
       switch (sort) {
         case "rating": return b.averageRating - a.averageRating || b.ratingCount - a.ratingCount;

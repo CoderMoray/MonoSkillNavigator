@@ -42,4 +42,5 @@ export type {
 export {
   isSkillContributor,
   isSkillOwner,
+  normalizeCategoryFilters,
 } from "./utils";

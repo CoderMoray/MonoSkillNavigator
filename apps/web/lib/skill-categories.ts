@@ -10,13 +10,18 @@ export const SKILL_CATEGORY_OPTIONS = [
   "Other"
 ] as const;
 
-export const ALL_SKILL_CATEGORIES_LABEL = "All categories";
+export const MAX_SKILL_CATEGORY_FILTERS = 3;
 
-export function skillMatchesCategory(categories: string[] | undefined, category: string): boolean {
-  if (!category || category === ALL_SKILL_CATEGORIES_LABEL) {
+export function normalizeSkillCategoryFilters(values: string[]): string[] {
+  return [...new Set(values.map((item) => item.trim()).filter(Boolean))].slice(0, MAX_SKILL_CATEGORY_FILTERS);
+}
+
+export function skillMatchesCategories(skillCategories: string[] | undefined, selectedCategories: string[]): boolean {
+  if (selectedCategories.length === 0) {
     return true;
   }
 
-  const normalized = category.trim().toLowerCase();
-  return (categories ?? []).some((item) => item.trim().toLowerCase() === normalized);
+  const normalizedSelected = selectedCategories.map((item) => item.trim().toLowerCase());
+  const normalizedSkill = (skillCategories ?? []).map((item) => item.trim().toLowerCase());
+  return normalizedSelected.every((item) => normalizedSkill.includes(item));
 }
