@@ -105,6 +105,7 @@ export function toSearchResult(skill: RegistrySkill): SkillSearchResult {
     latestVersion: skill.latestVersion,
     status: latest.status,
     scores: latest.review.scores,
+    categories: latest.manifest.categories ?? [],
     averageRating: skill.averageRating,
     ratingCount: skill.ratingCount,
     openIssues: skill.issues.filter((i) => i.status !== "closed").length,

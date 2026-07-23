@@ -137,9 +137,10 @@ export class PostgresRegistryStore extends JsonRegistryStore {
 
   // ==================== Read Operations ====================
 
-  async search(query = ""): Promise<SkillSearchResult[]> {
+  async search(query = "", category = ""): Promise<SkillSearchResult[]> {
     await this.ensureSchema();
     const q = query.trim();
+    const normalizedCategory = category.trim();
     const searchPattern = q ? `%${q}%` : "%";
 
     const rows = await this.db
@@ -149,6 +150,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         description: schema.skills.description,
         latestVersion: schema.skills.latestVersion,
         status: schema.skillVersions.status,
+        categories: schema.skillVersions.categories,
         qualityScore: schema.skillReviews.qualityScore,
         securityScore: schema.skillReviews.securityScore,
         reliabilityScore: schema.skillReviews.reliabilityScore,
@@ -186,12 +188,15 @@ export class PostgresRegistryStore extends JsonRegistryStore {
                 ilike(schema.skills.name, searchPattern),
                 ilike(schema.skills.description, searchPattern)
               )
+            : undefined,
+          normalizedCategory
+            ? sql`${normalizedCategory} = ANY(${schema.skillVersions.categories})`
             : undefined
         )
       )
       .groupBy(
         schema.skills.slug, schema.skills.name, schema.skills.description,
-        schema.skills.latestVersion, schema.skillVersions.status,
+        schema.skills.latestVersion, schema.skillVersions.status, schema.skillVersions.categories,
         schema.skillReviews.qualityScore, schema.skillReviews.securityScore,
         schema.skillReviews.reliabilityScore, schema.skills.averageRating,
         schema.skills.ratingCount, schema.skills.updatedAt
@@ -232,6 +237,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         securityScore: Number(r.securityScore),
         reliabilityScore: Number(r.reliabilityScore),
       },
+      categories: r.categories ?? [],
       averageRating: Number(r.averageRating),
       ratingCount: Number(r.ratingCount),
       openIssues: r.openIssues,

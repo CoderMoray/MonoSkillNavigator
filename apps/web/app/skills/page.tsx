@@ -6,23 +6,28 @@ import Link from "next/link";
 import { AppShell } from "../../components/AppShell";
 import { SkillCard } from "../../components/SkillCard";
 import { getLeaderboard, getSkills } from "../../lib/api";
+import { ALL_SKILL_CATEGORIES_LABEL, SKILL_CATEGORY_OPTIONS } from "../../lib/skill-categories";
 import type { SkillSearchResult } from "../../lib/types";
 
-const categories = ["All categories", "Security", "Automation", "Docs", "Developer", "Productivity"];
 const tabs = ["Skills", "Plugins"];
+const categoryFilters = [ALL_SKILL_CATEGORIES_LABEL, ...SKILL_CATEGORY_OPTIONS];
 
 export default function SkillsPage() {
   const [skills, setSkills] = useState<SkillSearchResult[]>([]);
   const [query, setQuery] = useState("");
+  const [category, setCategory] = useState(ALL_SKILL_CATEGORIES_LABEL);
   const [sort, setSort] = useState("recent");
   const [tab, setTab] = useState("Skills");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const activeCategory = category === ALL_SKILL_CATEGORIES_LABEL ? "" : category;
+
   useEffect(() => {
     const url = new URL(window.location.href);
     setQuery(url.searchParams.get("query") ?? "");
+    setCategory(url.searchParams.get("category") ?? ALL_SKILL_CATEGORIES_LABEL);
   }, []);
 
   useEffect(() => {
@@ -44,7 +49,9 @@ export default function SkillsPage() {
       setLoading(true);
       setError(null);
       try {
-        const items = query.trim() ? await getSkills(query) : await getLeaderboard(sort, 50);
+        const items = query.trim()
+          ? await getSkills(query, activeCategory)
+          : await getLeaderboard(sort, 50, activeCategory);
         if (!cancelled) {
           setSkills(items);
         }
@@ -64,7 +71,7 @@ export default function SkillsPage() {
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [query, sort]);
+  }, [query, sort, activeCategory]);
 
   return (
     <AppShell title="Skill 广场">
@@ -98,8 +105,15 @@ export default function SkillsPage() {
               ))}
             </div>
             <div className="category-row">
-              {categories.map((category) => (
-                <span className="category-chip" key={category}>{category}</span>
+              {categoryFilters.map((item) => (
+                <button
+                  className={`category-chip ${category === item ? "active" : ""}`}
+                  key={item}
+                  onClick={() => setCategory(item)}
+                  type="button"
+                >
+                  {item}
+                </button>
               ))}
             </div>
           </div>
@@ -140,7 +154,11 @@ export default function SkillsPage() {
             ))}
           </div>
         ) : skills.length === 0 ? (
-          <div className="empty">暂无匹配 Skill。可以先登录后运行 npm run skill -- publish examples/demo-skill。</div>
+          <div className="empty">
+            {activeCategory
+              ? `暂无 ${category} 分类下的 Skill。`
+              : "暂无匹配 Skill。可以先登录后运行 npm run skill -- publish examples/demo-skill。"}
+          </div>
         ) : (
           <div className="claw-list">
             {skills.map((skill) => (

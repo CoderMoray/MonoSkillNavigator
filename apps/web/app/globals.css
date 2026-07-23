@@ -847,6 +847,19 @@ button {
   padding: 7px 11px;
   font-size: 12px;
   font-weight: 650;
+  cursor: pointer;
+}
+
+.category-chip.active {
+  background: #111827;
+  border-color: #111827;
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .category-chip.active {
+  background: #f4f6fb;
+  border-color: #f4f6fb;
+  color: #111827;
 }
 
 :root[data-theme="dark"] .category-chip,

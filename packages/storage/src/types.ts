@@ -103,6 +103,7 @@ export interface SkillSearchResult {
   latestVersion: string;
   status: ReviewVerdict;
   scores: ReviewReport["scores"];
+  categories: string[];
   averageRating: number;
   ratingCount: number;
   openIssues: number;
@@ -166,10 +167,10 @@ export interface RegistryStore {
   createIssue(slug: string, issue: CreateIssueInput): Promise<RegistryIssue>;
   listIssues(slug: string, status?: IssueStatus): Promise<RegistryIssue[]>;
   addRating(slug: string, rating: CreateRatingInput): Promise<RegistryRating>;
-  search(query?: string): Promise<SkillSearchResult[]>;
+  search(query?: string, category?: string): Promise<SkillSearchResult[]>;
   getSkill(slug: string): Promise<RegistrySkill | undefined>;
   getVersion(slug: string, version?: string): Promise<RegistryVersion | undefined>;
-  leaderboard(sort?: LeaderboardSort, limit?: number): Promise<SkillSearchResult[]>;
+  leaderboard(sort?: LeaderboardSort, limit?: number, category?: string): Promise<SkillSearchResult[]>;
   downloadSnapshot(slug: string, version?: string): Promise<SkillSnapshot | undefined>;
   unpublishSkill(slug: string): Promise<RegistrySkill>;
   deleteSkill(slug: string): Promise<void>;

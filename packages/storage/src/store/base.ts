@@ -186,12 +186,21 @@ export abstract class JsonRegistryStore implements RegistryStore {
     return created;
   }
 
-  async search(query = ""): Promise<SkillSearchResult[]> {
+  async search(query = "", category = ""): Promise<SkillSearchResult[]> {
     const data = await this.load();
     const q = query.trim().toLowerCase();
+    const normalizedCategory = category.trim().toLowerCase();
     return Object.values(data.skills)
       .filter((s) => s.published !== false)
       .filter((s) => !q || s.slug.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))
+      .filter((s) => {
+        if (!normalizedCategory) {
+          return true;
+        }
+        const latest = s.versions[s.latestVersion];
+        const categories = latest?.manifest.categories ?? [];
+        return categories.some((item) => item.trim().toLowerCase() === normalizedCategory);
+      })
       .map(toSearchResult)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
@@ -206,8 +215,8 @@ export abstract class JsonRegistryStore implements RegistryStore {
     return skill.versions[resolveVersionReference(skill, version)];
   }
 
-  async leaderboard(sort: LeaderboardSort = "downloads", limit = 20): Promise<SkillSearchResult[]> {
-    const items = await this.search();
+  async leaderboard(sort: LeaderboardSort = "downloads", limit = 20, category = ""): Promise<SkillSearchResult[]> {
+    const items = await this.search("", category);
     return items.sort((a, b) => {
       switch (sort) {
         case "rating": return b.averageRating - a.averageRating || b.ratingCount - a.ratingCount;

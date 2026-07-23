@@ -18,18 +18,9 @@ import { getAuthToken } from "../../../lib/auth-token";
 import { readSkillFrontmatterFromZip } from "../../../lib/parse-skill-archive";
 import type { PublicUser, RegistrySkill } from "../../../lib/types";
 import { SKILL_ENTRY_BASENAMES, validatePublishMetadataInput } from "@skill-platform/skill-spec/skill-format";
+import { SKILL_CATEGORY_OPTIONS } from "../../../lib/skill-categories";
 
-const CATEGORY_OPTIONS = [
-  "Automation",
-  "Developer Tools",
-  "Documentation",
-  "Productivity",
-  "Data & Analytics",
-  "Security",
-  "Design & Creative",
-  "Communication",
-  "Other"
-];
+const CATEGORY_OPTIONS = [...SKILL_CATEGORY_OPTIONS];
 
 const MAX_CATEGORIES = 3;
 

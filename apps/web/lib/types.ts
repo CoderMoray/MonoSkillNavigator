@@ -181,6 +181,7 @@ export interface SkillSearchResult {
   latestVersion: string;
   status: ReviewVerdict;
   scores: ReviewScores;
+  categories: string[];
   averageRating: number;
   ratingCount: number;
   openIssues: number;
