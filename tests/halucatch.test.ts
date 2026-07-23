@@ -30,5 +30,10 @@ describe("HaluCatch evaluator adapter", () => {
         expect.stringContaining("复杂度与可维护性")
       ])
     );
+    expect(report.haluCatchReport).toBeDefined();
+    expect(report.haluCatchReport?.professional).toContain("HaluCatch");
+    expect(report.haluCatchReport?.simple.length).toBeGreaterThan(100);
+    expect(report.haluCatchReport?.action.length).toBeGreaterThan(50);
+    expect(report.haluCatchReport?.skillType).toBeTruthy();
   });
 });

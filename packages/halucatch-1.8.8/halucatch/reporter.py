@@ -370,7 +370,7 @@ def generate_report(info, results, output_dir=None, lang='zh-CN'):
 ## {msg['simple_result']}
 
 | 🏗️ {msg['foundation']} | 💻 {msg['code']} | 📝 {msg['rules']} | 🛡️ {msg['guardrails']} | 📐 {msg['complexity']} |
-|--------|--------|--------|--------|
+|--------|--------|--------|--------|--------|
 | {f_rating} {f_score} | {c_rating} {c_score} | {r_rating} {r_score} | {g_rating} {g_score} | {cx_rating} {cx_score} |
 
 ### {msg['simple_good']}

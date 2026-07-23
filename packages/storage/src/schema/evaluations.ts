@@ -9,6 +9,7 @@ export const skillEvaluations = pgTable("skill_evaluations", {
   score: integer("score").notNull(),
   tasksTotal: integer("tasks_total").notNull(),
   tasksPassed: integer("tasks_passed").notNull(),
+  haluCatchReport: text("halu_catch_report"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
   uniqueIndex("skill_evaluations_pkey").on(table.skillSlug, table.version),

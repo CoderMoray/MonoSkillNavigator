@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { MarkdownContent } from "../../../components/MarkdownContent";
 import type { LucideIcon } from "lucide-react";
 import { isSkillEntryPath } from "@skill-platform/skill-spec/skill-format";
 import {
@@ -46,6 +46,8 @@ type DetailPanel =
   | "evaluation"
   | "community";
 
+type HaluCatchReportTab = "professional" | "simple" | "action";
+
 interface DetailCard {
   id: DetailPanel;
   title: string;
@@ -83,6 +85,7 @@ export default function SkillDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activePanel, setActivePanel] = useState<DetailPanel>("skill-md");
+  const [haluCatchReportTab, setHaluCatchReportTab] = useState<HaluCatchReportTab>("professional");
   const [selectedVersionName, setSelectedVersionName] = useState<string | null>(null);
   const [expandedVersionNames, setExpandedVersionNames] = useState<Set<string>>(() => new Set());
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
@@ -250,6 +253,19 @@ export default function SkillDetailPage() {
   const openIssues = skill.issues.filter((issue) => issue.status !== "closed");
   const reviewFindings = currentVersion.review?.findings ?? [];
   const isHaluCatchEvaluation = currentVersion.evaluation?.provider === "halucatch-adapter";
+  const haluCatchReport = currentVersion.evaluation?.haluCatchReport;
+  const haluCatchReportMarkdown = !haluCatchReport
+    ? ""
+    : haluCatchReportTab === "simple"
+      ? haluCatchReport.simple
+      : haluCatchReportTab === "action"
+        ? haluCatchReport.action
+        : haluCatchReport.professional;
+  const haluCatchReportTabs: Array<{ id: HaluCatchReportTab; label: string }> = [
+    { id: "professional", label: "专业版" },
+    { id: "simple", label: "标准版" },
+    { id: "action", label: "行动版" }
+  ];
   const requirementGroups = [
     {
       title: "支持的 Agent",
@@ -739,9 +755,7 @@ export default function SkillDetailPage() {
                 {skillMdFile ? <span className="badge mono">{formatFileSize(skillMdFile.size)}</span> : null}
               </div>
               {markdownContent ? (
-                <div className="markdown-content">
-                  <ReactMarkdown>{markdownContent}</ReactMarkdown>
-                </div>
+                <MarkdownContent>{markdownContent}</MarkdownContent>
               ) : (
                 <div className="empty detail-empty">当前版本没有可渲染的 Skill 入口文件内容。</div>
               )}
@@ -1095,8 +1109,41 @@ export default function SkillDetailPage() {
                       <span>评估时间</span>
                       <strong>{formatDateTime(currentVersion.evaluation.createdAt)}</strong>
                     </div>
+                    {haluCatchReport ? (
+                      <div>
+                        <span>Skill 类型</span>
+                        <strong>{haluCatchReport.skillType}</strong>
+                      </div>
+                    ) : null}
                   </div>
-                  {currentVersion.evaluation.taskResults.length > 0 ? (
+                  {haluCatchReport ? (
+                    <div className="detail-subsection">
+                      <div className="section-head">
+                        <div>
+                          <h3>HaluCatch 完整报告</h3>
+                          <p className="description">保留 HaluCatch 生成的专业版、标准版与 AI 行动版 Markdown 报告。</p>
+                        </div>
+                      </div>
+                      <div className="detail-tab-bar halucatch-report-tabs" role="tablist" aria-label="HaluCatch 报告版本">
+                        {haluCatchReportTabs.map((tab) => (
+                          <button
+                            aria-selected={haluCatchReportTab === tab.id}
+                            className={`detail-tab ${haluCatchReportTab === tab.id ? "active" : ""}`}
+                            key={tab.id}
+                            onClick={() => setHaluCatchReportTab(tab.id)}
+                            role="tab"
+                            type="button"
+                          >
+                            {tab.label}
+                          </button>
+                        ))}
+                      </div>
+                      <MarkdownContent className="markdown-content halucatch-report-content">
+                        {haluCatchReportMarkdown}
+                      </MarkdownContent>
+                    </div>
+                  ) : null}
+                  {!haluCatchReport && currentVersion.evaluation.taskResults.length > 0 ? (
                     <div className="detail-subsection">
                       <h3>{isHaluCatchEvaluation ? "五维可靠性结果" : "任务结果"}</h3>
                       <ul className="list">
@@ -1116,7 +1163,7 @@ export default function SkillDetailPage() {
                       </ul>
                     </div>
                   ) : null}
-                  {currentVersion.evaluation.findings.length > 0 ? (
+                  {!haluCatchReport && currentVersion.evaluation.findings.length > 0 ? (
                     <div className="detail-subsection">
                       <h3>{isHaluCatchEvaluation ? "HaluCatch 发现" : "总体发现"}</h3>
                       <ul className="list">

@@ -31,6 +31,14 @@ export interface FunctionalEvaluationTaskResult {
   findings: FunctionalEvaluationFinding[];
 }
 
+export interface HaluCatchReportBundle {
+  skillType: string;
+  language: "zh-CN" | "en";
+  professional: string;
+  simple: string;
+  action: string;
+}
+
 export interface FunctionalEvaluationReport {
   id: string;
   provider: EvaluationProvider;
@@ -40,6 +48,7 @@ export interface FunctionalEvaluationReport {
   tasksPassed: number;
   taskResults: FunctionalEvaluationTaskResult[];
   findings: FunctionalEvaluationFinding[];
+  haluCatchReport?: HaluCatchReportBundle;
   createdAt: string;
 }
 
@@ -62,6 +71,11 @@ interface HaluCatchPayload {
   error?: string;
   skillType?: string;
   results?: Partial<Record<HaluCatchDimensionKey, HaluCatchDimension>>;
+  reports?: {
+    professional?: string;
+    simple?: string;
+    action?: string;
+  };
 }
 
 interface ProcessOutput {
@@ -159,6 +173,7 @@ async function evaluateWithHaluCatch(snapshot: SkillSnapshot): Promise<Functiona
       )
     );
     const tasksPassed = taskResults.filter((result) => result.score >= 80).length;
+    const haluCatchReport = buildHaluCatchReportBundle(payload);
 
     return {
       id: `halucatch_${snapshot.contentHash.slice(0, 16)}_${Date.now()}`,
@@ -169,6 +184,7 @@ async function evaluateWithHaluCatch(snapshot: SkillSnapshot): Promise<Functiona
       tasksPassed,
       taskResults,
       findings,
+      haluCatchReport,
       createdAt: new Date().toISOString()
     };
   } finally {
@@ -354,10 +370,37 @@ function parseHaluCatchPayload(output: ProcessOutput): HaluCatchPayload {
     throw new Error("HaluCatch did not return all five evaluation dimensions.");
   }
 
+  const reports = isRecord(parsed.reports)
+    ? {
+        professional: typeof parsed.reports.professional === "string" ? parsed.reports.professional : undefined,
+        simple: typeof parsed.reports.simple === "string" ? parsed.reports.simple : undefined,
+        action: typeof parsed.reports.action === "string" ? parsed.reports.action : undefined
+      }
+    : undefined;
+
+  if (!reports?.professional || !reports.simple || !reports.action) {
+    throw new Error("HaluCatch did not return the full markdown report bundle.");
+  }
+
   return {
     ok: true,
     skillType: typeof parsed.skillType === "string" ? parsed.skillType : undefined,
-    results
+    results,
+    reports
+  };
+}
+
+function buildHaluCatchReportBundle(payload: HaluCatchPayload): HaluCatchReportBundle {
+  if (!payload.reports?.professional || !payload.reports.simple || !payload.reports.action) {
+    throw new Error("HaluCatch did not return the full markdown report bundle.");
+  }
+
+  return {
+    skillType: payload.skillType ?? "unknown",
+    language: "zh-CN",
+    professional: payload.reports.professional,
+    simple: payload.reports.simple,
+    action: payload.reports.action
   };
 }
 

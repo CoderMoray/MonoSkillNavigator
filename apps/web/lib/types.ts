@@ -54,6 +54,14 @@ export interface FunctionalEvaluationTaskResult {
   findings: FunctionalEvaluationFinding[];
 }
 
+export interface HaluCatchReportBundle {
+  skillType: string;
+  language: "zh-CN" | "en";
+  professional: string;
+  simple: string;
+  action: string;
+}
+
 export interface FunctionalEvaluationReport {
   id: string;
   provider: "static-taskset" | "halucatch-adapter";
@@ -63,6 +71,7 @@ export interface FunctionalEvaluationReport {
   tasksPassed: number;
   taskResults: FunctionalEvaluationTaskResult[];
   findings: FunctionalEvaluationFinding[];
+  haluCatchReport?: HaluCatchReportBundle;
   createdAt: string;
 }
 

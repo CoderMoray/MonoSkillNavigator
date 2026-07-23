@@ -34,6 +34,7 @@ def evaluate(skill_dir: str, halucatch_dir: str) -> dict:
         check_methodology,
         check_rules,
     )
+    from halucatch.reporter import generate_report
     from halucatch.scanner import scan_folder
 
     # HaluCatch's scanner and complexity evaluator emit progress logs. Keep
@@ -69,7 +70,15 @@ def evaluate(skill_dir: str, halucatch_dir: str) -> dict:
                 "complexity": check_complexity(info, skill_type),
             }
 
-    return {"ok": True, "skillType": skill_type, "results": results}
+    with contextlib.redirect_stdout(sys.stderr):
+        reports = generate_report(info, results, output_dir=None, lang="zh-CN")
+
+    return {
+        "ok": True,
+        "skillType": skill_type,
+        "results": results,
+        "reports": reports,
+    }
 
 
 def main() -> None:

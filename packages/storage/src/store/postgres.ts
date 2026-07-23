@@ -1,4 +1,4 @@
-import type { FunctionalEvaluationFinding, FunctionalEvaluationReport, FunctionalEvaluationTaskResult } from "@skill-platform/evaluator";
+import type { FunctionalEvaluationFinding, FunctionalEvaluationReport, FunctionalEvaluationTaskResult, HaluCatchReportBundle } from "@skill-platform/evaluator";
 import type { ReviewFinding, ReviewReport, ReviewVerdict } from "@skill-platform/review-engine";
 import {
   getSkillSlug,
@@ -42,6 +42,22 @@ function toFunctionalEvaluationFinding(row: EvaluationFindingRow): FunctionalEva
     message: row.message,
     recommendation: row.recommendation,
   };
+}
+
+function parseHaluCatchReport(value: string | null | undefined): HaluCatchReportBundle | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(value) as HaluCatchReportBundle;
+  } catch {
+    return undefined;
+  }
+}
+
+function serializeHaluCatchReport(report: HaluCatchReportBundle | undefined): string | null {
+  return report ? JSON.stringify(report) : null;
 }
 
 function toStringList(value: unknown): string[] {
@@ -347,6 +363,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
               })
             ),
             findings: evaluationReportFindings.map(toFunctionalEvaluationFinding),
+            haluCatchReport: parseHaluCatchReport(evaluation.haluCatchReport),
             createdAt: String(evaluation.createdAt),
           }
         : undefined;
@@ -614,7 +631,9 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         skillSlug: slug, version, evaluationId: evaluation.id,
         provider: evaluation.provider, status: evaluation.status,
         score: evaluation.score, tasksTotal: evaluation.tasksTotal ?? evaluation.tasks_total ?? 0,
-        tasksPassed: evaluation.tasksPassed ?? evaluation.tasks_passed ?? 0, createdAt,
+        tasksPassed: evaluation.tasksPassed ?? evaluation.tasks_passed ?? 0,
+        haluCatchReport: serializeHaluCatchReport(evaluation.haluCatchReport),
+        createdAt,
       }).onConflictDoUpdate({
         target: [schema.skillEvaluations.skillSlug, schema.skillEvaluations.version],
         set: {
@@ -622,6 +641,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
           status: evaluation.status, score: evaluation.score,
           tasksTotal: evaluation.tasksTotal ?? evaluation.tasks_total ?? 0,
           tasksPassed: evaluation.tasksPassed ?? evaluation.tasks_passed ?? 0,
+          haluCatchReport: serializeHaluCatchReport(evaluation.haluCatchReport),
           createdAt,
         },
       });
@@ -745,7 +765,9 @@ export class PostgresRegistryStore extends JsonRegistryStore {
           skillSlug: slug, version, evaluationId: evaluation.id,
           provider: evaluation.provider, status: evaluation.status,
           score: evaluation.score, tasksTotal: evaluation.tasksTotal ?? 0,
-          tasksPassed: evaluation.tasksPassed ?? 0, createdAt: now,
+          tasksPassed: evaluation.tasksPassed ?? 0,
+          haluCatchReport: serializeHaluCatchReport(evaluation.haluCatchReport),
+          createdAt: now,
         });
         await replaceEvaluationDetails(tx, slug, version, evaluation);
       }
