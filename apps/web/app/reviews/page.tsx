@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Activity, CheckCircle2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
-import { ScoreBars } from "../../components/ScoreBars";
+import { ScoreRadar } from "../../components/ScoreRadar";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../components/StatusBadge";
 import { getSkill, getSkills } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
-import type { RegistrySkill, ReviewFinding } from "../../lib/types";
+import { averageReviewScores } from "../../lib/review-scores";
+import type { RegistrySkill, ReviewFinding, ReviewScores } from "../../lib/types";
 
 export default function ReviewsPage() {
   const [skills, setSkills] = useState<RegistrySkill[]>([]);
@@ -60,6 +61,20 @@ export default function ReviewsPage() {
 
     return { versions: versions.length, findings, blockers, passed, averageReliability };
   }, [skills]);
+
+  const platformAverageScores = useMemo<ReviewScores | undefined>(() => {
+    const items = skills
+      .map((skill) => skill.versions[skill.latestVersion])
+      .filter((version): version is NonNullable<typeof version> => Boolean(version))
+      .map((version) => ({ scores: version.review.scores }));
+    return averageReviewScores(items);
+  }, [skills]);
+
+  const platformSampleSize = useMemo(
+    () =>
+      skills.filter((skill) => skill.versions[skill.latestVersion]).length,
+    [skills]
+  );
 
   return (
     <AppShell title="审查中心">
@@ -123,7 +138,11 @@ export default function ReviewsPage() {
                         </div>
                       </div>
                       <div style={{ marginTop: 16 }}>
-                        <ScoreBars scores={latest.review.scores} />
+                        <ScoreRadar
+                          averageScores={platformAverageScores}
+                          sampleSize={platformSampleSize}
+                          scores={latest.review.scores}
+                        />
                       </div>
                     </li>
                   );

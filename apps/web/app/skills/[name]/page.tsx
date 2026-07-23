@@ -29,12 +29,13 @@ import {
   X
 } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
-import { ScoreBars } from "../../../components/ScoreBars";
+import { ScoreRadar } from "../../../components/ScoreRadar";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
-import { addSkillContributor, addSkillRating, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, saveBlobAsFile, unpublishSkill } from "../../../lib/api";
+import { addSkillContributor, addSkillRating, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, saveBlobAsFile, unpublishSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { formatDateTime, formatNumber } from "../../../lib/format";
-import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill } from "../../../lib/types";
+import { averageReviewScores } from "../../../lib/review-scores";
+import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill, ReviewScores } from "../../../lib/types";
 
 type DetailPanel =
   | "skill-md"
@@ -113,6 +114,32 @@ export default function SkillDetailPage() {
   const [manageError, setManageError] = useState<string | null>(null);
   const [unpublishingSkill, setUnpublishingSkill] = useState(false);
   const [deletingSkill, setDeletingSkill] = useState(false);
+  const [platformAverageScores, setPlatformAverageScores] = useState<ReviewScores | undefined>();
+  const [platformSampleSize, setPlatformSampleSize] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPlatformAverages() {
+      try {
+        const items = await getSkills();
+        if (!cancelled) {
+          setPlatformSampleSize(items.length);
+          setPlatformAverageScores(averageReviewScores(items));
+        }
+      } catch {
+        if (!cancelled) {
+          setPlatformSampleSize(0);
+          setPlatformAverageScores(undefined);
+        }
+      }
+    }
+
+    void loadPlatformAverages();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1006,7 +1033,11 @@ export default function SkillDetailPage() {
               </div>
               {currentVersion.review?.scores ? (
                 <div className="review-score-card">
-                  <ScoreBars scores={currentVersion.review.scores} />
+                  <ScoreRadar
+                    averageScores={platformAverageScores}
+                    sampleSize={platformSampleSize}
+                    scores={currentVersion.review.scores}
+                  />
                 </div>
               ) : null}
               {reviewFindings.length === 0 ? (

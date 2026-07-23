@@ -2292,6 +2292,148 @@ button {
   padding: 18px;
 }
 
+.score-radar {
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+}
+
+.score-radar-head {
+  width: min(100%, 520px);
+}
+
+.score-radar-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  justify-content: center;
+}
+
+.score-radar-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-strong);
+  font-size: 13px;
+}
+
+.score-radar-key i {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+.score-radar-key-current i {
+  background: rgba(26, 115, 232, 0.28);
+  box-shadow: inset 0 0 0 2px #1a73e8;
+}
+
+.score-radar-key-average i {
+  background: rgba(234, 179, 8, 0.18);
+  box-shadow: inset 0 0 0 2px rgba(234, 179, 8, 0.85);
+}
+
+.score-radar-chart {
+  width: min(100%, 360px);
+  height: auto;
+  display: block;
+}
+
+.score-radar-grid {
+  fill: none;
+  stroke: rgba(17, 24, 39, 0.08);
+  stroke-width: 1;
+}
+
+.score-radar-axis {
+  stroke: rgba(17, 24, 39, 0.1);
+  stroke-width: 1;
+}
+
+.score-radar-area-current {
+  fill: rgba(26, 115, 232, 0.18);
+  stroke: none;
+}
+
+.score-radar-outline-current {
+  fill: none;
+  stroke: #1a73e8;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.score-radar-area-average {
+  fill: rgba(234, 179, 8, 0.12);
+  stroke: none;
+}
+
+.score-radar-outline-average {
+  fill: none;
+  stroke: rgba(234, 179, 8, 0.9);
+  stroke-dasharray: 5 4;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.score-radar-label-name {
+  fill: var(--muted-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.score-radar-label-value {
+  fill: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.score-radar-legend {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  width: min(100%, 520px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.score-radar-legend li {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.score-radar-legend span {
+  color: var(--muted-strong);
+  font-size: 12px;
+}
+
+.score-radar-legend-values {
+  display: grid;
+  gap: 2px;
+}
+
+.score-radar-legend-current {
+  font-size: 16px;
+}
+
+.score-radar-legend-average {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+@media (max-width: 720px) {
+  .score-radar-legend {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .detail-list {
   margin-top: 18px;
 }
@@ -2327,6 +2469,64 @@ button {
 :root[data-theme="dark"] .review-score-card,
 :root[data-theme="dark"] .evaluation-summary > div {
   background: rgba(24, 26, 36, 0.72);
+}
+
+:root[data-theme="dark"] .score-radar-grid {
+  stroke: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .score-radar-axis {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme="dark"] .score-radar-area-current {
+  fill: rgba(88, 166, 255, 0.22);
+}
+
+:root[data-theme="dark"] .score-radar-outline-current {
+  stroke: #58a6ff;
+}
+
+:root[data-theme="dark"] .score-radar-area-average {
+  fill: rgba(250, 204, 21, 0.14);
+}
+
+:root[data-theme="dark"] .score-radar-outline-average {
+  stroke: rgba(250, 204, 21, 0.92);
+}
+
+:root[data-theme="dark"] .score-radar-key-current i {
+  background: rgba(88, 166, 255, 0.24);
+  box-shadow: inset 0 0 0 2px #58a6ff;
+}
+
+:root[data-theme="dark"] .score-radar-key-average i {
+  background: rgba(250, 204, 21, 0.16);
+  box-shadow: inset 0 0 0 2px rgba(250, 204, 21, 0.92);
+}
+
+:root[data-theme="dark"] .score-radar-legend li {
+  background: rgba(24, 26, 36, 0.72);
+}
+
+:root[data-theme="dark"] .score-radar-label-name {
+  fill: rgba(255, 255, 255, 0.78);
+}
+
+:root[data-theme="dark"] .score-radar-label-value {
+  fill: #ffffff;
+}
+
+:root[data-theme="dark"] .score-radar-legend span {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+:root[data-theme="dark"] .score-radar-legend-current {
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .score-radar-legend-average {
+  color: rgba(255, 255, 255, 0.62);
 }
 
 :root[data-theme="dark"] .detail-tab:hover {
