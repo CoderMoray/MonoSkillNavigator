@@ -6,8 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, GitBranch, LinkIcon } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { SkillCard } from "../../../components/SkillCard";
-import { getLeaderboard } from "../../../lib/api";
-import { aggregateCreators, normalizeHandle, type CreatorSummary } from "../../../lib/creators";
+import { getCreatorProfile } from "../../../lib/api";
+import { normalizeHandle, type CreatorSummary } from "../../../lib/creators";
 import { formatNumber } from "../../../lib/format";
 
 type CreatorProfileTab = "skills" | "plugins" | "starred";
@@ -33,14 +33,14 @@ export default function CreatorProfilePage() {
       setLoading(true);
       setError(null);
       try {
-        const skills = await getLeaderboard("downloads", 100);
-        const matched = aggregateCreators(skills).find((item) => item.handle === handle) ?? null;
+        const matched = await getCreatorProfile(handle);
         if (!cancelled) {
           setCreator(matched);
         }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "加载失败");
+          setCreator(null);
         }
       } finally {
         if (!cancelled) {
@@ -112,7 +112,7 @@ export default function CreatorProfilePage() {
 
             <div className="profile-meta">
               <h2>About</h2>
-              <p>{topSkillNames ? `Publisher behind ${topSkillNames}.` : "Publisher on SkillHub."}</p>
+              <p>{topSkillNames ? `Publisher behind ${topSkillNames}.` : "Publisher on MonoSkillNavigator."}</p>
               <h2>Organizations</h2>
               <p>SkillHub</p>
               <h2>Links</h2>

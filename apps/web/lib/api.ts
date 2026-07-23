@@ -8,6 +8,7 @@ import type {
   ReviewReport,
   SkillSearchResult
 } from "./types";
+import type { CreatorSummary } from "./creators";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:3000";
 
@@ -38,6 +39,23 @@ export async function getLeaderboard(sort = "reliability", limit = 8, categories
 
   const data = await request<{ items: SkillSearchResult[] }>(url);
   return data.items;
+}
+
+export async function getCreators(query = ""): Promise<CreatorSummary[]> {
+  const url = new URL("/creators", API_BASE_URL);
+  if (query.trim()) {
+    url.searchParams.set("query", query.trim());
+  }
+
+  const data = await request<{ items: CreatorSummary[] }>(url);
+  return data.items;
+}
+
+export async function getCreatorProfile(username: string): Promise<CreatorSummary> {
+  const data = await request<{ creator: CreatorSummary }>(
+    new URL(`/creators/${encodeURIComponent(username)}`, API_BASE_URL)
+  );
+  return data.creator;
 }
 
 export async function getSkill(slug: string, token?: string): Promise<RegistrySkill> {

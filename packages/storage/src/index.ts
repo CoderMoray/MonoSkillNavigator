@@ -44,3 +44,11 @@ export {
   isSkillOwner,
   normalizeCategoryFilters,
 } from "./utils";
+
+export {
+  aggregateCreators,
+  createEmptyCreatorSummary,
+  listCreators,
+  normalizeHandle,
+  type CreatorSummary,
+} from "./creators";

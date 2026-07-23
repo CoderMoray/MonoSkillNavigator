@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Download, Search, Sparkles, UserRound } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
-import { getLeaderboard } from "../../lib/api";
-import { aggregateCreators, type CreatorSummary } from "../../lib/creators";
+import { getCreators } from "../../lib/api";
+import type { CreatorSummary } from "../../lib/creators";
 import { formatNumber } from "../../lib/format";
 
 export default function CreatorsPage() {
@@ -21,9 +21,9 @@ export default function CreatorsPage() {
       setLoading(true);
       setError(null);
       try {
-        const skills = await getLeaderboard("downloads", 100);
+        const items = await getCreators();
         if (!cancelled) {
-          setCreators(aggregateCreators(skills));
+          setCreators(items);
         }
       } catch (err) {
         if (!cancelled) {
@@ -81,7 +81,7 @@ export default function CreatorsPage() {
           <div className="section-head">
             <div>
               <h2>Popular publishers</h2>
-              <p>按下载量和发布数量排序。</p>
+              <p>包含已发布 Skill 的 Creator 与已注册但尚未发布的用户。</p>
             </div>
           </div>
 
@@ -105,7 +105,7 @@ export default function CreatorsPage() {
                       <strong>{creator.name}</strong>
                       <span>@{creator.handle}</span>
                     </div>
-                    <p>{creator.skills.slice(0, 3).map((skill) => skill.name).join(" · ") || "Publisher on SkillHub."}</p>
+                    <p>{creator.skills.slice(0, 3).map((skill) => skill.name).join(" · ") || "Publisher on MonoSkillNavigator."}</p>
                   </div>
                   <div className="publisher-stats">
                     <span><UserRound size={13} /> {formatNumber(creator.published)} published</span>

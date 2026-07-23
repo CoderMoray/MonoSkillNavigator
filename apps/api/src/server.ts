@@ -14,12 +14,16 @@ import {
   type SkillSnapshot
 } from "@skill-platform/skill-spec";
 import {
+  aggregateCreators,
   createAuthStoreFromEnv,
+  createEmptyCreatorSummary,
   createRegistryStoreFromEnv,
   isSkillContributor,
   isSkillOwner,
+  listCreators,
   loadDotEnvIfPresent,
   normalizeCategoryFilters,
+  normalizeHandle,
   type ContributorRole,
   type IssueSeverity,
   type IssueStatus,
@@ -81,6 +85,10 @@ interface ChangePasswordBody {
 
 interface SkillParams {
   slug: string;
+}
+
+interface CreatorParams {
+  username: string;
 }
 
 interface VersionParams {
@@ -169,6 +177,39 @@ export function buildServer() {
     return {
       items: await store.search(request.query.query ?? "", normalizeCategoryFilters(request.query.category))
     };
+  });
+
+  app.get<{ Querystring: { query?: string } }>("/creators", async (request) => {
+    const skills = await store.search("");
+    const users = await authStore.listUsers();
+    const normalizedQuery = request.query.query?.trim().toLowerCase() ?? "";
+    const items = listCreators(skills, users).filter((creator) => {
+      if (!normalizedQuery) {
+        return true;
+      }
+      return (
+        creator.name.toLowerCase().includes(normalizedQuery) ||
+        creator.handle.includes(normalizedQuery)
+      );
+    });
+
+    return { items };
+  });
+
+  app.get<{ Params: CreatorParams }>("/creators/:username", async (request, reply) => {
+    const handle = normalizeHandle(request.params.username);
+    const skills = await store.search("");
+    const matched = aggregateCreators(skills).find((item) => item.handle === handle);
+    if (matched) {
+      return { creator: matched };
+    }
+
+    const user = await authStore.getUserByUsername(handle);
+    if (!user) {
+      return reply.code(404).send({ error: "Creator not found" });
+    }
+
+    return { creator: createEmptyCreatorSummary(user.username) };
   });
 
   app.post<{ Body: PublishBody }>("/skills/publish/preview", async (request, reply) => {

@@ -40,6 +40,7 @@ export interface AuthStore {
   logout(token: string): Promise<void>;
   getUserByToken(token: string): Promise<PublicUser | undefined>;
   getUserByUsername(username: string): Promise<PublicUser | undefined>;
+  listUsers(): Promise<PublicUser[]>;
   changePassword(token: string, currentPassword: string, newPassword: string): Promise<PublicUser>;
 }
 
@@ -142,6 +143,13 @@ abstract class JsonAuthStore implements AuthStore {
       (item) => item.username.toLowerCase() === normalizedUsername.toLowerCase()
     );
     return user ? toPublicUser(user) : undefined;
+  }
+
+  async listUsers(): Promise<PublicUser[]> {
+    const data = await this.load();
+    return Object.values(data.users)
+      .map(toPublicUser)
+      .sort((a, b) => a.username.localeCompare(b.username));
   }
 
   async changePassword(token: string, currentPassword: string, newPassword: string): Promise<PublicUser> {
@@ -326,6 +334,17 @@ export class PostgresAuthStore implements AuthStore {
     );
 
     return result.rows[0] ? toPublicDatabaseUser(result.rows[0]) : undefined;
+  }
+
+  async listUsers(): Promise<PublicUser[]> {
+    await this.ensureSchema();
+    const result = await this.pool.query<DatabaseUserRow>(
+      `select id, username, role, password_hash, created_at, updated_at
+       from platform_users
+       order by lower(username)`
+    );
+
+    return result.rows.map(toPublicDatabaseUser);
   }
 
   async changePassword(token: string, currentPassword: string, newPassword: string): Promise<PublicUser> {
