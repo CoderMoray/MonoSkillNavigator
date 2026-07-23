@@ -6,6 +6,11 @@ import {
   validateSkillSnapshot
 } from "@skill-platform/skill-spec";
 import { evaluateSkillSnapshot, type FunctionalEvaluationReport } from "@skill-platform/evaluator";
+import {
+  isSkillSpectorEnabled,
+  runSkillSpectorSecurityScan,
+  type SkillSpectorScanSummary
+} from "./skillspector.js";
 
 export type ReviewCategory =
   | "compliance"
@@ -45,8 +50,11 @@ export interface ReviewReport {
   verdict: ReviewVerdict;
   scores: ReviewScores;
   findings: ReviewFinding[];
+  skillSpector?: SkillSpectorScanSummary;
   createdAt: string;
 }
+
+export type { SkillSpectorScanSummary } from "./skillspector.js";
 
 interface PatternRule {
   id: string;
@@ -155,11 +163,32 @@ export async function reviewSkillSnapshot(
   }
 
   reviewManifest(snapshot, findings);
-  reviewContent(snapshot, findings);
   reviewQualityEvidence(snapshot, findings);
 
+  let skillSpector: SkillSpectorScanSummary | undefined;
+  if (isSkillSpectorEnabled()) {
+    try {
+      const scan = await runSkillSpectorSecurityScan(snapshot);
+      skillSpector = scan.summary;
+      findings.push(...scan.findings);
+    } catch (error) {
+      reviewContent(snapshot, findings);
+      findings.push({
+        id: "skillspector-unavailable",
+        category: "security",
+        severity: "low",
+        title: "SkillSpector security scan unavailable",
+        message: `SkillSpector static security scan could not run: ${truncateError(error)}`,
+        recommendation:
+          "Install Python 3.12+ with SkillSpector dependencies, keep packages/SkillSpector-main available, or set SKILLSPECTOR_PYTHON. Falling back to built-in regex checks."
+      });
+    }
+  } else {
+    reviewContent(snapshot, findings);
+  }
+
   const evaluation = evaluationOverride ?? await evaluateSkillSnapshot(snapshot);
-  const scores = calculateScores(findings, snapshot, evaluation);
+  const scores = calculateScores(findings, evaluation, skillSpector);
   const verdict = calculateVerdict(findings);
 
   return {
@@ -171,6 +200,7 @@ export async function reviewSkillSnapshot(
     verdict,
     scores,
     findings,
+    skillSpector,
     createdAt: new Date().toISOString()
   };
 }
@@ -328,12 +358,14 @@ function reviewQualityEvidence(snapshot: SkillSnapshot, findings: ReviewFinding[
 
 function calculateScores(
   findings: ReviewFinding[],
-  _snapshot: SkillSnapshot,
-  evaluation: FunctionalEvaluationReport
+  evaluation: FunctionalEvaluationReport,
+  skillSpector?: SkillSpectorScanSummary
 ): ReviewScores {
   const complianceScore = clampScore(100 - penalty(findings, ["compliance"]));
   const qualityScore = clampScore(100 - penalty(findings, ["quality"]));
-  const securityScore = clampScore(100 - penalty(findings, ["security", "leakage"]));
+  const securityScore = skillSpector
+    ? clampScore(100 - skillSpector.riskScore)
+    : clampScore(100 - penalty(findings, ["security", "leakage"]));
   const privacyScore = clampScore(100 - penalty(findings, ["privacy"]));
   const reliabilityScore = clampScore(evaluation.score);
 
@@ -385,4 +417,9 @@ function excerpt(content: string, index: number): string {
   const start = Math.max(0, index - 80);
   const end = Math.min(content.length, index + 160);
   return content.slice(start, end).replace(/\s+/g, " ").trim();
+}
+
+function truncateError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.length <= 300 ? message : `${message.slice(0, 297)}...`;
 }

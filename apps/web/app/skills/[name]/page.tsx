@@ -249,6 +249,17 @@ export default function SkillDetailPage() {
   const tags = currentVersion.manifest.tags ?? [];
   const openIssues = skill.issues.filter((issue) => issue.status !== "closed");
   const reviewFindings = currentVersion.review?.findings ?? [];
+  const skillSpectorScan =
+    currentVersion.review?.skillSpector ??
+    (reviewFindings.some((finding) => finding.id.startsWith("skillspector-"))
+      ? {
+          provider: "skillspector-static" as const,
+          riskScore: Math.max(0, Math.min(100, 100 - (currentVersion.review?.scores.securityScore ?? 100))),
+          riskSeverity: "UNKNOWN",
+          recommendation: "UNKNOWN",
+          scanMode: "static-only" as const
+        }
+      : undefined);
   const isHaluCatchEvaluation = currentVersion.evaluation?.provider === "halucatch-adapter";
   const haluCatchReport = currentVersion.evaluation?.haluCatchReport;
   const haluCatchReportSummary = haluCatchReport ? extractHaluCatchSummary(haluCatchReport.simple) : "";
@@ -1034,7 +1045,12 @@ export default function SkillDetailPage() {
                 <div className="section-head">
                   <div>
                     <h3>审查报告</h3>
-                    <p className="description">合规、隐私、安全与质量维度的静态审查结果。</p>
+                    <p className="description">
+                      合规、隐私、安全与质量维度的静态审查结果。
+                      {skillSpectorScan
+                        ? ` 安全分由 SkillSpector 静态扫描得出（风险分 ${skillSpectorScan.riskScore}/100 → 安全分 ${currentVersion.review?.scores.securityScore ?? "—"}）。`
+                        : null}
+                    </p>
                   </div>
                 </div>
                 {currentVersion.review?.scores ? (
@@ -1050,7 +1066,9 @@ export default function SkillDetailPage() {
                   <div className="empty detail-empty">未发现风险项。</div>
                 ) : (
                   <ul className="list detail-list">
-                    {reviewFindings.map((finding) => (
+                    {reviewFindings
+                      .filter((finding) => finding.id !== "skillspector-unavailable")
+                      .map((finding) => (
                       <li className={`list-item finding ${finding.severity}`} key={finding.id}>
                         <div className="card-head">
                           <strong>{finding.title}</strong>

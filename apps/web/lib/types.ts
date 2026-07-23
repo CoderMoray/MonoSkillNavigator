@@ -37,7 +37,16 @@ export interface ReviewReport {
   verdict: ReviewVerdict;
   scores: ReviewScores;
   findings: ReviewFinding[];
+  skillSpector?: SkillSpectorScanSummary;
   createdAt: string;
+}
+
+export interface SkillSpectorScanSummary {
+  provider: "skillspector-static";
+  riskScore: number;
+  riskSeverity: string;
+  recommendation: string;
+  scanMode: "static-only";
 }
 
 export interface FunctionalEvaluationFinding {
