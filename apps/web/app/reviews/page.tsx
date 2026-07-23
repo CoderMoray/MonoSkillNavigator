@@ -11,6 +11,13 @@ import { formatDateTime } from "../../lib/format";
 import { averageReviewScores } from "../../lib/review-scores";
 import type { RegistrySkill, ReviewFinding, ReviewScores } from "../../lib/types";
 
+interface AggregatedFinding {
+  finding: ReviewFinding;
+  skillSlug: string;
+  skillName: string;
+  version: string;
+}
+
 export default function ReviewsPage() {
   const [skills, setSkills] = useState<RegistrySkill[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,8 +56,21 @@ export default function ReviewsPage() {
     const versions = skills
       .map((skill) => skill.versions[skill.latestVersion])
       .filter((version): version is NonNullable<typeof version> => Boolean(version));
-    const findings = versions.flatMap((version) => version.review.findings);
-    const blockers = findings.filter((finding) => finding.severity === "critical" || finding.severity === "high").length;
+    const findings: AggregatedFinding[] = skills.flatMap((skill) => {
+      const latest = skill.versions[skill.latestVersion];
+      if (!latest) {
+        return [];
+      }
+      return latest.review.findings.map((finding) => ({
+        finding,
+        skillSlug: skill.slug,
+        skillName: skill.name,
+        version: latest.version
+      }));
+    });
+    const blockers = findings.filter(
+      ({ finding }) => finding.severity === "critical" || finding.severity === "high"
+    ).length;
     const passed = versions.filter((version) => version.status === "published").length;
     const averageReliability =
       versions.length === 0
@@ -158,8 +178,14 @@ export default function ReviewsPage() {
                 </div>
               ) : (
                 <ul className="list">
-                  {reviewStats.findings.slice(0, 12).map((finding) => (
-                    <FindingItem finding={finding} key={finding.id} />
+                  {reviewStats.findings.slice(0, 12).map((item) => (
+                    <FindingItem
+                      finding={item.finding}
+                      key={`${item.skillSlug}:${item.finding.id}`}
+                      skillName={item.skillName}
+                      skillSlug={item.skillSlug}
+                      version={item.version}
+                    />
                   ))}
                 </ul>
               )}
@@ -201,13 +227,27 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-function FindingItem({ finding }: { finding: ReviewFinding }) {
+function FindingItem({
+  finding,
+  skillName,
+  skillSlug,
+  version
+}: {
+  finding: ReviewFinding;
+  skillName: string;
+  skillSlug: string;
+  version: string;
+}) {
   return (
     <li className={`list-item finding ${finding.severity}`}>
       <div className="card-head">
         <strong>{finding.title}</strong>
         <SeverityBadge severity={finding.severity} />
       </div>
+      <p className="description">
+        <Link href={`/skills/${encodeURIComponent(skillSlug)}`}>{skillName}</Link>
+        {" · "}v{version}
+      </p>
       <p className="description">{finding.message}</p>
     </li>
   );
