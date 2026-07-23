@@ -34,10 +34,8 @@ export interface ReviewFinding {
 }
 
 export interface ReviewScores {
-  complianceScore: number;
-  securityScore: number;
-  privacyScore: number;
   qualityScore: number;
+  securityScore: number;
   reliabilityScore: number;
 }
 
@@ -361,19 +359,15 @@ function calculateScores(
   evaluation: FunctionalEvaluationReport,
   skillSpector?: SkillSpectorScanSummary
 ): ReviewScores {
-  const complianceScore = clampScore(100 - penalty(findings, ["compliance"]));
-  const qualityScore = clampScore(100 - penalty(findings, ["quality"]));
+  const qualityScore = clampScore(100 - penalty(findings, ["compliance", "quality"]));
   const securityScore = skillSpector
     ? clampScore(100 - skillSpector.riskScore)
-    : clampScore(100 - penalty(findings, ["security", "leakage"]));
-  const privacyScore = clampScore(100 - penalty(findings, ["privacy"]));
+    : clampScore(100 - penalty(findings, ["security", "privacy", "leakage"]));
   const reliabilityScore = clampScore(evaluation.score);
 
   return {
-    complianceScore,
-    securityScore,
-    privacyScore,
     qualityScore,
+    securityScore,
     reliabilityScore
   };
 }

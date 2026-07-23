@@ -10,10 +10,8 @@ export type ReviewCategory =
 export type EvaluationStatus = "passed" | "partial" | "failed" | "not-configured";
 
 export interface ReviewScores {
-  complianceScore: number;
-  securityScore: number;
-  privacyScore: number;
   qualityScore: number;
+  securityScore: number;
   reliabilityScore: number;
 }
 

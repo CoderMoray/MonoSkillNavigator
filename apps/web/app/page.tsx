@@ -95,7 +95,7 @@ export default function HomePage() {
           </span>
           <h1>Discover trusted skills from standout creators.</h1>
           <p>
-            搜索、审查、安装和分发适用于 AI Agent 的 Skill。每个包都经过合规、安全、隐私、质量和可靠性评估。
+            搜索、审查、安装和分发适用于 AI Agent 的 Skill。每个包都经过质量、安全和可靠性评估。
           </p>
 
           <form className="hero-search" onSubmit={handleSearch}>

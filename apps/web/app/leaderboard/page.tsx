@@ -11,10 +11,8 @@ import type { SkillSearchResult } from "../../lib/types";
 
 const sortOptions = [
   { value: "reliability", label: "可靠性分", icon: Award },
-  { value: "compliance", label: "合规分", icon: ShieldCheck },
-  { value: "security", label: "安全分", icon: ShieldCheck },
-  { value: "privacy", label: "隐私分", icon: ShieldCheck },
   { value: "quality", label: "质量分", icon: Trophy },
+  { value: "security", label: "安全分", icon: ShieldCheck },
   { value: "rating", label: "用户评分", icon: Star },
   { value: "downloads", label: "下载量", icon: Download },
   { value: "recent", label: "最近更新", icon: Trophy }
@@ -98,8 +96,7 @@ export default function LeaderboardPage() {
                         <strong>#{index + 1} {item.name}</strong>
                       </Link>
                       <p className="description">
-                        合规 {item.scores.complianceScore} · 安全 {item.scores.securityScore} · 隐私{" "}
-                        {item.scores.privacyScore} · 质量 {item.scores.qualityScore} · 可靠性{" "}
+                        质量 {item.scores.qualityScore} · 安全 {item.scores.securityScore} · 可靠性{" "}
                         {item.scores.reliabilityScore}
                       </p>
                     </div>

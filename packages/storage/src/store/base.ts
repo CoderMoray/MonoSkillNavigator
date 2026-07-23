@@ -211,10 +211,8 @@ export abstract class JsonRegistryStore implements RegistryStore {
     return items.sort((a, b) => {
       switch (sort) {
         case "rating": return b.averageRating - a.averageRating || b.ratingCount - a.ratingCount;
-        case "compliance": return b.scores.complianceScore - a.scores.complianceScore;
         case "quality": return b.scores.qualityScore - a.scores.qualityScore;
         case "security": return b.scores.securityScore - a.scores.securityScore;
-        case "privacy": return b.scores.privacyScore - a.scores.privacyScore;
         case "reliability": return b.scores.reliabilityScore - a.scores.reliabilityScore;
         case "recent": return b.updatedAt.localeCompare(a.updatedAt);
         default: return b.downloads - a.downloads;

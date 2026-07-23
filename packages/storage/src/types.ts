@@ -9,10 +9,8 @@ export type IssueSeverity = "low" | "medium" | "high" | "critical";
 export type LeaderboardSort =
   | "downloads"
   | "rating"
-  | "compliance"
   | "quality"
   | "security"
-  | "privacy"
   | "reliability"
   | "recent";
 export type ArtifactProvider = "minio";

@@ -1046,7 +1046,7 @@ export default function SkillDetailPage() {
                   <div>
                     <h3>审查报告</h3>
                     <p className="description">
-                      合规、隐私、安全与质量维度的静态审查结果。
+                      质量、安全与可靠性三维审查结果；质量分汇总平台的合规与质量规则。
                       {skillSpectorScan
                         ? ` 安全分由 SkillSpector 静态扫描得出（风险分 ${skillSpectorScan.riskScore}/100 → 安全分 ${currentVersion.review?.scores.securityScore ?? "—"}）。`
                         : null}

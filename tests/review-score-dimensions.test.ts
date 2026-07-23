@@ -54,17 +54,44 @@ function evaluation(score: number): FunctionalEvaluationReport {
 }
 
 describe("review score dimensions", () => {
-  test("keeps HaluCatch out of quality and mirrors evaluator score in reliability", async () => {
+  test("combines platform compliance and quality rules while keeping HaluCatch in reliability", async () => {
     const previous = process.env.SKILLSPECTOR_ENABLED;
     process.env.SKILLSPECTOR_ENABLED = "false";
     try {
       const lowReliability = await reviewSkillSnapshot(snapshot, undefined, evaluation(62));
       const highReliability = await reviewSkillSnapshot(snapshot, undefined, evaluation(90));
+      const missingLicenseAndTags = await reviewSkillSnapshot(
+        {
+          ...snapshot,
+          manifest: {
+            ...snapshot.manifest,
+            license: undefined,
+            tags: []
+          }
+        },
+        undefined,
+        evaluation(90)
+      );
+      const privacyFallback = await reviewSkillSnapshot(
+        {
+          ...snapshot,
+          files: snapshot.files.map((file) =>
+            file.path === "SKILL.md"
+              ? { ...file, content: `${file.content}\nprintenv` }
+              : file
+          )
+        },
+        undefined,
+        evaluation(90)
+      );
 
       expect(lowReliability.scores.qualityScore).toBe(highReliability.scores.qualityScore);
-      expect(lowReliability.scores.complianceScore).toBe(highReliability.scores.complianceScore);
+      expect(missingLicenseAndTags.scores.qualityScore).toBe(lowReliability.scores.qualityScore - 6);
+      expect(privacyFallback.scores.securityScore).toBe(lowReliability.scores.securityScore - 25);
       expect(lowReliability.scores.reliabilityScore).toBe(62);
       expect(highReliability.scores.reliabilityScore).toBe(90);
+      expect(lowReliability.scores).not.toHaveProperty("complianceScore");
+      expect(lowReliability.scores).not.toHaveProperty("privacyScore");
       expect(lowReliability.scores).not.toHaveProperty("overallScore");
       expect(lowReliability.scores).not.toHaveProperty("functionalScore");
     } finally {

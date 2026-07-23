@@ -1,10 +1,8 @@
 import type { ReviewScores } from "./types";
 
 const scoreKeys: Array<keyof ReviewScores> = [
-  "complianceScore",
-  "securityScore",
-  "privacyScore",
   "qualityScore",
+  "securityScore",
   "reliabilityScore"
 ];
 
@@ -22,10 +20,8 @@ export function averageReviewScores(items: Array<{ scores: ReviewScores }>): Rev
 
   const count = items.length;
   return {
-    complianceScore: Math.round(totals.complianceScore / count),
-    securityScore: Math.round(totals.securityScore / count),
-    privacyScore: Math.round(totals.privacyScore / count),
     qualityScore: Math.round(totals.qualityScore / count),
+    securityScore: Math.round(totals.securityScore / count),
     reliabilityScore: Math.round(totals.reliabilityScore / count)
   };
 }

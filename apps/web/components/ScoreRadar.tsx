@@ -1,10 +1,8 @@
 import type { ReviewScores } from "../lib/types";
 
 const dimensions: Array<{ key: keyof ReviewScores; label: string }> = [
-  { key: "complianceScore", label: "合规" },
-  { key: "securityScore", label: "安全" },
-  { key: "privacyScore", label: "隐私" },
   { key: "qualityScore", label: "质量" },
+  { key: "securityScore", label: "安全" },
   { key: "reliabilityScore", label: "可靠性" }
 ];
 
@@ -69,7 +67,7 @@ export function ScoreRadar({ scores, averageScores, sampleSize }: ScoreRadarProp
       </div>
 
       <svg
-        aria-label="五维审查分数雷达图，含当前 Skill 与平台均值对比"
+        aria-label="三维审查分数雷达图，含当前 Skill 与平台均值对比"
         className="score-radar-chart"
         role="img"
         viewBox={`0 0 ${SIZE} ${SIZE}`}

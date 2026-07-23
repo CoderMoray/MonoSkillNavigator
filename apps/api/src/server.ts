@@ -87,6 +87,8 @@ interface VersionParams {
   version: string;
 }
 
+type LeaderboardQuerySort = LeaderboardSort | "compliance" | "privacy";
+
 export function buildServer() {
   const app = Fastify({
     logger: true
@@ -282,9 +284,12 @@ export function buildServer() {
     };
   });
 
-  app.get<{ Querystring: { sort?: LeaderboardSort; limit?: string } }>("/leaderboard", async (request) => {
+  app.get<{ Querystring: { sort?: LeaderboardQuerySort; limit?: string } }>("/leaderboard", async (request) => {
     return {
-      items: await store.leaderboard(request.query.sort ?? "downloads", Number(request.query.limit ?? 20))
+      items: await store.leaderboard(
+        normalizeLeaderboardSort(request.query.sort),
+        Number(request.query.limit ?? 20)
+      )
     };
   });
 
@@ -564,6 +569,16 @@ function normalizeChangelog(value: string | undefined): string | undefined {
     throw new Error("Changelog must not exceed 10000 characters");
   }
   return changelog || undefined;
+}
+
+function normalizeLeaderboardSort(sort: LeaderboardQuerySort | undefined): LeaderboardSort {
+  if (sort === "compliance") {
+    return "quality";
+  }
+  if (sort === "privacy") {
+    return "security";
+  }
+  return sort ?? "downloads";
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

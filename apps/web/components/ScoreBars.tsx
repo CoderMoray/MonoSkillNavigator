@@ -1,10 +1,8 @@
 import type { ReviewScores } from "../lib/types";
 
 const rows: Array<[keyof ReviewScores, string]> = [
-  ["complianceScore", "合规"],
-  ["securityScore", "安全"],
-  ["privacyScore", "隐私"],
   ["qualityScore", "质量"],
+  ["securityScore", "安全"],
   ["reliabilityScore", "可靠性"]
 ];
 

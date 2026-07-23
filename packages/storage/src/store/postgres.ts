@@ -149,10 +149,8 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         description: schema.skills.description,
         latestVersion: schema.skills.latestVersion,
         status: schema.skillVersions.status,
-        complianceScore: schema.skillReviews.complianceScore,
         qualityScore: schema.skillReviews.qualityScore,
         securityScore: schema.skillReviews.securityScore,
-        privacyScore: schema.skillReviews.privacyScore,
         reliabilityScore: schema.skillReviews.reliabilityScore,
         averageRating: schema.skills.averageRating,
         ratingCount: schema.skills.ratingCount,
@@ -194,8 +192,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       .groupBy(
         schema.skills.slug, schema.skills.name, schema.skills.description,
         schema.skills.latestVersion, schema.skillVersions.status,
-        schema.skillReviews.complianceScore, schema.skillReviews.qualityScore,
-        schema.skillReviews.securityScore, schema.skillReviews.privacyScore,
+        schema.skillReviews.qualityScore, schema.skillReviews.securityScore,
         schema.skillReviews.reliabilityScore, schema.skills.averageRating,
         schema.skills.ratingCount, schema.skills.updatedAt
       )
@@ -231,10 +228,8 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       latestVersion: r.latestVersion,
       status: r.status as SkillSearchResult["status"],
       scores: {
-        complianceScore: Number(r.complianceScore),
         qualityScore: Number(r.qualityScore),
         securityScore: Number(r.securityScore),
-        privacyScore: Number(r.privacyScore),
         reliabilityScore: Number(r.reliabilityScore),
       },
       averageRating: Number(r.averageRating),
@@ -415,8 +410,8 @@ export class PostgresRegistryStore extends JsonRegistryStore {
           version: review.reportVersion, contentHash: review.contentHash,
           verdict: review.verdict as RegistryVersion["status"],
           scores: {
-            complianceScore: Number(review.complianceScore), qualityScore: Number(review.qualityScore),
-            securityScore: Number(review.securityScore), privacyScore: Number(review.privacyScore),
+            qualityScore: Number(review.qualityScore),
+            securityScore: Number(review.securityScore),
             reliabilityScore: Number(review.reliabilityScore),
           },
           findings: findings.map((f) => ({
@@ -584,16 +579,16 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     await this.db.insert(schema.skillReviews).values({
       skillSlug: slug, version, reviewId: review.id, reportVersion: review.version ?? "1.0",
       contentHash: review.contentHash ?? "", verdict: review.verdict,
-      complianceScore: review.scores.complianceScore, qualityScore: review.scores.qualityScore,
-      securityScore: review.scores.securityScore, privacyScore: review.scores.privacyScore,
+      qualityScore: review.scores.qualityScore,
+      securityScore: review.scores.securityScore,
       reliabilityScore: review.scores.reliabilityScore, createdAt,
     }).onConflictDoUpdate({
       target: [schema.skillReviews.skillSlug, schema.skillReviews.version],
       set: {
         reviewId: review.id, reportVersion: review.version ?? "1.0",
         contentHash: review.contentHash ?? "", verdict: review.verdict,
-        complianceScore: review.scores.complianceScore, qualityScore: review.scores.qualityScore,
-        securityScore: review.scores.securityScore, privacyScore: review.scores.privacyScore,
+        qualityScore: review.scores.qualityScore,
+        securityScore: review.scores.securityScore,
         reliabilityScore: review.scores.reliabilityScore,
       },
     });
@@ -745,8 +740,8 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         skillSlug: slug, version, reviewId: review.id ?? `review_${Date.now()}`,
         reportVersion: review.version ?? "1.0", contentHash: review.contentHash ?? "",
         verdict: review.verdict,
-        complianceScore: review.scores.complianceScore, qualityScore: review.scores.qualityScore,
-        securityScore: review.scores.securityScore, privacyScore: review.scores.privacyScore,
+        qualityScore: review.scores.qualityScore,
+        securityScore: review.scores.securityScore,
         reliabilityScore: review.scores.reliabilityScore, createdAt: now,
       });
 

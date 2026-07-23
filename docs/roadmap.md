@@ -68,7 +68,7 @@
 - [ ] 文件夹直接上传（`webkitdirectory` / File System Access，不必先打 zip）
 - [ ] 上传进度条（大文件 / 慢网络）
 - [ ] 发布历史（当前用户近期发布、失败原因、重试入口）
-- [ ] 发布页实时审查反馈（上传后展示 compliance / security findings 摘要）
+- [ ] 发布页实时审查反馈（上传后展示质量 / 安全 finding 摘要）
 
 
 
@@ -97,7 +97,7 @@
 - [ ] Skill 产物 / 效果展示 Tab（可选上传 demo 截图、示例输出；不影响发布，有则展示）
 - [ ] 搜索：名称 / slug 精确匹配 + tag 过滤 + 切词 / 语义匹配（向量或全文索引）
 - [ ] 搜索支持多维度筛选（评分、发布时间、审查状态）
-- [x] 排行榜：移除「综合分」；按 reliability / compliance / security / privacy / quality 单项维度排序
+- [x] 排行榜：移除「综合分」；按 quality / security / reliability 单项维度排序
 - [ ] 排行榜交互（切换排序维度、分页）
 - [ ] Keynote / 设计稿（`.docx`）中的前端视觉修改落地
 
@@ -116,18 +116,18 @@
 
 ## Phase 2：审查、评估与质量报告
 
-**目标**：静态合规 + 外部质量评估分层清晰，结果可解释、可对比。
+**目标**：平台质量规则、静态安全扫描和可靠性评估分层清晰，结果可解释、可对比。
 
 审查分两段：
 
-1. **平台静态检查**（合规、格式、隐私、安全）— 本地 `review-engine` + 可选外部扫描
+1. **平台质量检查**（合规、格式、文档和审查证据）+ **SkillSpector 安全扫描**（安全、隐私、泄露）
 2. **HaluCatch 可靠性检查**（功能性 / 幻觉类）— 当前发布同步执行静态五维检查，后续迁入异步 Worker
 
 
 
 ### 2.1 审查流水线
 
-- [ ] 整合静态检查入口：安全审查、格式校验、隐私合规统一报告
+- [x] 整合静态检查入口：平台质量规则与 SkillSpector 安全扫描统一报告
 - [ ] VirusTotal 或 Skill Vetter 类工具：对 Skill 包做额外静态 / 恶意特征扫描
 - [ ] Worker 改造为队列式异步审查（发布后后台重审、状态流转：pending → reviewing → published / needs-review / rejected）
 - [ ] 完善用户创建引导（首次发布 checklist、常见 finding 说明、修复建议链接）
@@ -144,7 +144,7 @@
 
 ### 2.3 质量可视化
 
-- [ ] 审查 / 评估维度雷达图：**当前 Skill vs 平台均值**（compliance、security、privacy、quality、reliability）
+- [x] 审查 / 评估维度雷达图：**当前 Skill vs 平台均值**（quality、security、reliability）
 - [ ] 详情页与审查中心统一展示组件
 
 ---

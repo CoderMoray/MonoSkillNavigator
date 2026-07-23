@@ -23,7 +23,7 @@ flowchart TD
 - `apps/cli`：命令行入口，支持 `review`、`publish`、`search`、`info`、`install`。
 - `apps/worker`：审查 Worker，可对待审版本重新执行审查。
 - `packages/skill-spec`：Skill 包读取、frontmatter 解析、schema 校验、快照与 hash。
-- `packages/review-engine`：合规、安全、隐私、质量与可靠性五维评分；不生成综合分。
+- `packages/review-engine`：质量、安全与可靠性三维评分；质量汇总平台合规和质量规则，安全采用 SkillSpector 静态扫描，可靠性采用 HaluCatch；不生成综合分。
 - `packages/storage`：注册表存储抽象。一期使用本地 JSON 文件，后续替换为 PostgreSQL + 对象存储。
 - `docs/rules`：平台规范与审查规则。
 
