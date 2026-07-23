@@ -640,6 +640,18 @@ button {
   color: var(--foreground);
 }
 
+:root[data-theme="dark"] .select-wrap .select,
+:root[data-theme="dark"] .contributor-select {
+  color-scheme: light;
+  color: var(--foreground);
+}
+
+:root[data-theme="dark"] .select option,
+:root[data-theme="dark"] .contributor-select option {
+  background-color: #ffffff;
+  color: #171717;
+}
+
 .select-wrap {
   display: flex;
   align-items: center;
