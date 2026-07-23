@@ -33,6 +33,7 @@ import { ScoreRadar } from "../../../components/ScoreRadar";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
 import { addSkillContributor, addSkillRating, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, saveBlobAsFile, unpublishSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
+import { creatorProfilePath } from "../../../lib/creators";
 import { formatDateTime, formatNumber } from "../../../lib/format";
 import { buildHaluCatchReportPath, extractHaluCatchSummary } from "../../../lib/halucatch-report";
 import { averageReviewScores } from "../../../lib/review-scores";
@@ -554,7 +555,7 @@ export default function SkillDetailPage() {
     try {
       await deleteSkill(token, skill.slug);
       setDeleteModalOpen(false);
-      router.push("/account");
+      router.push(viewer ? creatorProfilePath(viewer.username) : "/creators");
     } catch (err) {
       setManageError(err instanceof Error ? err.message : "删除失败");
     } finally {

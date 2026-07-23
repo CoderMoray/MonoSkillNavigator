@@ -15,6 +15,7 @@ import {
 } from "../../../lib/api";
 import { savePublishNotice } from "../../../lib/publish-notice";
 import { getAuthToken } from "../../../lib/auth-token";
+import { creatorProfilePath } from "../../../lib/creators";
 import { readSkillFrontmatterFromZip } from "../../../lib/parse-skill-archive";
 import type { PublicUser, RegistrySkill } from "../../../lib/types";
 import { SKILL_ENTRY_BASENAMES, validatePublishMetadataInput } from "@skill-platform/skill-spec/skill-format";
@@ -360,7 +361,7 @@ function PublishSkillPageContent() {
         verdict: published.review.verdict,
         isNewVersion
       });
-      router.push("/account");
+      router.push(user ? creatorProfilePath(user.username) : "/account");
     } catch (err) {
       setError(err instanceof Error ? err.message : "发布失败");
     } finally {

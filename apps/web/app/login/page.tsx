@@ -7,6 +7,7 @@ import { LogIn } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
 import { loginUser } from "../../lib/api";
 import { setAuthToken } from "../../lib/auth-token";
+import { creatorProfilePath } from "../../lib/creators";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function LoginPage() {
     try {
       const session = await loginUser(username, password);
       setAuthToken(session.token);
-      router.push("/account");
+      router.push(creatorProfilePath(session.user.username));
     } catch (err) {
       setError(err instanceof Error ? err.message : "登录失败");
     } finally {

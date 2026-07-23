@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, KeyRound, LogIn, LogOut, Monitor, Moon, PackagePlus, Sun, UserCircle } from "lucide-react";
 import { getCurrentUser, logoutUser } from "../lib/api";
 import { AUTH_TOKEN_CHANGED_EVENT, clearAuthToken, getAuthToken } from "../lib/auth-token";
+import { creatorProfilePath } from "../lib/creators";
 import type { PublicUser } from "../lib/types";
 
 type ThemeMode = "system" | "light" | "dark";
@@ -148,7 +149,7 @@ export function AuthStatus() {
         <div className="user-menu-dropdown" role="menu">
           <Link
             className="user-menu-item"
-            href="/account"
+            href={creatorProfilePath(user.username)}
             onClick={() => setMenuOpen(false)}
             role="menuitem"
           >

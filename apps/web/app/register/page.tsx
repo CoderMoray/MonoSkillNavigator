@@ -7,6 +7,7 @@ import { UserPlus } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
 import { registerUser } from "../../lib/api";
 import { setAuthToken } from "../../lib/auth-token";
+import { creatorProfilePath } from "../../lib/creators";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export default function RegisterPage() {
     try {
       const session = await registerUser(username, password);
       setAuthToken(session.token);
-      router.push("/account");
+      router.push(creatorProfilePath(session.user.username));
     } catch (err) {
       setError(err instanceof Error ? err.message : "注册失败");
     } finally {
