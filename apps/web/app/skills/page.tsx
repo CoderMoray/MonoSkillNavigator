@@ -3,17 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Search, Sparkles, Trophy, UploadCloud } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { AppShell } from "../../components/AppShell";
 import { SkillCard } from "../../components/SkillCard";
 import { getLeaderboard, getSkills } from "../../lib/api";
 import type { SkillSearchResult } from "../../lib/types";
 
 const categories = ["All categories", "Security", "Automation", "Docs", "Developer", "Productivity"];
-const tabs = ["Skills", "Plugins", "Creators"];
+const tabs = ["Skills", "Plugins"];
 
 export default function SkillsPage() {
-  const router = useRouter();
   const [skills, setSkills] = useState<SkillSearchResult[]>([]);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("recent");
@@ -92,7 +90,7 @@ export default function SkillsPage() {
                 <button
                   className={tab === item ? "active" : ""}
                   key={item}
-                  onClick={() => (item === "Creators" ? router.push("/creators") : setTab(item))}
+                  onClick={() => setTab(item)}
                   type="button"
                 >
                   {item}
