@@ -8,11 +8,8 @@ import { getLeaderboard } from "../../lib/api";
 import { aggregateCreators, type CreatorSummary } from "../../lib/creators";
 import { formatNumber } from "../../lib/format";
 
-const filters = ["All", "Verified", "Orgs", "Organizations", "Users"];
-
 export default function CreatorsPage() {
   const [creators, setCreators] = useState<CreatorSummary[]>([]);
-  const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,22 +44,14 @@ export default function CreatorsPage() {
 
   const visibleCreators = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return creators.filter((creator) => {
-      if (filter === "Users" && creator.name.toLowerCase().includes("org")) {
-        return false;
-      }
-      if ((filter === "Orgs" || filter === "Organizations") && !creator.name.toLowerCase().includes("org")) {
-        return false;
-      }
-      if (filter === "Verified" && creator.published < 2 && creator.downloads < 1000) {
-        return false;
-      }
-      if (!normalizedQuery) {
-        return true;
-      }
-      return creator.name.toLowerCase().includes(normalizedQuery) || creator.handle.includes(normalizedQuery);
-    });
-  }, [creators, filter, query]);
+    if (!normalizedQuery) {
+      return creators;
+    }
+    return creators.filter(
+      (creator) =>
+        creator.name.toLowerCase().includes(normalizedQuery) || creator.handle.includes(normalizedQuery)
+    );
+  }, [creators, query]);
 
   return (
     <AppShell title="Creators">
@@ -78,13 +67,6 @@ export default function CreatorsPage() {
 
         <section className="market-panel">
           <div className="market-toolbar">
-            <div className="segmented">
-              {filters.map((item) => (
-                <button className={filter === item ? "active" : ""} key={item} onClick={() => setFilter(item)} type="button">
-                  {item}
-                </button>
-              ))}
-            </div>
             <div className="searchbox compact-search">
               <Search size={16} color="var(--muted)" />
               <input
