@@ -1109,7 +1109,7 @@ export default function SkillDetailPage() {
                         <div className="section-head">
                           <div>
                             <h3>HaluCatch 报告摘要</h3>
-                            <p className="description">标准版报告 TLDR 与五维可靠性结果；完整 Markdown 报告请跳转查看。</p>
+                            <p className="description">标准版报告一句话总结；完整 Markdown 报告请跳转查看。</p>
                           </div>
                           {haluCatchReportHref ? (
                             <Link className="button secondary compact" href={haluCatchReportHref}>
@@ -1122,31 +1122,11 @@ export default function SkillDetailPage() {
                             {haluCatchReportSummary}
                           </MarkdownContent>
                         ) : null}
-                        {currentVersion.evaluation.taskResults.length > 0 ? (
-                          <div className="detail-subsection">
-                            <h4>五维可靠性结果</h4>
-                            <ul className="list">
-                              {currentVersion.evaluation.taskResults.map((task) => (
-                                <li className="list-item" key={task.name}>
-                                  <div className="card-head">
-                                    <strong>{task.name}</strong>
-                                    <span className="badge">Score {task.score}</span>
-                                  </div>
-                                  {task.findings.slice(0, 2).map((finding) => (
-                                    <p className="description" key={finding.id}>
-                                      {finding.message}
-                                    </p>
-                                  ))}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : null}
                       </div>
                     ) : null}
-                    {!haluCatchReport && currentVersion.evaluation.taskResults.length > 0 ? (
+                    {!isHaluCatchEvaluation && currentVersion.evaluation.taskResults.length > 0 ? (
                       <div className="detail-subsection">
-                        <h3>{isHaluCatchEvaluation ? "五维可靠性结果" : "任务结果"}</h3>
+                        <h3>任务结果</h3>
                         <ul className="list">
                           {currentVersion.evaluation.taskResults.map((task) => (
                             <li className="list-item" key={task.name}>
@@ -1164,9 +1144,9 @@ export default function SkillDetailPage() {
                         </ul>
                       </div>
                     ) : null}
-                    {!haluCatchReport && currentVersion.evaluation.findings.length > 0 ? (
+                    {!isHaluCatchEvaluation && currentVersion.evaluation.findings.length > 0 ? (
                       <div className="detail-subsection">
-                        <h3>{isHaluCatchEvaluation ? "HaluCatch 发现" : "总体发现"}</h3>
+                        <h3>总体发现</h3>
                         <ul className="list">
                           {currentVersion.evaluation.findings.map((finding) => (
                             <li className={`list-item finding ${finding.severity}`} key={finding.id}>
