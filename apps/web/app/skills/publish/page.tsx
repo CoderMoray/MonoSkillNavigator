@@ -27,7 +27,8 @@ const CATEGORY_OPTIONS = [
   "Data & Analytics",
   "Security",
   "Design & Creative",
-  "Communication"
+  "Communication",
+  "Other"
 ];
 
 const MAX_CATEGORIES = 3;
