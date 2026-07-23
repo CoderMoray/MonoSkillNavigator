@@ -2075,6 +2075,16 @@ button {
   color: var(--foreground);
 }
 
+.markdown-content .katex {
+  font-size: 1em;
+}
+
+.markdown-content .katex-display {
+  margin: 12px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .file-browser {
   display: grid;
   min-width: 0;
@@ -2549,6 +2559,10 @@ button {
 :root[data-theme="dark"] .markdown-content :not(pre) > code,
 :root[data-theme="dark"] .markdown-content th {
   background: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme="dark"] .markdown-content .katex {
+  color: var(--foreground);
 }
 
 .card h2,
