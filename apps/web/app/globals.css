@@ -1968,6 +1968,21 @@ button {
   padding: 24px;
 }
 
+.halucatch-report-summary {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.56);
+  padding: 16px 20px;
+}
+
+.halucatch-report-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
 .markdown-content > :first-child {
   margin-top: 0;
 }
@@ -2490,7 +2505,8 @@ button {
 :root[data-theme="dark"] .requirement-card,
 :root[data-theme="dark"] .review-score-card,
 :root[data-theme="dark"] .evaluation-summary > div,
-:root[data-theme="dark"] .halucatch-report-content {
+:root[data-theme="dark"] .halucatch-report-content,
+:root[data-theme="dark"] .halucatch-report-summary {
   background: rgba(24, 26, 36, 0.72);
 }
 

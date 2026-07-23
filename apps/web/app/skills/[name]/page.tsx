@@ -14,6 +14,7 @@ import {
   Copy,
   Download,
   EyeOff,
+  ExternalLink,
   FileCode2,
   FileText,
   Files,
@@ -33,6 +34,7 @@ import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../component
 import { addSkillContributor, addSkillRating, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, saveBlobAsFile, unpublishSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { formatDateTime, formatNumber } from "../../../lib/format";
+import { buildHaluCatchReportPath, extractHaluCatchSummary } from "../../../lib/halucatch-report";
 import { averageReviewScores } from "../../../lib/review-scores";
 import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill, ReviewScores } from "../../../lib/types";
 
@@ -43,8 +45,6 @@ type DetailPanel =
   | "versions"
   | "quality"
   | "community";
-
-type HaluCatchReportTab = "professional" | "simple" | "action";
 
 interface DetailCard {
   id: DetailPanel;
@@ -83,7 +83,6 @@ export default function SkillDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activePanel, setActivePanel] = useState<DetailPanel>("skill-md");
-  const [haluCatchReportTab, setHaluCatchReportTab] = useState<HaluCatchReportTab>("professional");
   const [selectedVersionName, setSelectedVersionName] = useState<string | null>(null);
   const [expandedVersionNames, setExpandedVersionNames] = useState<Set<string>>(() => new Set());
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
@@ -252,18 +251,10 @@ export default function SkillDetailPage() {
   const reviewFindings = currentVersion.review?.findings ?? [];
   const isHaluCatchEvaluation = currentVersion.evaluation?.provider === "halucatch-adapter";
   const haluCatchReport = currentVersion.evaluation?.haluCatchReport;
-  const haluCatchReportMarkdown = !haluCatchReport
-    ? ""
-    : haluCatchReportTab === "simple"
-      ? haluCatchReport.simple
-      : haluCatchReportTab === "action"
-        ? haluCatchReport.action
-        : haluCatchReport.professional;
-  const haluCatchReportTabs: Array<{ id: HaluCatchReportTab; label: string }> = [
-    { id: "professional", label: "专业版" },
-    { id: "simple", label: "标准版" },
-    { id: "action", label: "行动版" }
-  ];
+  const haluCatchReportSummary = haluCatchReport ? extractHaluCatchSummary(haluCatchReport.simple) : "";
+  const haluCatchReportHref = haluCatchReport
+    ? buildHaluCatchReportPath(skill.slug, currentVersion.version)
+    : null;
   const requirementGroups = [
     {
       title: "支持的 Agent",
@@ -1117,27 +1108,40 @@ export default function SkillDetailPage() {
                       <div className="detail-subsection">
                         <div className="section-head">
                           <div>
-                            <h3>HaluCatch 完整报告</h3>
-                            <p className="description">保留 HaluCatch 生成的专业版、标准版与 AI 行动版 Markdown 报告。</p>
+                            <h3>HaluCatch 报告摘要</h3>
+                            <p className="description">标准版报告 TLDR 与五维可靠性结果；完整 Markdown 报告请跳转查看。</p>
                           </div>
+                          {haluCatchReportHref ? (
+                            <Link className="button secondary compact" href={haluCatchReportHref}>
+                              <ExternalLink size={14} /> 查看完整报告
+                            </Link>
+                          ) : null}
                         </div>
-                        <div className="detail-tab-bar halucatch-report-tabs" role="tablist" aria-label="HaluCatch 报告版本">
-                          {haluCatchReportTabs.map((tab) => (
-                            <button
-                              aria-selected={haluCatchReportTab === tab.id}
-                              className={`detail-tab ${haluCatchReportTab === tab.id ? "active" : ""}`}
-                              key={tab.id}
-                              onClick={() => setHaluCatchReportTab(tab.id)}
-                              role="tab"
-                              type="button"
-                            >
-                              {tab.label}
-                            </button>
-                          ))}
-                        </div>
-                        <MarkdownContent className="markdown-content halucatch-report-content">
-                          {haluCatchReportMarkdown}
-                        </MarkdownContent>
+                        {haluCatchReportSummary ? (
+                          <MarkdownContent className="markdown-content halucatch-report-summary">
+                            {haluCatchReportSummary}
+                          </MarkdownContent>
+                        ) : null}
+                        {currentVersion.evaluation.taskResults.length > 0 ? (
+                          <div className="detail-subsection">
+                            <h4>五维可靠性结果</h4>
+                            <ul className="list">
+                              {currentVersion.evaluation.taskResults.map((task) => (
+                                <li className="list-item" key={task.name}>
+                                  <div className="card-head">
+                                    <strong>{task.name}</strong>
+                                    <span className="badge">Score {task.score}</span>
+                                  </div>
+                                  {task.findings.slice(0, 2).map((finding) => (
+                                    <p className="description" key={finding.id}>
+                                      {finding.message}
+                                    </p>
+                                  ))}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                     {!haluCatchReport && currentVersion.evaluation.taskResults.length > 0 ? (
