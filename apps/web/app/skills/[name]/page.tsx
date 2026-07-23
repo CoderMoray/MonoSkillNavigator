@@ -17,7 +17,6 @@ import {
   FileCode2,
   FileText,
   Files,
-  Gauge,
   History,
   MessageSquare,
   Package,
@@ -42,8 +41,7 @@ type DetailPanel =
   | "skill-card"
   | "files"
   | "versions"
-  | "review"
-  | "evaluation"
+  | "quality"
   | "community";
 
 type HaluCatchReportTab = "professional" | "simple" | "action";
@@ -309,20 +307,12 @@ export default function SkillDetailPage() {
       meta: `${versions.length} 个版本`
     },
     {
-      id: "review",
-      title: "审查报告",
+      id: "quality",
+      title: "审查与评估",
       icon: ShieldCheck,
-      meta: `${reviewFindings.length} 项发现`
-    },
-    {
-      id: "evaluation",
-      title: "可靠性评估",
-      icon: Gauge,
       meta: currentVersion.evaluation
-        ? isHaluCatchEvaluation
-          ? `${currentVersion.evaluation.tasksPassed}/${currentVersion.evaluation.tasksTotal} 维通过`
-          : `${currentVersion.evaluation.tasksPassed}/${currentVersion.evaluation.tasksTotal} 通过`
-        : "未配置"
+        ? `${reviewFindings.length} 项审查 · ${currentVersion.evaluation.score} 分`
+        : `${reviewFindings.length} 项审查 · 未评估`
     },
     {
       id: "community",
@@ -1032,158 +1022,166 @@ export default function SkillDetailPage() {
             </>
           ) : null}
 
-          {activePanel === "review" ? (
+          {activePanel === "quality" ? (
             <>
               <div className="detail-panel-head">
                 <div>
-                  <span className="eyebrow">Audit</span>
-                  <h2>审查报告</h2>
+                  <span className="eyebrow">Quality assurance</span>
+                  <h2>审查与评估</h2>
                   <p className="description">
-                    审查于 {currentVersion.review?.createdAt ? formatDateTime(currentVersion.review.createdAt) : "未知时间"} 完成，
+                    静态审查于 {currentVersion.review?.createdAt ? formatDateTime(currentVersion.review.createdAt) : "未知时间"} 完成，
                     内容 hash 为 <span className="mono">{currentVersion.contentHash.slice(0, 16)}...</span>
                   </p>
                 </div>
-                <VerdictBadge verdict={currentVersion.status} />
-              </div>
-              {currentVersion.review?.scores ? (
-                <div className="review-score-card">
-                  <ScoreRadar
-                    averageScores={platformAverageScores}
-                    sampleSize={platformSampleSize}
-                    scores={currentVersion.review.scores}
-                  />
+                <div className="card-head-actions">
+                  <VerdictBadge verdict={currentVersion.status} />
+                  {currentVersion.evaluation ? <EvaluationBadge status={currentVersion.evaluation.status} /> : null}
                 </div>
-              ) : null}
-              {reviewFindings.length === 0 ? (
-                <div className="empty detail-empty">未发现风险项。</div>
-              ) : (
-                <ul className="list detail-list">
-                  {reviewFindings.map((finding) => (
-                    <li className={`list-item finding ${finding.severity}`} key={finding.id}>
-                      <div className="card-head">
-                        <strong>{finding.title}</strong>
-                        <SeverityBadge severity={finding.severity} />
-                      </div>
-                      <p className="description">{finding.message}</p>
-                      <p className="description">建议：{finding.recommendation}</p>
-                      {finding.evidence ? <pre className="pre">{finding.evidence}</pre> : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          ) : null}
+              </div>
 
-          {activePanel === "evaluation" ? (
-            <>
-              <div className="detail-panel-head">
-                <div>
-                  <span className="eyebrow">{isHaluCatchEvaluation ? "HaluCatch reliability" : "Reliability check"}</span>
-                  <h2>{isHaluCatchEvaluation ? "HaluCatch 可靠性评估" : "可靠性评估"}</h2>
-                  <p className="description">
-                    {isHaluCatchEvaluation
-                      ? "基于五维静态可靠性检查，评估 Skill 的可复现性、规则清晰度与执行护栏。"
-                      : "查看可靠性任务集的完成情况与发现。"}
-                  </p>
+              <div className="detail-subsection">
+                <div className="section-head">
+                  <div>
+                    <h3>审查报告</h3>
+                    <p className="description">合规、隐私、安全与质量维度的静态审查结果。</p>
+                  </div>
                 </div>
-                {currentVersion.evaluation ? <EvaluationBadge status={currentVersion.evaluation.status} /> : null}
+                {currentVersion.review?.scores ? (
+                  <div className="review-score-card">
+                    <ScoreRadar
+                      averageScores={platformAverageScores}
+                      sampleSize={platformSampleSize}
+                      scores={currentVersion.review.scores}
+                    />
+                  </div>
+                ) : null}
+                {reviewFindings.length === 0 ? (
+                  <div className="empty detail-empty">未发现风险项。</div>
+                ) : (
+                  <ul className="list detail-list">
+                    {reviewFindings.map((finding) => (
+                      <li className={`list-item finding ${finding.severity}`} key={finding.id}>
+                        <div className="card-head">
+                          <strong>{finding.title}</strong>
+                          <SeverityBadge severity={finding.severity} />
+                        </div>
+                        <p className="description">{finding.message}</p>
+                        <p className="description">建议：{finding.recommendation}</p>
+                        {finding.evidence ? <pre className="pre">{finding.evidence}</pre> : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              {currentVersion.evaluation ? (
-                <>
-                  <div className="evaluation-summary">
-                    <div>
-                      <span>Provider</span>
-                      <strong>{isHaluCatchEvaluation ? "HaluCatch" : currentVersion.evaluation.provider}</strong>
-                    </div>
-                    <div>
-                      <span>可靠性分</span>
-                      <strong>{currentVersion.evaluation.score}</strong>
-                    </div>
-                    <div>
-                      <span>Tasks</span>
-                      <strong>
-                        {currentVersion.evaluation.tasksPassed}/{currentVersion.evaluation.tasksTotal}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>评估时间</span>
-                      <strong>{formatDateTime(currentVersion.evaluation.createdAt)}</strong>
+
+              <div className="detail-subsection">
+                <div className="section-head">
+                  <div>
+                    <h3>{isHaluCatchEvaluation ? "HaluCatch 可靠性评估" : "可靠性评估"}</h3>
+                    <p className="description">
+                      {isHaluCatchEvaluation
+                        ? "基于五维静态可靠性检查，评估 Skill 的可复现性、规则清晰度与执行护栏。"
+                        : "查看可靠性任务集的完成情况与发现。"}
+                    </p>
+                  </div>
+                </div>
+                {currentVersion.evaluation ? (
+                  <>
+                    <div className="evaluation-summary">
+                      <div>
+                        <span>Provider</span>
+                        <strong>{isHaluCatchEvaluation ? "HaluCatch" : currentVersion.evaluation.provider}</strong>
+                      </div>
+                      <div>
+                        <span>可靠性分</span>
+                        <strong>{currentVersion.evaluation.score}</strong>
+                      </div>
+                      <div>
+                        <span>Tasks</span>
+                        <strong>
+                          {currentVersion.evaluation.tasksPassed}/{currentVersion.evaluation.tasksTotal}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>评估时间</span>
+                        <strong>{formatDateTime(currentVersion.evaluation.createdAt)}</strong>
+                      </div>
+                      {haluCatchReport ? (
+                        <div>
+                          <span>Skill 类型</span>
+                          <strong>{haluCatchReport.skillType}</strong>
+                        </div>
+                      ) : null}
                     </div>
                     {haluCatchReport ? (
-                      <div>
-                        <span>Skill 类型</span>
-                        <strong>{haluCatchReport.skillType}</strong>
+                      <div className="detail-subsection">
+                        <div className="section-head">
+                          <div>
+                            <h3>HaluCatch 完整报告</h3>
+                            <p className="description">保留 HaluCatch 生成的专业版、标准版与 AI 行动版 Markdown 报告。</p>
+                          </div>
+                        </div>
+                        <div className="detail-tab-bar halucatch-report-tabs" role="tablist" aria-label="HaluCatch 报告版本">
+                          {haluCatchReportTabs.map((tab) => (
+                            <button
+                              aria-selected={haluCatchReportTab === tab.id}
+                              className={`detail-tab ${haluCatchReportTab === tab.id ? "active" : ""}`}
+                              key={tab.id}
+                              onClick={() => setHaluCatchReportTab(tab.id)}
+                              role="tab"
+                              type="button"
+                            >
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
+                        <MarkdownContent className="markdown-content halucatch-report-content">
+                          {haluCatchReportMarkdown}
+                        </MarkdownContent>
                       </div>
                     ) : null}
-                  </div>
-                  {haluCatchReport ? (
-                    <div className="detail-subsection">
-                      <div className="section-head">
-                        <div>
-                          <h3>HaluCatch 完整报告</h3>
-                          <p className="description">保留 HaluCatch 生成的专业版、标准版与 AI 行动版 Markdown 报告。</p>
-                        </div>
+                    {!haluCatchReport && currentVersion.evaluation.taskResults.length > 0 ? (
+                      <div className="detail-subsection">
+                        <h3>{isHaluCatchEvaluation ? "五维可靠性结果" : "任务结果"}</h3>
+                        <ul className="list">
+                          {currentVersion.evaluation.taskResults.map((task) => (
+                            <li className="list-item" key={task.name}>
+                              <div className="card-head">
+                                <strong>{task.name}</strong>
+                                <span className="badge">Score {task.score}</span>
+                              </div>
+                              {task.findings.map((finding) => (
+                                <p className="description" key={finding.id}>
+                                  {finding.message}
+                                </p>
+                              ))}
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                      <div className="detail-tab-bar halucatch-report-tabs" role="tablist" aria-label="HaluCatch 报告版本">
-                        {haluCatchReportTabs.map((tab) => (
-                          <button
-                            aria-selected={haluCatchReportTab === tab.id}
-                            className={`detail-tab ${haluCatchReportTab === tab.id ? "active" : ""}`}
-                            key={tab.id}
-                            onClick={() => setHaluCatchReportTab(tab.id)}
-                            role="tab"
-                            type="button"
-                          >
-                            {tab.label}
-                          </button>
-                        ))}
+                    ) : null}
+                    {!haluCatchReport && currentVersion.evaluation.findings.length > 0 ? (
+                      <div className="detail-subsection">
+                        <h3>{isHaluCatchEvaluation ? "HaluCatch 发现" : "总体发现"}</h3>
+                        <ul className="list">
+                          {currentVersion.evaluation.findings.map((finding) => (
+                            <li className={`list-item finding ${finding.severity}`} key={finding.id}>
+                              <div className="card-head">
+                                <strong>{finding.task ?? "可靠性检查"}</strong>
+                                <SeverityBadge severity={finding.severity} />
+                              </div>
+                              <p className="description">{finding.message}</p>
+                              <p className="description">建议：{finding.recommendation}</p>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                      <MarkdownContent className="markdown-content halucatch-report-content">
-                        {haluCatchReportMarkdown}
-                      </MarkdownContent>
-                    </div>
-                  ) : null}
-                  {!haluCatchReport && currentVersion.evaluation.taskResults.length > 0 ? (
-                    <div className="detail-subsection">
-                      <h3>{isHaluCatchEvaluation ? "五维可靠性结果" : "任务结果"}</h3>
-                      <ul className="list">
-                        {currentVersion.evaluation.taskResults.map((task) => (
-                          <li className="list-item" key={task.name}>
-                            <div className="card-head">
-                              <strong>{task.name}</strong>
-                              <span className="badge">Score {task.score}</span>
-                            </div>
-                            {task.findings.map((finding) => (
-                              <p className="description" key={finding.id}>
-                                {finding.message}
-                              </p>
-                            ))}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  {!haluCatchReport && currentVersion.evaluation.findings.length > 0 ? (
-                    <div className="detail-subsection">
-                      <h3>{isHaluCatchEvaluation ? "HaluCatch 发现" : "总体发现"}</h3>
-                      <ul className="list">
-                        {currentVersion.evaluation.findings.map((finding) => (
-                          <li className={`list-item finding ${finding.severity}`} key={finding.id}>
-                            <div className="card-head">
-                              <strong>{finding.task ?? "可靠性检查"}</strong>
-                              <SeverityBadge severity={finding.severity} />
-                            </div>
-                            <p className="description">{finding.message}</p>
-                            <p className="description">建议：{finding.recommendation}</p>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <div className="empty detail-empty">该版本暂无可靠性评估报告。</div>
-              )}
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="empty detail-empty">该版本暂无可靠性评估报告。</div>
+                )}
+              </div>
             </>
           ) : null}
 
