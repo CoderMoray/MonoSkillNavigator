@@ -28,8 +28,6 @@ const sortTabs = [
   { value: "recent", label: "New" }
 ];
 
-const categories = ["All categories", "Security", "Productivity", "Docs", "Cloud", "Developer"];
-
 const appTiles = [
   { name: "GitHub", icon: GitBranch, description: "Review PRs, manage issues, and automate repo workflows." },
   { name: "VS Code", icon: Code2, description: "Edit repos, run tasks, and ship code from the editor." },
@@ -131,11 +129,6 @@ export default function HomePage() {
                 >
                   {tab.label}
                 </button>
-              ))}
-            </div>
-            <div className="category-row">
-              {categories.map((category) => (
-                <span className="category-chip" key={category}>{category}</span>
               ))}
             </div>
           </div>
