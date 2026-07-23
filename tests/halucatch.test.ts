@@ -35,5 +35,14 @@ describe("HaluCatch evaluator adapter", () => {
     expect(report.haluCatchReport?.simple.length).toBeGreaterThan(100);
     expect(report.haluCatchReport?.action.length).toBeGreaterThan(50);
     expect(report.haluCatchReport?.skillType).toBeTruthy();
+    for (const markdown of [
+      report.haluCatchReport?.professional,
+      report.haluCatchReport?.simple,
+      report.haluCatchReport?.action
+    ]) {
+      expect(markdown).not.toMatch(/\*\*(?:文件|File)\*\*:/);
+      expect(markdown).not.toMatch(/skill-platform-halucatch/i);
+      expect(markdown).not.toMatch(/AppData[\\/]Local[\\/]Temp/i);
+    }
   });
 });

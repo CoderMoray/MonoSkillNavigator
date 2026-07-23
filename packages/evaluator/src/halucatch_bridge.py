@@ -10,8 +10,49 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import os
+import re
 import sys
 import traceback
+
+
+def _prepare_info_for_report(info: dict) -> None:
+    """Use Skill-relative paths in report metadata instead of temp absolute paths."""
+    source = info.get("skill_md_source")
+    if isinstance(source, str) and source.strip():
+        info["skill_md_path"] = source.strip()
+        return
+
+    skill_md_path = info.get("skill_md_path")
+    if isinstance(skill_md_path, str) and skill_md_path.strip():
+        info["skill_md_path"] = os.path.basename(skill_md_path.replace("\\", "/"))
+
+
+def _sanitize_report_text(text: str, skill_dir: str) -> str:
+    """Remove materialized snapshot paths from HaluCatch markdown reports."""
+    if not text:
+        return text
+
+    # HaluCatch includes the scanned entry path in the professional report header.
+    text = re.sub(r"^\*\*(?:文件|File)\*\*: .+\r?\n", "", text, flags=re.MULTILINE)
+
+    skill_dir_norm = os.path.normpath(skill_dir)
+    for variant in {
+        skill_dir_norm,
+        skill_dir_norm.replace("\\", "/"),
+        skill_dir_norm.replace("/", "\\"),
+    }:
+        escaped = re.escape(variant)
+        text = re.sub(rf"(?i){escaped}[\\/]?", "", text)
+
+    return text
+
+
+def _sanitize_reports(reports: dict, skill_dir: str) -> dict:
+    sanitized = {}
+    for key, value in reports.items():
+        sanitized[key] = _sanitize_report_text(value, skill_dir) if isinstance(value, str) else value
+    return sanitized
 
 
 def parse_args() -> argparse.Namespace:
@@ -70,6 +111,8 @@ def evaluate(skill_dir: str, halucatch_dir: str) -> dict:
                 "complexity": check_complexity(info, skill_type),
             }
 
+    _prepare_info_for_report(info)
+
     with contextlib.redirect_stdout(sys.stderr):
         reports = generate_report(info, results, output_dir=None, lang="zh-CN")
 
@@ -77,7 +120,7 @@ def evaluate(skill_dir: str, halucatch_dir: str) -> dict:
         "ok": True,
         "skillType": skill_type,
         "results": results,
-        "reports": reports,
+        "reports": _sanitize_reports(reports, skill_dir),
     }
 
 
