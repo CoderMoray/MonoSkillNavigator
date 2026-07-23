@@ -10,10 +10,19 @@ import { getLeaderboard } from "../../../lib/api";
 import { aggregateCreators, normalizeHandle, type CreatorSummary } from "../../../lib/creators";
 import { formatNumber } from "../../../lib/format";
 
+type CreatorProfileTab = "skills" | "plugins" | "starred";
+
+const profileTabs: Array<{ id: CreatorProfileTab; label: (creator: CreatorSummary) => string }> = [
+  { id: "skills", label: (creator) => `Skills ${creator.published}` },
+  { id: "plugins", label: () => "Plugins 0" },
+  { id: "starred", label: () => "Starred 0" }
+];
+
 export default function CreatorProfilePage() {
   const params = useParams<{ username: string }>();
   const handle = normalizeHandle(decodeURIComponent(params.username));
   const [creator, setCreator] = useState<CreatorSummary | null>(null);
+  const [activeTab, setActiveTab] = useState<CreatorProfileTab>("skills");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,16 +126,38 @@ export default function CreatorProfilePage() {
           <section className="profile-content">
             <div className="market-toolbar">
               <div className="segmented">
-                <button className="active" type="button">Skills {creator.published}</button>
-                <button type="button">Plugins 0</button>
-                <button type="button">Starred {creator.ratingCount}</button>
+                {profileTabs.map((tab) => (
+                  <button
+                    className={activeTab === tab.id ? "active" : ""}
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    type="button"
+                  >
+                    {tab.label(creator)}
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="claw-list">
-              {creator.skills.map((skill) => (
-                <SkillCard key={skill.slug} skill={skill} variant="row" />
-              ))}
-            </div>
+
+            {activeTab === "skills" ? (
+              creator.skills.length === 0 ? (
+                <div className="empty">该 Creator 暂无已发布 Skill。</div>
+              ) : (
+                <div className="claw-list">
+                  {creator.skills.map((skill) => (
+                    <SkillCard key={skill.slug} skill={skill} variant="row" />
+                  ))}
+                </div>
+              )
+            ) : null}
+
+            {activeTab === "plugins" ? (
+              <div className="empty">Plugins 功能暂未开放，当前平台仅支持 Skill 发布与浏览。</div>
+            ) : null}
+
+            {activeTab === "starred" ? (
+              <div className="empty">Starred 功能暂未开放，暂不支持查看 Creator 的收藏列表。</div>
+            ) : null}
           </section>
         </section>
       </div>
