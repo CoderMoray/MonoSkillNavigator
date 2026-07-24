@@ -247,6 +247,116 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       contributors: contributorsMap.get(r.slug) ?? [],
       downloads: r.totalDownloads,
       updatedAt: String(r.updatedAt),
+      published: true,
+    }));
+  }
+
+  async listUnpublishedSkillsForOwner(ownerUserId: string): Promise<SkillSearchResult[]> {
+    await this.ensureSchema();
+    const ownerMatch = or(
+      eq(schema.skills.ownerUserId, ownerUserId),
+      sql`exists (
+        select 1 from ${schema.skillContributors} sc
+        where sc.skill_slug = ${schema.skills.slug}
+        and sc.role = 'owner'
+        and sc.user_id = ${ownerUserId}
+      )`
+    );
+
+    const rows = await this.db
+      .select({
+        slug: schema.skills.slug,
+        name: schema.skills.name,
+        description: schema.skills.description,
+        latestVersion: schema.skills.latestVersion,
+        status: schema.skillVersions.status,
+        categories: schema.skillVersions.categories,
+        qualityScore: schema.skillReviews.qualityScore,
+        securityScore: schema.skillReviews.securityScore,
+        reliabilityScore: schema.skillReviews.reliabilityScore,
+        averageRating: schema.skills.averageRating,
+        ratingCount: schema.skills.ratingCount,
+        totalDownloads: sql<number>`coalesce(sum(${schema.skillVersions.downloads}), 0)`.mapWith(Number),
+        updatedAt: schema.skills.updatedAt,
+        openIssues: sql<number>`(
+          select count(*) from ${schema.skillIssues}
+          where ${schema.skillIssues.skillSlug} = ${schema.skills.slug}
+          and ${schema.skillIssues.status} != 'closed'
+        )`.mapWith(Number),
+      })
+      .from(schema.skills)
+      .innerJoin(
+        schema.skillVersions,
+        and(
+          eq(schema.skillVersions.skillSlug, schema.skills.slug),
+          eq(schema.skillVersions.version, schema.skills.latestVersion)
+        )
+      )
+      .innerJoin(
+        schema.skillReviews,
+        and(
+          eq(schema.skillReviews.skillSlug, schema.skills.slug),
+          eq(schema.skillReviews.version, schema.skills.latestVersion)
+        )
+      )
+      .where(and(eq(schema.skills.published, false), ownerMatch))
+      .groupBy(
+        schema.skills.slug,
+        schema.skills.name,
+        schema.skills.description,
+        schema.skills.latestVersion,
+        schema.skillVersions.status,
+        schema.skillVersions.categories,
+        schema.skillReviews.qualityScore,
+        schema.skillReviews.securityScore,
+        schema.skillReviews.reliabilityScore,
+        schema.skills.averageRating,
+        schema.skills.ratingCount,
+        schema.skills.updatedAt
+      )
+      .orderBy(desc(schema.skills.updatedAt));
+
+    const slugs = rows.map((r) => r.slug);
+    if (slugs.length === 0) return [];
+
+    const allContributors = await this.db
+      .select()
+      .from(schema.skillContributors)
+      .where(inArray(schema.skillContributors.skillSlug, slugs));
+
+    const contributorsMap = new Map<string, SkillSearchResult["contributors"]>();
+    for (const c of allContributors) {
+      const list = contributorsMap.get(c.skillSlug) ?? [];
+      list.push({
+        id: c.id,
+        userId: c.userId ?? undefined,
+        username: c.username ?? undefined,
+        name: c.name,
+        role: c.role as SkillSearchResult["contributors"][number]["role"],
+        addedAt: String(c.addedAt),
+      });
+      contributorsMap.set(c.skillSlug, list);
+    }
+
+    return rows.map((r) => ({
+      slug: r.slug,
+      name: r.name,
+      description: r.description,
+      latestVersion: r.latestVersion,
+      status: r.status as SkillSearchResult["status"],
+      scores: {
+        qualityScore: Number(r.qualityScore),
+        securityScore: Number(r.securityScore),
+        reliabilityScore: Number(r.reliabilityScore),
+      },
+      categories: r.categories ?? [],
+      averageRating: Number(r.averageRating),
+      ratingCount: Number(r.ratingCount),
+      openIssues: r.openIssues,
+      contributors: contributorsMap.get(r.slug) ?? [],
+      downloads: r.totalDownloads,
+      updatedAt: String(r.updatedAt),
+      published: false,
     }));
   }
 

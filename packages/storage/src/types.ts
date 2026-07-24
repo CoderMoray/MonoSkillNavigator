@@ -110,6 +110,8 @@ export interface SkillSearchResult {
   contributors: RegistryContributor[];
   downloads: number;
   updatedAt: string;
+  /** Omitted or true for public search; false when listed only on owner profile */
+  published?: boolean;
 }
 
 export interface CreateIssueInput {
@@ -168,6 +170,7 @@ export interface RegistryStore {
   listIssues(slug: string, status?: IssueStatus): Promise<RegistryIssue[]>;
   addRating(slug: string, rating: CreateRatingInput): Promise<RegistryRating>;
   search(query?: string, categories?: string[]): Promise<SkillSearchResult[]>;
+  listUnpublishedSkillsForOwner(ownerUserId: string): Promise<SkillSearchResult[]>;
   getSkill(slug: string): Promise<RegistrySkill | undefined>;
   getVersion(slug: string, version?: string): Promise<RegistryVersion | undefined>;
   leaderboard(sort?: LeaderboardSort, limit?: number, categories?: string[]): Promise<SkillSearchResult[]>;

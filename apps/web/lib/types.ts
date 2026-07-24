@@ -188,6 +188,7 @@ export interface SkillSearchResult {
   contributors: RegistryContributor[];
   downloads: number;
   updatedAt: string;
+  published?: boolean;
 }
 
 export interface PublicUser {

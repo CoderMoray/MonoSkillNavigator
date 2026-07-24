@@ -21,6 +21,7 @@ import {
   createId,
   createOwnerContributor,
   emptyRegistry,
+  isSkillOwner,
   matchesContributorUser,
   normalizeReleaseTags,
   resolveVersionReference,
@@ -199,6 +200,14 @@ export abstract class JsonRegistryStore implements RegistryStore {
         return skillMatchesCategoryFilters(latest?.manifest.categories, selectedCategories);
       })
       .map(toSearchResult)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  async listUnpublishedSkillsForOwner(ownerUserId: string): Promise<SkillSearchResult[]> {
+    const data = await this.load();
+    return Object.values(data.skills)
+      .filter((skill) => skill.published === false && isSkillOwner(skill, { id: ownerUserId, username: "" }))
+      .map((skill) => ({ ...toSearchResult(skill), published: false }))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 

@@ -22,6 +22,7 @@ import {
   isSkillOwner,
   listCreators,
   loadDotEnvIfPresent,
+  mergeOwnerUnpublishedSkills,
   normalizeCategoryFilters,
   normalizeHandle,
   type ContributorRole,
@@ -198,10 +199,19 @@ export function buildServer() {
 
   app.get<{ Params: CreatorParams }>("/creators/:username", async (request, reply) => {
     const handle = normalizeHandle(request.params.username);
+    const viewer = await getAuthenticatedUser(request.headers.authorization, authStore);
     const skills = await store.search("");
+    const isProfileOwner = Boolean(viewer && normalizeHandle(viewer.username) === handle);
+    let unpublished: Awaited<ReturnType<typeof store.listUnpublishedSkillsForOwner>> = [];
+    if (isProfileOwner && viewer) {
+      unpublished = await store.listUnpublishedSkillsForOwner(viewer.id);
+    }
+
     const matched = aggregateCreators(skills).find((item) => item.handle === handle);
     if (matched) {
-      return { creator: matched };
+      return {
+        creator: isProfileOwner ? mergeOwnerUnpublishedSkills(matched, unpublished) : matched
+      };
     }
 
     const user = await authStore.getUserByUsername(handle);
@@ -209,7 +219,11 @@ export function buildServer() {
       return reply.code(404).send({ error: "Creator not found" });
     }
 
-    return { creator: createEmptyCreatorSummary(user.username) };
+    let creator = createEmptyCreatorSummary(user.username);
+    if (isProfileOwner) {
+      creator = mergeOwnerUnpublishedSkills(creator, unpublished);
+    }
+    return { creator };
   });
 
   app.post<{ Body: PublishBody }>("/skills/publish/preview", async (request, reply) => {

@@ -49,6 +49,7 @@ export {
   aggregateCreators,
   createEmptyCreatorSummary,
   listCreators,
+  mergeOwnerUnpublishedSkills,
   normalizeHandle,
   type CreatorSummary,
 } from "./creators";

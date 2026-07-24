@@ -90,6 +90,23 @@ function weightedAverage(skills: SkillSearchResult[]): number {
   return Math.round((score / ratings) * 10) / 10;
 }
 
+/** Appends owner-only unpublished skills to a creator profile (does not change published count). */
+export function mergeOwnerUnpublishedSkills(
+  creator: CreatorSummary,
+  unpublished: SkillSearchResult[]
+): CreatorSummary {
+  const existingSlugs = new Set(creator.skills.map((skill) => skill.slug));
+  const extra = unpublished
+    .filter((skill) => !existingSlugs.has(skill.slug))
+    .map((skill) => ({ ...skill, published: false }));
+  if (extra.length === 0) {
+    return creator;
+  }
+
+  const skills = [...creator.skills, ...extra].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return { ...creator, skills };
+}
+
 function unknownContributor(): RegistryContributor {
   return {
     id: "unknown",

@@ -51,9 +51,10 @@ export async function getCreators(query = ""): Promise<CreatorSummary[]> {
   return data.items;
 }
 
-export async function getCreatorProfile(username: string): Promise<CreatorSummary> {
+export async function getCreatorProfile(username: string, token?: string): Promise<CreatorSummary> {
   const data = await request<{ creator: CreatorSummary }>(
-    new URL(`/creators/${encodeURIComponent(username)}`, API_BASE_URL)
+    new URL(`/creators/${encodeURIComponent(username)}`, API_BASE_URL),
+    { token }
   );
   return data.creator;
 }

@@ -34,7 +34,7 @@ export default function CreatorProfilePage() {
       try {
         const token = getAuthToken();
         const [matched, currentUser] = await Promise.all([
-          getCreatorProfile(handle),
+          getCreatorProfile(handle, token ?? undefined),
           token ? getCurrentUser(token).catch(() => null) : Promise.resolve(null)
         ]);
         if (!cancelled) {

@@ -129,6 +129,7 @@ export function toSearchResult(skill: RegistrySkill): SkillSearchResult {
     contributors: skill.contributors,
     downloads: Object.values(skill.versions).reduce((t, v) => t + v.downloads, 0),
     updatedAt: skill.updatedAt,
+    published: skill.published !== false,
   };
 }
 

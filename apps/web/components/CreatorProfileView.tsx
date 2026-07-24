@@ -132,11 +132,18 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
                   : "该 Creator 暂无已发布 Skill。"}
               </div>
             ) : (
-              <div className="claw-list">
-                {creator.skills.map((skill) => (
-                  <SkillCard key={skill.slug} skill={skill} variant="row" />
-                ))}
-              </div>
+              <>
+                {isOwner && creator.skills.some((skill) => skill.published === false) ? (
+                  <p className="description" style={{ marginBottom: 12 }}>
+                    已下架 Skill 仅在此个人资料对你可见，不会出现在 Skill 广场或搜索页。
+                  </p>
+                ) : null}
+                <div className="claw-list">
+                  {creator.skills.map((skill) => (
+                    <SkillCard key={skill.slug} skill={skill} variant="row" />
+                  ))}
+                </div>
+              </>
             )
           ) : null}
 

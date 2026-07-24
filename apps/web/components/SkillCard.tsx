@@ -16,6 +16,7 @@ export function SkillCard({ skill, variant = "card" }: { skill: SkillSearchResul
           <div>
             <div className="skill-row-title">
               <strong>{skill.name}</strong>
+              {skill.published === false ? <span className="badge">已下架</span> : null}
               <span>@{owner?.username ?? owner?.name ?? "unknown"}</span>
             </div>
             <p>{skill.description}</p>
@@ -39,6 +40,7 @@ export function SkillCard({ skill, variant = "card" }: { skill: SkillSearchResul
       <div className="card-head">
         <div>
           <h3 className="skill-title">{skill.name}</h3>
+          {skill.published === false ? <span className="badge">已下架</span> : null}
           <div className="mono">latest@{skill.latestVersion}</div>
         </div>
         <VerdictBadge verdict={skill.status} />
