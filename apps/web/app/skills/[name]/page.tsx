@@ -25,13 +25,14 @@ import {
   ShieldCheck,
   Star,
   Trash2,
+  Upload,
   Users,
   X
 } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { ScoreRadar } from "../../../components/ScoreRadar";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
-import { addSkillContributor, addSkillRating, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, saveBlobAsFile, unpublishSkill } from "../../../lib/api";
+import { addSkillContributor, addSkillRating, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, republishSkill, saveBlobAsFile, unpublishSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { creatorProfilePath } from "../../../lib/creators";
 import { formatDateTime, formatNumber } from "../../../lib/format";
@@ -110,10 +111,12 @@ export default function SkillDetailPage() {
   const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [unpublishModalOpen, setUnpublishModalOpen] = useState(false);
+  const [republishModalOpen, setRepublishModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [manageMessage, setManageMessage] = useState<string | null>(null);
   const [manageError, setManageError] = useState<string | null>(null);
   const [unpublishingSkill, setUnpublishingSkill] = useState(false);
+  const [republishingSkill, setRepublishingSkill] = useState(false);
   const [deletingSkill, setDeletingSkill] = useState(false);
   const [platformAverageScores, setPlatformAverageScores] = useState<ReviewScores | undefined>();
   const [platformSampleSize, setPlatformSampleSize] = useState(0);
@@ -180,7 +183,7 @@ export default function SkillDetailPage() {
   }, [skillSlug]);
 
   useEffect(() => {
-    if (!issueModalOpen && !ratingModalOpen && !unpublishModalOpen && !deleteModalOpen) {
+    if (!issueModalOpen && !ratingModalOpen && !unpublishModalOpen && !republishModalOpen && !deleteModalOpen) {
       return;
     }
 
@@ -189,6 +192,7 @@ export default function SkillDetailPage() {
         setIssueModalOpen(false);
         setRatingModalOpen(false);
         setUnpublishModalOpen(false);
+        setRepublishModalOpen(false);
         setDeleteModalOpen(false);
         setIssueError(null);
         setRatingError(null);
@@ -198,7 +202,7 @@ export default function SkillDetailPage() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [issueModalOpen, ratingModalOpen, unpublishModalOpen, deleteModalOpen]);
+  }, [issueModalOpen, ratingModalOpen, unpublishModalOpen, republishModalOpen, deleteModalOpen]);
 
   const currentVersion = useMemo(() => {
     if (!skill) {
@@ -541,6 +545,29 @@ export default function SkillDetailPage() {
     }
   }
 
+  async function handleRepublish() {
+    setManageError(null);
+    setManageMessage(null);
+
+    const token = getAuthToken();
+    if (!token) {
+      setManageError("请先登录后再操作。");
+      return;
+    }
+
+    setRepublishingSkill(true);
+    try {
+      const updated = await republishSkill(token, skill.slug);
+      setSkill(updated);
+      setRepublishModalOpen(false);
+      setManageMessage("Skill 已重新上架，将出现在 Skill 广场与排行榜。");
+    } catch (err) {
+      setManageError(err instanceof Error ? err.message : "上架失败");
+    } finally {
+      setRepublishingSkill(false);
+    }
+  }
+
   async function handleDelete() {
     setManageError(null);
     setManageMessage(null);
@@ -625,7 +652,11 @@ export default function SkillDetailPage() {
                   <button className="button secondary" onClick={() => setUnpublishModalOpen(true)} type="button">
                     <EyeOff size={16} /> 下架
                   </button>
-                ) : null}
+                ) : (
+                  <button className="button secondary" onClick={() => setRepublishModalOpen(true)} type="button">
+                    <Upload size={16} /> 上架
+                  </button>
+                )}
                 <button className="button secondary danger" onClick={() => setDeleteModalOpen(true)} type="button">
                   <Trash2 size={16} /> 删除
                 </button>
@@ -654,7 +685,7 @@ export default function SkillDetailPage() {
             {manageMessage ? <div className="notice">{manageMessage}</div> : null}
             {manageError ? <div className="error">{manageError}</div> : null}
             {isOwner && isUnpublished ? (
-              <p className="description">此 Skill 已下架，仅你可见。发布新版本后将重新上架。</p>
+              <p className="description">此 Skill 已下架，仅你可见。可直接上架恢复公开，或发布新版本后再上架。</p>
             ) : null}
           </div>
 
@@ -1463,7 +1494,7 @@ export default function SkillDetailPage() {
               <div className="modal-form">
                 <p className="description">
                   下架后，<strong>{skill.name}</strong> 将从 Skill 广场、排行榜和公开搜索中隐藏，其他用户无法访问或下载。
-                  你可以继续在此页面查看，或通过发布新版本重新上架。
+                  你可以继续在此页面查看，之后可通过「上架」恢复公开。
                 </p>
                 {manageError ? <div className="error compact-error">{manageError}</div> : null}
                 <div className="modal-actions">
@@ -1479,6 +1510,64 @@ export default function SkillDetailPage() {
                   </button>
                   <button className="button primary" disabled={unpublishingSkill} onClick={() => void handleUnpublish()} type="button">
                     {unpublishingSkill ? "下架中…" : "确认下架"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {republishModalOpen ? (
+          <div
+            className="modal-overlay"
+            onClick={() => {
+              setRepublishModalOpen(false);
+              setManageError(null);
+            }}
+            role="presentation"
+          >
+            <div
+              aria-labelledby="republish-modal-title"
+              aria-modal="true"
+              className="modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+            >
+              <div className="modal-head">
+                <div>
+                  <span className="eyebrow">Republish skill</span>
+                  <h3 id="republish-modal-title">上架 Skill</h3>
+                </div>
+                <button
+                  aria-label="关闭"
+                  className="modal-close"
+                  onClick={() => {
+                    setRepublishModalOpen(false);
+                    setManageError(null);
+                  }}
+                  type="button"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="modal-form">
+                <p className="description">
+                  将 <strong>{skill.name}</strong> 重新上架到 Skill 广场与排行榜，使用当前最新版本 v{currentVersion.version}，无需发布新版本。
+                </p>
+                {manageError ? <div className="error compact-error">{manageError}</div> : null}
+                <div className="modal-actions">
+                  <button
+                    className="button secondary"
+                    onClick={() => {
+                      setRepublishModalOpen(false);
+                      setManageError(null);
+                    }}
+                    type="button"
+                  >
+                    取消
+                  </button>
+                  <button className="button primary" disabled={republishingSkill} onClick={() => void handleRepublish()} type="button">
+                    {republishingSkill ? "上架中…" : "确认上架"}
                   </button>
                 </div>
               </div>

@@ -263,6 +263,17 @@ export async function unpublishSkill(token: string, slug: string): Promise<Regis
   return data.skill;
 }
 
+export async function republishSkill(token: string, slug: string): Promise<RegistrySkill> {
+  const data = await request<{ skill: RegistrySkill }>(
+    new URL(`/skills/${encodeURIComponent(slug)}/republish`, API_BASE_URL),
+    {
+      method: "POST",
+      token
+    }
+  );
+  return data.skill;
+}
+
 export async function deleteSkill(token: string, slug: string): Promise<void> {
   await request<{ ok: boolean }>(new URL(`/skills/${encodeURIComponent(slug)}`, API_BASE_URL), {
     method: "DELETE",

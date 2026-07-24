@@ -860,6 +860,25 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     return skill;
   }
 
+  async republishSkill(slug: string): Promise<RegistrySkill> {
+    await this.ensureSchema();
+    const now = new Date();
+    const updated = await this.db.update(schema.skills)
+      .set({ published: true, updatedAt: now })
+      .where(eq(schema.skills.slug, slug))
+      .returning({ slug: schema.skills.slug });
+
+    if (updated.length === 0) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+
+    const skill = await this.getSkill(slug);
+    if (!skill) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+    return skill;
+  }
+
   async deleteSkill(slug: string): Promise<void> {
     await this.ensureSchema();
 

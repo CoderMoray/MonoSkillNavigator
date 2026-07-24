@@ -492,6 +492,31 @@ export function buildServer() {
     }
   });
 
+  app.post<{ Params: SkillParams }>("/skills/:slug/republish", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
+    const skill = await store.getSkill(request.params.slug);
+    if (!skill) {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
+    if (!isSkillOwner(skill, user)) {
+      return reply.code(403).send({ error: "Forbidden" });
+    }
+    if (skill.published !== false) {
+      return reply.code(400).send({ error: "skill_already_published" });
+    }
+
+    try {
+      const updated = await store.republishSkill(request.params.slug);
+      return { skill: updated };
+    } catch {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
+  });
+
   app.delete<{ Params: SkillParams }>("/skills/:slug", async (request, reply) => {
     const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
     if (!user) {

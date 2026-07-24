@@ -256,6 +256,20 @@ export abstract class JsonRegistryStore implements RegistryStore {
     return skill;
   }
 
+  async republishSkill(slug: string): Promise<RegistrySkill> {
+    const data = await this.load();
+    const skill = data.skills[slug];
+    if (!skill) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+
+    const now = new Date().toISOString();
+    skill.published = true;
+    skill.updatedAt = now;
+    await this.save(data);
+    return skill;
+  }
+
   async deleteSkill(slug: string): Promise<void> {
     const data = await this.load();
     const skill = data.skills[slug];

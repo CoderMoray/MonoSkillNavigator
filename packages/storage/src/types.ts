@@ -173,6 +173,7 @@ export interface RegistryStore {
   leaderboard(sort?: LeaderboardSort, limit?: number, categories?: string[]): Promise<SkillSearchResult[]>;
   downloadSnapshot(slug: string, version?: string): Promise<SkillSnapshot | undefined>;
   unpublishSkill(slug: string): Promise<RegistrySkill>;
+  republishSkill(slug: string): Promise<RegistrySkill>;
   deleteSkill(slug: string): Promise<void>;
   reviewAll(
     reviewFn: (snapshot: SkillSnapshot, version: string) => ReviewReport | Promise<ReviewReport>,
