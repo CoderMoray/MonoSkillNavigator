@@ -177,6 +177,10 @@ export abstract class JsonRegistryStore implements RegistryStore {
     const data = await this.load();
     const skill = data.skills[slug];
     if (!skill) throw new Error(`Skill not found: ${slug}`);
+    const normalizedUser = rating.user.trim().toLowerCase();
+    if (skill.ratings.some((existing) => existing.user.trim().toLowerCase() === normalizedUser)) {
+      throw new Error("rating_already_submitted");
+    }
     const created: RegistryRating = {
       id: createId("rating"), version: rating.version, user: rating.user,
       score: rating.score, comment: rating.comment, createdAt: new Date().toISOString(),

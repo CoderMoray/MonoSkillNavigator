@@ -576,6 +576,29 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     await this.ensureSchema();
     if (rating.score < 1 || rating.score > 5) throw new Error("Rating score must be between 1 and 5");
 
+    const [skillRow] = await this.db
+      .select({ slug: schema.skills.slug })
+      .from(schema.skills)
+      .where(eq(schema.skills.slug, slug))
+      .limit(1);
+    if (!skillRow) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+
+    const [existing] = await this.db
+      .select({ id: schema.skillRatings.id })
+      .from(schema.skillRatings)
+      .where(
+        and(
+          eq(schema.skillRatings.skillSlug, slug),
+          sql`lower(${schema.skillRatings.userName}) = lower(${rating.user})`
+        )
+      )
+      .limit(1);
+    if (existing) {
+      throw new Error("rating_already_submitted");
+    }
+
     const id = `rating_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const createdAt = new Date();
 

@@ -76,6 +76,13 @@ function stripFrontmatter(markdown: string): string {
   return markdown.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
 }
 
+function formatRatingError(message: string): string {
+  if (message === "rating_already_submitted") {
+    return "你已对该 Skill 提交过评分，每位用户仅可评分一次。";
+  }
+  return message;
+}
+
 export default function SkillDetailPage() {
   const params = useParams<{ name: string }>();
   const router = useRouter();
@@ -211,6 +218,14 @@ export default function SkillDetailPage() {
     return (selectedVersionName ? skill.versions[selectedVersionName] : undefined) ?? skill.versions[skill.latestVersion];
   }, [selectedVersionName, skill]);
 
+  const viewerExistingRating = useMemo(() => {
+    if (!viewer || !skill) {
+      return undefined;
+    }
+    const handle = viewer.username.trim().toLowerCase();
+    return skill.ratings.find((rating) => rating.user.trim().toLowerCase() === handle);
+  }, [skill, viewer]);
+
   const versions = useMemo(
     () => (skill ? Object.values(skill.versions).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : []),
     [skill]
@@ -342,6 +357,10 @@ export default function SkillDetailPage() {
   }
 
   function openRatingModal() {
+    if (viewerExistingRating) {
+      setRatingMessage(`你已对该 Skill 评分（${viewerExistingRating.score}/5），每位用户仅可提交一次。`);
+      return;
+    }
     setRatingError(null);
     setRatingModalOpen(true);
   }
@@ -492,7 +511,7 @@ export default function SkillDetailPage() {
       setRatingModalOpen(false);
       setRatingMessage("评分已提交。");
     } catch (err) {
-      setRatingError(err instanceof Error ? err.message : "提交评分失败");
+      setRatingError(formatRatingError(err instanceof Error ? err.message : "提交评分失败"));
     } finally {
       setSubmittingRating(false);
     }
@@ -1274,9 +1293,13 @@ export default function SkillDetailPage() {
                     <div className="card-head-actions">
                       <span className="badge">{skill.ratingCount}</span>
                       {viewer ? (
-                        <button className="button secondary compact" onClick={openRatingModal} type="button">
-                          <Star size={14} /> 提交评分
-                        </button>
+                        viewerExistingRating ? (
+                          <span className="badge">你已评分 {viewerExistingRating.score}/5</span>
+                        ) : (
+                          <button className="button secondary compact" onClick={openRatingModal} type="button">
+                            <Star size={14} /> 提交评分
+                          </button>
+                        )
                       ) : (
                         <Link className="button secondary compact" href="/login">登录后提交</Link>
                       )}

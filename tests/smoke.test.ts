@@ -200,6 +200,28 @@ test("未登录评分应拒绝", async () => {
   expect(res.status).toBe(401);
 });
 
+test("同一用户对同一 Skill 重复评分应拒绝", async () => {
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+  const first = await fetch(`${API}/skills/demo-skill/ratings`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ score: 4 }),
+  });
+  expect([201, 409]).toContain(first.status);
+
+  const second = await fetch(`${API}/skills/demo-skill/ratings`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ score: 5 }),
+  });
+  expect(second.status).toBe(409);
+  const body = (await second.json()) as { error?: string };
+  expect(body.error).toBe("rating_already_submitted");
+});
+
 test("未登录创建 Issue 应拒绝", async () => {
   const res = await fetch(`${API}/skills/demo-skill/issues`, {
     method: "POST",

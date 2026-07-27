@@ -1,4 +1,4 @@
-import { pgTable, text, smallint, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, smallint, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { skills } from "./skills";
 
@@ -36,4 +36,9 @@ export const skillRatings = pgTable("skill_ratings", {
   score: smallint("score").notNull(),
   comment: text("comment"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-});
+}, (table) => [
+  uniqueIndex("skill_ratings_skill_slug_user_name_unique").on(
+    table.skillSlug,
+    sql`lower(${table.userName})`
+  ),
+]);

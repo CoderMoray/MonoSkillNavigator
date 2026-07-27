@@ -428,7 +428,9 @@ export function buildServer() {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "rating_failed";
-      return reply.code(message.includes("score") ? 400 : 404).send({ error: message });
+      const status =
+        message === "rating_already_submitted" ? 409 : message.includes("score") ? 400 : 404;
+      return reply.code(status).send({ error: message });
     }
   });
 
