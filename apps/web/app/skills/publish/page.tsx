@@ -65,6 +65,7 @@ function PublishSkillPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [archiveHint, setArchiveHint] = useState<string | null>(null);
   const [parsingArchive, setParsingArchive] = useState(false);
+  const [existingSkillBySlug, setExistingSkillBySlug] = useState<RegistrySkill | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -143,6 +144,40 @@ function PublishSkillPageContent() {
   }, [sourceSlug]);
 
   useEffect(() => {
+    if (isNewVersion) {
+      setExistingSkillBySlug(null);
+      return;
+    }
+
+    const normalizedSlug = slug.trim();
+    if (!normalizedSlug || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(normalizedSlug)) {
+      setExistingSkillBySlug(null);
+      return;
+    }
+
+    let cancelled = false;
+    const token = getAuthToken();
+    const timeout = window.setTimeout(() => {
+      void getSkill(normalizedSlug, token ?? undefined)
+        .then((skill) => {
+          if (!cancelled) {
+            setExistingSkillBySlug(skill);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setExistingSkillBySlug(null);
+          }
+        });
+    }, 280);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [isNewVersion, slug]);
+
+  useEffect(() => {
     if (!categoryMenuOpen) {
       return;
     }
@@ -187,6 +222,8 @@ function PublishSkillPageContent() {
 
   const showPublishForm = Boolean(file && !parsingArchive);
 
+  const skillForVersionCheck = isNewVersion ? sourceSkill : existingSkillBySlug;
+
   const publishBlockReason = useMemo(() => {
     if (!showPublishForm) {
       return null;
@@ -195,19 +232,22 @@ function PublishSkillPageContent() {
       return "无权发布新版本。";
     }
 
-    return (
-      validatePublishMetadata(
-        createPublishMetadata({
-          displayName,
-          slug,
-          summary,
-          categories,
-          topics,
-          version,
-          releaseTags
-        })
-      ) ?? null
-    );
+    const metadata = createPublishMetadata({
+      displayName,
+      slug,
+      summary,
+      categories,
+      topics,
+      version,
+      releaseTags
+    });
+
+    const metadataError = validatePublishMetadata(metadata);
+    if (metadataError) {
+      return metadataError;
+    }
+
+    return getVersionConflictMessage(skillForVersionCheck, metadata.version);
   }, [
     categories,
     displayName,
@@ -215,6 +255,7 @@ function PublishSkillPageContent() {
     isOwner,
     releaseTags,
     showPublishForm,
+    skillForVersionCheck,
     slug,
     summary,
     topics,
@@ -350,6 +391,12 @@ function PublishSkillPageContent() {
       return;
     }
 
+    const versionConflict = getVersionConflictMessage(skillForVersionCheck, metadata.version);
+    if (versionConflict) {
+      setError(versionConflict);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const archiveBase64 = await readFileAsBase64(file);
@@ -363,7 +410,8 @@ function PublishSkillPageContent() {
       });
       router.push(user ? creatorProfilePath(user.username) : "/account");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "发布失败");
+      const message = err instanceof Error ? err.message : "发布失败";
+      setError(formatPublishError(message));
     } finally {
       setSubmitting(false);
     }
@@ -555,7 +603,10 @@ function PublishSkillPageContent() {
                       <label className="field">
                         <span>Version <em>必填</em></span>
                         <input
-                          onChange={(event) => setVersion(event.target.value)}
+                          onChange={(event) => {
+                            setError(null);
+                            setVersion(event.target.value);
+                          }}
                           pattern="(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?"
                           placeholder="1.0.0"
                           required
@@ -639,6 +690,26 @@ function validatePublishMetadata(metadata: PublishSkillMetadata): string | undef
     return `Category 最多选择 ${MAX_CATEGORIES} 个。`;
   }
   return undefined;
+}
+
+function getVersionConflictMessage(skill: RegistrySkill | null | undefined, versionInput: string): string | null {
+  const nextVersion = versionInput.trim();
+  if (!skill || !nextVersion) {
+    return null;
+  }
+  if (skill.versions[nextVersion]) {
+    return `版本号冲突：v${nextVersion} 已存在，请改用尚未发布的版本号（当前最新为 v${skill.latestVersion}）。`;
+  }
+  return null;
+}
+
+function formatPublishError(message: string): string {
+  const match = /^Version already exists: ([^@]+)@(.+)$/.exec(message);
+  if (match) {
+    const [, conflictSlug, conflictVersion] = match;
+    return `版本号冲突：v${conflictVersion} 已存在于 Skill「${conflictSlug}」，请改用尚未发布的版本号。`;
+  }
+  return message;
 }
 
 function suggestNextPatchVersion(version: string): string {
