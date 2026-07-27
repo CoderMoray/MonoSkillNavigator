@@ -2019,6 +2019,10 @@ button {
   margin-top: 0;
 }
 
+.finding-confidence {
+  font-variant-numeric: tabular-nums;
+}
+
 .halucatch-report-back-link {
   display: inline-flex;
   align-items: center;

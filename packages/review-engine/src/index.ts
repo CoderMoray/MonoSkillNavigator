@@ -37,6 +37,8 @@ export interface ReviewFinding {
   path?: string;
   evidence?: string;
   recommendation: string;
+  /** SkillSpector per-finding confidence in 0.0–1.0 when available. */
+  confidence?: number;
 }
 
 export interface ReviewScores {

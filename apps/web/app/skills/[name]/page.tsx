@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { HaluCatchRadar } from "../../../components/HaluCatchRadar";
+import { FindingConfidenceBadge } from "../../../components/FindingConfidenceBadge";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
 import { addSkillContributor, addSkillRating, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, republishSkill, saveBlobAsFile, unpublishSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
@@ -1192,7 +1193,10 @@ export default function SkillDetailPage() {
                       <li className={`list-item finding ${finding.severity}`} key={finding.id}>
                         <div className="card-head">
                           <strong>{finding.title}</strong>
-                          <SeverityBadge severity={finding.severity} />
+                          <div className="tag-row" style={{ marginTop: 0 }}>
+                            <SeverityBadge severity={finding.severity} />
+                            <FindingConfidenceBadge finding={finding} />
+                          </div>
                         </div>
                         <p className="description">{finding.message}</p>
                         <p className="description">建议：{finding.recommendation}</p>

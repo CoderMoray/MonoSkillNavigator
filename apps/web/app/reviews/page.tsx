@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Activity, CheckCircle2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
+import { FindingConfidenceBadge } from "../../components/FindingConfidenceBadge";
 import { HaluCatchRadar } from "../../components/HaluCatchRadar";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../components/StatusBadge";
 import { getSkill, getSkills } from "../../lib/api";
@@ -235,7 +236,10 @@ function FindingItem({
     <li className={`list-item finding ${finding.severity}`}>
       <div className="card-head">
         <strong>{finding.title}</strong>
-        <SeverityBadge severity={finding.severity} />
+        <div className="tag-row" style={{ marginTop: 0 }}>
+          <SeverityBadge severity={finding.severity} />
+          <FindingConfidenceBadge finding={finding} />
+        </div>
       </div>
       <p className="description">
         <Link href={`/skills/${encodeURIComponent(skillSlug)}`}>{skillName}</Link>

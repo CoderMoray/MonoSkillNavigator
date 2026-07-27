@@ -24,6 +24,7 @@ export interface ReviewFinding {
   path?: string;
   evidence?: string;
   recommendation: string;
+  confidence?: number;
 }
 
 export interface ReviewReport {

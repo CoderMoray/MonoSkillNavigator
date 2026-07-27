@@ -540,6 +540,9 @@ export class PostgresRegistryStore extends JsonRegistryStore {
             id: f.findingId, category: f.category as any, severity: f.severity as any,
             title: f.title, message: f.message, path: f.path ?? undefined,
             evidence: f.evidence ?? undefined, recommendation: f.recommendation,
+            ...(f.confidence != null && Number.isFinite(Number(f.confidence))
+              ? { confidence: Number(f.confidence) }
+              : {}),
           })),
           createdAt: String(review.createdAt),
         } : {} as RegistryVersion["review"],
@@ -752,6 +755,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
           title: f.title, message: f.message,
           path: f.path ?? null, evidence: f.evidence ?? null,
           recommendation: f.recommendation,
+          confidence: typeof f.confidence === "number" && Number.isFinite(f.confidence) ? f.confidence : null,
         }))
       );
     }
@@ -900,6 +904,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
             skillSlug: slug, version, position: i, findingId: f.id ?? `finding_${i}`,
             category: f.category, severity: f.severity, title: f.title, message: f.message,
             path: f.path ?? null, evidence: f.evidence ?? null, recommendation: f.recommendation,
+            confidence: typeof f.confidence === "number" && Number.isFinite(f.confidence) ? f.confidence : null,
           }))
         );
       }

@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, uniqueIndex, real } from "drizzle-orm/pg-core";
 import { skillVersions } from "./skills";
 
 export const skillReviews = pgTable("skill_reviews", {
@@ -28,6 +28,7 @@ export const skillReviewFindings = pgTable("skill_review_findings", {
   path: text("path"),
   evidence: text("evidence"),
   recommendation: text("recommendation").notNull(),
+  confidence: real("confidence"),
 }, (table) => [
   uniqueIndex("skill_review_findings_pkey").on(table.skillSlug, table.version, table.position),
 ]);
