@@ -444,7 +444,7 @@ function PublishSkillPageContent() {
                   />
                 </label>
 
-                {error ? <div className="error compact-error">{error}</div> : null}
+                {!showPublishForm && error ? <div className="error compact-error">{error}</div> : null}
 
                 {showPublishForm ? (
                   <div className="publish-form-fields">
@@ -590,14 +590,14 @@ function PublishSkillPageContent() {
                       </label>
                     ) : null}
 
-                    {!canPublish && publishBlockReason ? (
-                      <p className="description publish-block-reason">{publishBlockReason}</p>
-                    ) : null}
-
                     <button className="button primary" disabled={submitting || !canPublish} type="submit">
                       {submitting ? "发布并审查中..." : isNewVersion ? "发布新版本" : "发布 Skill"}
                       <ArrowRight size={16} />
                     </button>
+
+                    {error || (!canPublish && publishBlockReason) ? (
+                      <div className="error compact-error publish-form-feedback">{error ?? publishBlockReason}</div>
+                    ) : null}
                   </div>
                 ) : null}
               </form>
