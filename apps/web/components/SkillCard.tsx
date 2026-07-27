@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, MessageSquare, Star, Users } from "lucide-react";
+import { Download, EyeOff, MessageSquare, Star, Users } from "lucide-react";
 import { formatDateTime, formatNumber } from "../lib/format";
 import type { SkillSearchResult } from "../lib/types";
 import { ScoreBars } from "./ScoreBars";
@@ -16,8 +16,12 @@ export function SkillCard({ skill, variant = "card" }: { skill: SkillSearchResul
           <div>
             <div className="skill-row-title">
               <strong>{skill.name}</strong>
-              {skill.published === false ? <span className="badge">已下架</span> : null}
               <span>@{owner?.username ?? owner?.name ?? "unknown"}</span>
+              {skill.published === false ? (
+                <span className="badge badge-unpublished">
+                  <EyeOff size={12} /> 已下架
+                </span>
+              ) : null}
             </div>
             <p>{skill.description}</p>
           </div>
@@ -40,7 +44,11 @@ export function SkillCard({ skill, variant = "card" }: { skill: SkillSearchResul
       <div className="card-head">
         <div>
           <h3 className="skill-title">{skill.name}</h3>
-          {skill.published === false ? <span className="badge">已下架</span> : null}
+          {skill.published === false ? (
+            <span className="badge badge-unpublished">
+              <EyeOff size={12} /> 已下架
+            </span>
+          ) : null}
           <div className="mono">latest@{skill.latestVersion}</div>
         </div>
         <VerdictBadge verdict={skill.status} />

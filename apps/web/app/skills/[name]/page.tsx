@@ -625,9 +625,13 @@ export default function SkillDetailPage() {
             <h1>{skill.name}</h1>
             <p>{skill.description}</p>
             <div className="tag-row">
+              {isUnpublished ? (
+                <span className="badge badge-unpublished">
+                  <EyeOff size={13} /> 已下架
+                </span>
+              ) : null}
               <span className="badge mono">{skill.slug}</span>
               <span className="badge">v{currentVersion.version}</span>
-              {isUnpublished ? <span className="badge">已下架</span> : null}
               <span className="badge">
                 <Star size={13} /> {skill.averageRating ? skill.averageRating.toFixed(1) : "暂无评分"}
               </span>

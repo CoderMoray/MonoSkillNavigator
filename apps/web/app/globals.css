@@ -1682,6 +1682,28 @@ button {
   color: var(--red);
 }
 
+.badge.badge-unpublished {
+  border-color: rgba(180, 83, 9, 0.55);
+  background: #fff7ed;
+  color: #9a3412;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  box-shadow: 0 0 0 1px rgba(234, 88, 12, 0.15);
+}
+
+:root[data-theme="dark"] .badge.badge-unpublished {
+  border-color: rgba(251, 146, 60, 0.55);
+  background: rgba(154, 52, 18, 0.35);
+  color: #fdba74;
+  box-shadow: 0 0 0 1px rgba(251, 146, 60, 0.2);
+}
+
+.skill-detail-hero .badge.badge-unpublished {
+  padding: 6px 12px;
+  font-size: 13px;
+  text-transform: none;
+}
+
 .card-foot {
   display: flex;
   align-items: center;
