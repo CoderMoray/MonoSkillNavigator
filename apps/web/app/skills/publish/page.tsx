@@ -601,12 +601,6 @@ function PublishSkillPageContent() {
                   </div>
                 ) : null}
               </form>
-
-              <div className="publish-cli-card">
-                <strong>也可以使用 CLI 发布文件夹或 zip：</strong>
-                <pre>{`$ npm run skill -- publish ./my-skill --token <token>
-$ npm run skill -- publish ./my-skill.zip --token <token>`}</pre>
-              </div>
             </div>
           </section>
         )}
