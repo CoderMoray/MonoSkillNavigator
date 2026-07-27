@@ -32,11 +32,12 @@ import {
 import { AppShell } from "../../../components/AppShell";
 import { HaluCatchRadar } from "../../../components/HaluCatchRadar";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
-import { addSkillContributor, addSkillRating, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, republishSkill, saveBlobAsFile, unpublishSkill } from "../../../lib/api";
+import { addSkillContributor, addSkillRating, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, republishSkill, saveBlobAsFile, unpublishSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { creatorProfilePath } from "../../../lib/creators";
 import { formatDateTime, formatNumber } from "../../../lib/format";
 import { buildHaluCatchReportPath, extractHaluCatchSummary } from "../../../lib/halucatch-report";
+import { averageHaluCatchRadarScores, type HaluCatchRadarScores } from "../../../lib/halucatch-scores";
 import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill } from "../../../lib/types";
 
 type DetailPanel =
@@ -124,6 +125,39 @@ export default function SkillDetailPage() {
   const [unpublishingSkill, setUnpublishingSkill] = useState(false);
   const [republishingSkill, setRepublishingSkill] = useState(false);
   const [deletingSkill, setDeletingSkill] = useState(false);
+  const [platformAverageHaluCatch, setPlatformAverageHaluCatch] = useState<HaluCatchRadarScores | undefined>();
+  const [platformHaluCatchSampleSize, setPlatformHaluCatchSampleSize] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPlatformHaluCatchAverages() {
+      try {
+        const summaries = await getSkills();
+        const details = await Promise.all(summaries.map((item) => getSkill(item.slug)));
+        if (cancelled) {
+          return;
+        }
+        const evaluations = details
+          .map((item) => item.versions[item.latestVersion]?.evaluation)
+          .filter((evaluation): evaluation is NonNullable<typeof evaluation> => Boolean(evaluation));
+        setPlatformAverageHaluCatch(averageHaluCatchRadarScores(evaluations));
+        setPlatformHaluCatchSampleSize(
+          evaluations.filter((evaluation) => evaluation.provider === "halucatch-adapter").length
+        );
+      } catch {
+        if (!cancelled) {
+          setPlatformAverageHaluCatch(undefined);
+          setPlatformHaluCatchSampleSize(0);
+        }
+      }
+    }
+
+    void loadPlatformHaluCatchAverages();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -306,7 +340,7 @@ export default function SkillDetailPage() {
       title: "审查与评估",
       icon: ShieldCheck,
       meta: currentVersion.evaluation
-        ? `${reviewFindings.length} 项审查 · ${currentVersion.evaluation.score} 分`
+        ? `${reviewFindings.length} 项审查 · 已评估`
         : `${reviewFindings.length} 项审查 · 未评估`
     },
     {
@@ -1069,9 +1103,50 @@ export default function SkillDetailPage() {
                 </div>
               </div>
 
-              {isHaluCatchEvaluation ? (
-                <div className="review-score-card">
-                  <HaluCatchRadar evaluation={currentVersion.evaluation} />
+              {isHaluCatchEvaluation && currentVersion.evaluation ? (
+                <div className="detail-subsection halucatch-evaluation-block">
+                  <div className="section-head">
+                    <div>
+                      <h3>HaluCatch 质量评估</h3>
+                      <p className="description">五维静态可靠性检查：地基、代码、规则、护栏与复杂度。</p>
+                    </div>
+                    {haluCatchReportHref ? (
+                      <Link className="button secondary compact" href={haluCatchReportHref}>
+                        <ExternalLink size={14} /> 查看完整报告
+                      </Link>
+                    ) : null}
+                  </div>
+                  <div className="evaluation-summary">
+                    <div>
+                      <span>Provider</span>
+                      <strong>HaluCatch</strong>
+                    </div>
+                    <div>
+                      <span>评估时间</span>
+                      <strong>{formatDateTime(currentVersion.evaluation.createdAt)}</strong>
+                    </div>
+                    {haluCatchReport ? (
+                      <div>
+                        <span>Skill 类型</span>
+                        <strong>{haluCatchReport.skillType}</strong>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="review-score-card halucatch-radar-card">
+                    <HaluCatchRadar
+                      averageScores={platformAverageHaluCatch}
+                      evaluation={currentVersion.evaluation}
+                      sampleSize={platformHaluCatchSampleSize}
+                    />
+                  </div>
+                  {haluCatchReport && haluCatchReportSummary ? (
+                    <div className="halucatch-inline-summary">
+                      <h4>报告摘要</h4>
+                      <MarkdownContent className="markdown-content halucatch-report-summary">
+                        {haluCatchReportSummary}
+                      </MarkdownContent>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -1108,15 +1183,12 @@ export default function SkillDetailPage() {
                 )}
               </div>
 
+              {!isHaluCatchEvaluation ? (
               <div className="detail-subsection">
                 <div className="section-head">
                   <div>
-                    <h3>{isHaluCatchEvaluation ? "HaluCatch 可靠性评估" : "可靠性评估"}</h3>
-                    <p className="description">
-                      {isHaluCatchEvaluation
-                        ? "五维静态可靠性检查：地基、代码、规则、护栏与复杂度。"
-                        : "查看可靠性任务集的完成情况与发现。"}
-                    </p>
+                    <h3>可靠性评估</h3>
+                    <p className="description">查看可靠性任务集的完成情况与发现。</p>
                   </div>
                 </div>
                 {currentVersion.evaluation ? (
@@ -1124,11 +1196,7 @@ export default function SkillDetailPage() {
                     <div className="evaluation-summary">
                       <div>
                         <span>Provider</span>
-                        <strong>{isHaluCatchEvaluation ? "HaluCatch" : currentVersion.evaluation.provider}</strong>
-                      </div>
-                      <div>
-                        <span>可靠性分</span>
-                        <strong>{currentVersion.evaluation.score}</strong>
+                        <strong>{currentVersion.evaluation.provider}</strong>
                       </div>
                       <div>
                         <span>Tasks</span>
@@ -1140,34 +1208,8 @@ export default function SkillDetailPage() {
                         <span>评估时间</span>
                         <strong>{formatDateTime(currentVersion.evaluation.createdAt)}</strong>
                       </div>
-                      {haluCatchReport ? (
-                        <div>
-                          <span>Skill 类型</span>
-                          <strong>{haluCatchReport.skillType}</strong>
-                        </div>
-                      ) : null}
                     </div>
-                    {haluCatchReport ? (
-                      <div className="detail-subsection">
-                        <div className="section-head">
-                          <div>
-                            <h3>HaluCatch 报告摘要</h3>
-                            <p className="description">标准版报告一句话总结；完整 Markdown 报告请跳转查看。</p>
-                          </div>
-                          {haluCatchReportHref ? (
-                            <Link className="button secondary compact" href={haluCatchReportHref}>
-                              <ExternalLink size={14} /> 查看完整报告
-                            </Link>
-                          ) : null}
-                        </div>
-                        {haluCatchReportSummary ? (
-                          <MarkdownContent className="markdown-content halucatch-report-summary">
-                            {haluCatchReportSummary}
-                          </MarkdownContent>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    {!isHaluCatchEvaluation && currentVersion.evaluation.taskResults.length > 0 ? (
+                    {currentVersion.evaluation.taskResults.length > 0 ? (
                       <div className="detail-subsection">
                         <h3>任务结果</h3>
                         <ul className="list">
@@ -1187,7 +1229,7 @@ export default function SkillDetailPage() {
                         </ul>
                       </div>
                     ) : null}
-                    {!isHaluCatchEvaluation && currentVersion.evaluation.findings.length > 0 ? (
+                    {currentVersion.evaluation.findings.length > 0 ? (
                       <div className="detail-subsection">
                         <h3>总体发现</h3>
                         <ul className="list">
@@ -1209,6 +1251,7 @@ export default function SkillDetailPage() {
                   <div className="empty detail-empty">该版本暂无可靠性评估报告。</div>
                 )}
               </div>
+              ) : null}
             </>
           ) : null}
 

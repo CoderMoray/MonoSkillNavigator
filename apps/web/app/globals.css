@@ -2000,6 +2000,25 @@ button {
   padding: 16px 20px;
 }
 
+.halucatch-evaluation-block {
+  display: grid;
+  gap: 16px;
+}
+
+.halucatch-evaluation-block .halucatch-radar-card {
+  margin-bottom: 0;
+}
+
+.halucatch-inline-summary h4 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.halucatch-inline-summary .halucatch-report-summary {
+  margin-top: 0;
+}
+
 .halucatch-report-back-link {
   display: inline-flex;
   align-items: center;

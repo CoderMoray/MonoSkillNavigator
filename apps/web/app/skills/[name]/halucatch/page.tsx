@@ -131,10 +131,6 @@ function HaluCatchReportPageContent() {
       <section className="card detail-panel">
         <div className="evaluation-summary">
           <div>
-            <span>可靠性分</span>
-            <strong>{version.evaluation?.score ?? "—"}</strong>
-          </div>
-          <div>
             <span>Tasks</span>
             <strong>
               {version.evaluation?.tasksPassed ?? 0}/{version.evaluation?.tasksTotal ?? 0}
