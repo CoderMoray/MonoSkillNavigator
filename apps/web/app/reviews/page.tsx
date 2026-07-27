@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Activity, CheckCircle2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
-import { ScoreRadar } from "../../components/ScoreRadar";
+import { HaluCatchRadar } from "../../components/HaluCatchRadar";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../components/StatusBadge";
 import { getSkill, getSkills } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
-import { averageReviewScores } from "../../lib/review-scores";
-import type { RegistrySkill, ReviewFinding, ReviewScores } from "../../lib/types";
+import { averageHaluCatchRadarScores } from "../../lib/halucatch-scores";
+import type { RegistrySkill, ReviewFinding } from "../../lib/types";
 
 interface AggregatedFinding {
   finding: ReviewFinding;
@@ -82,17 +82,17 @@ export default function ReviewsPage() {
     return { versions: versions.length, findings, blockers, passed, averageReliability };
   }, [skills]);
 
-  const platformAverageScores = useMemo<ReviewScores | undefined>(() => {
-    const items = skills
-      .map((skill) => skill.versions[skill.latestVersion])
-      .filter((version): version is NonNullable<typeof version> => Boolean(version))
-      .map((version) => ({ scores: version.review.scores }));
-    return averageReviewScores(items);
+  const platformAverageHaluCatch = useMemo(() => {
+    const evaluations = skills
+      .map((skill) => skill.versions[skill.latestVersion]?.evaluation)
+      .filter((evaluation): evaluation is NonNullable<typeof evaluation> => Boolean(evaluation));
+    return averageHaluCatchRadarScores(evaluations);
   }, [skills]);
 
-  const platformSampleSize = useMemo(
+  const platformHaluCatchSampleSize = useMemo(
     () =>
-      skills.filter((skill) => skill.versions[skill.latestVersion]).length,
+      skills.filter((skill) => skill.versions[skill.latestVersion]?.evaluation?.provider === "halucatch-adapter")
+        .length,
     [skills]
   );
 
@@ -158,10 +158,10 @@ export default function ReviewsPage() {
                         </div>
                       </div>
                       <div style={{ marginTop: 16 }}>
-                        <ScoreRadar
-                          averageScores={platformAverageScores}
-                          sampleSize={platformSampleSize}
-                          scores={latest.review.scores}
+                        <HaluCatchRadar
+                          averageScores={platformAverageHaluCatch}
+                          evaluation={latest.evaluation}
+                          sampleSize={platformHaluCatchSampleSize}
                         />
                       </div>
                     </li>

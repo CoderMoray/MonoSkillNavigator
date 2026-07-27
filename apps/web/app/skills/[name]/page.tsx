@@ -30,15 +30,14 @@ import {
   X
 } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
-import { ScoreRadar } from "../../../components/ScoreRadar";
+import { HaluCatchRadar } from "../../../components/HaluCatchRadar";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
-import { addSkillContributor, addSkillRating, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, republishSkill, saveBlobAsFile, unpublishSkill } from "../../../lib/api";
+import { addSkillContributor, addSkillRating, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, republishSkill, saveBlobAsFile, unpublishSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { creatorProfilePath } from "../../../lib/creators";
 import { formatDateTime, formatNumber } from "../../../lib/format";
 import { buildHaluCatchReportPath, extractHaluCatchSummary } from "../../../lib/halucatch-report";
-import { averageReviewScores } from "../../../lib/review-scores";
-import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill, ReviewScores } from "../../../lib/types";
+import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill } from "../../../lib/types";
 
 type DetailPanel =
   | "skill-md"
@@ -125,32 +124,6 @@ export default function SkillDetailPage() {
   const [unpublishingSkill, setUnpublishingSkill] = useState(false);
   const [republishingSkill, setRepublishingSkill] = useState(false);
   const [deletingSkill, setDeletingSkill] = useState(false);
-  const [platformAverageScores, setPlatformAverageScores] = useState<ReviewScores | undefined>();
-  const [platformSampleSize, setPlatformSampleSize] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadPlatformAverages() {
-      try {
-        const items = await getSkills();
-        if (!cancelled) {
-          setPlatformSampleSize(items.length);
-          setPlatformAverageScores(averageReviewScores(items));
-        }
-      } catch {
-        if (!cancelled) {
-          setPlatformSampleSize(0);
-          setPlatformAverageScores(undefined);
-        }
-      }
-    }
-
-    void loadPlatformAverages();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1096,27 +1069,24 @@ export default function SkillDetailPage() {
                 </div>
               </div>
 
+              {isHaluCatchEvaluation ? (
+                <div className="review-score-card">
+                  <HaluCatchRadar evaluation={currentVersion.evaluation} />
+                </div>
+              ) : null}
+
               <div className="detail-subsection">
                 <div className="section-head">
                   <div>
                     <h3>审查报告</h3>
                     <p className="description">
-                      质量、安全与可靠性三维审查结果；质量分汇总平台的合规与质量规则。
+                      静态审查 finding 与发布结论；综合质量、安全分来自平台规则与 SkillSpector。
                       {skillSpectorScan
                         ? ` 安全分由 SkillSpector 静态扫描得出（风险分 ${skillSpectorScan.riskScore}/100 → 安全分 ${currentVersion.review?.scores.securityScore ?? "—"}）。`
                         : null}
                     </p>
                   </div>
                 </div>
-                {currentVersion.review?.scores ? (
-                  <div className="review-score-card">
-                    <ScoreRadar
-                      averageScores={platformAverageScores}
-                      sampleSize={platformSampleSize}
-                      scores={currentVersion.review.scores}
-                    />
-                  </div>
-                ) : null}
                 {reviewFindings.length === 0 ? (
                   <div className="empty detail-empty">未发现风险项。</div>
                 ) : (
@@ -1144,7 +1114,7 @@ export default function SkillDetailPage() {
                     <h3>{isHaluCatchEvaluation ? "HaluCatch 可靠性评估" : "可靠性评估"}</h3>
                     <p className="description">
                       {isHaluCatchEvaluation
-                        ? "基于五维静态可靠性检查，评估 Skill 的可复现性、规则清晰度与执行护栏。"
+                        ? "五维静态可靠性检查：地基、代码、规则、护栏与复杂度。"
                         : "查看可靠性任务集的完成情况与发现。"}
                     </p>
                   </div>
