@@ -61,7 +61,7 @@ export default function AccountPage() {
               <UserCircle size={14} />
               Profile
             </span>
-            <h2 style={{ marginTop: 14 }}>个人资料</h2>
+            <h2 style={{ marginTop: 14 }}>个人中心</h2>
             <p>登录后查看你的 Creator 主页、发布记录与账户设置。</p>
           </div>
         </section>

@@ -154,7 +154,7 @@ export function AuthStatus() {
             role="menuitem"
           >
             <UserCircle size={15} />
-            个人资料
+            个人中心
           </Link>
           <Link
             className="user-menu-item"
