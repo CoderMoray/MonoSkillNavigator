@@ -276,17 +276,16 @@ export default function SkillDetailPage() {
   const tags = currentVersion.manifest.tags ?? [];
   const openIssues = skill.issues.filter((issue) => issue.status !== "closed");
   const reviewFindings = currentVersion.review?.findings ?? [];
-  const skillSpectorScan =
-    currentVersion.review?.skillSpector ??
-    (reviewFindings.some((finding) => finding.id.startsWith("skillspector-"))
-      ? {
-          provider: "skillspector-static" as const,
-          riskScore: Math.max(0, Math.min(100, 100 - (currentVersion.review?.scores.securityScore ?? 100))),
-          riskSeverity: "UNKNOWN",
-          recommendation: "UNKNOWN",
-          scanMode: "static-only" as const
-        }
-      : undefined);
+  const securityFindings = reviewFindings.filter(
+    (finding) =>
+      finding.id === "skillspector-unavailable" ||
+      finding.id.startsWith("skillspector-") ||
+      finding.category === "security" ||
+      finding.category === "privacy" ||
+      finding.category === "leakage"
+  );
+  const skillSpectorScan = currentVersion.review?.skillSpector;
+  const hiddenPlatformFindingCount = reviewFindings.length - securityFindings.length;
   const isHaluCatchEvaluation = currentVersion.evaluation?.provider === "halucatch-adapter";
   const haluCatchReport = currentVersion.evaluation?.haluCatchReport;
   const haluCatchReportSummary = haluCatchReport ? extractHaluCatchSummary(haluCatchReport.simple) : "";
@@ -340,8 +339,8 @@ export default function SkillDetailPage() {
       title: "审查与评估",
       icon: ShieldCheck,
       meta: currentVersion.evaluation
-        ? `${reviewFindings.length} 项审查 · 已评估`
-        : `${reviewFindings.length} 项审查 · 未评估`
+        ? `${securityFindings.length} 项安全 finding · 已评估`
+        : `${securityFindings.length} 项安全 finding · 未评估`
     },
     {
       id: "community",
@@ -1108,7 +1107,7 @@ export default function SkillDetailPage() {
                   <div className="section-head">
                     <div>
                       <h3>HaluCatch 质量评估</h3>
-                      <p className="description">五维静态可靠性检查：地基、代码、规则、护栏与复杂度。</p>
+                      <p className="description">五维静态质量检查：地基、代码、规则、护栏与复杂度。</p>
                     </div>
                     {haluCatchReportHref ? (
                       <Link className="button secondary compact" href={haluCatchReportHref}>
@@ -1153,22 +1152,43 @@ export default function SkillDetailPage() {
               <div className="detail-subsection">
                 <div className="section-head">
                   <div>
-                    <h3>审查报告</h3>
+                    <h3>安全审查</h3>
                     <p className="description">
-                      静态审查 finding 与发布结论；综合质量、安全分来自平台规则与 SkillSpector。
+                      由 SkillSpector 对发布包做静态安全扫描；以下 finding 与风险分用于解释阻断或复核原因，不再汇总为单一安全分。
                       {skillSpectorScan
-                        ? ` 安全分由 SkillSpector 静态扫描得出（风险分 ${skillSpectorScan.riskScore}/100 → 安全分 ${currentVersion.review?.scores.securityScore ?? "—"}）。`
+                        ? ` 当前风险分 ${skillSpectorScan.riskScore}/100（${skillSpectorScan.riskSeverity}）。`
+                        : null}
+                      {hiddenPlatformFindingCount > 0
+                        ? ` 另有 ${hiddenPlatformFindingCount} 条平台质量/合规提示（如 description、tags、tests）计入审查记录，但不在此安全区域展示。`
                         : null}
                     </p>
                   </div>
                 </div>
-                {reviewFindings.length === 0 ? (
-                  <div className="empty detail-empty">未发现风险项。</div>
+                {skillSpectorScan ? (
+                  <div className="evaluation-summary">
+                    <div>
+                      <span>扫描器</span>
+                      <strong>SkillSpector</strong>
+                    </div>
+                    <div>
+                      <span>风险分</span>
+                      <strong>{skillSpectorScan.riskScore}/100</strong>
+                    </div>
+                    <div>
+                      <span>建议</span>
+                      <strong>{skillSpectorScan.recommendation}</strong>
+                    </div>
+                    <div>
+                      <span>模式</span>
+                      <strong>{skillSpectorScan.scanMode}</strong>
+                    </div>
+                  </div>
+                ) : null}
+                {securityFindings.length === 0 ? (
+                  <div className="empty detail-empty">未发现安全相关 finding。</div>
                 ) : (
                   <ul className="list detail-list">
-                    {reviewFindings
-                      .filter((finding) => finding.id !== "skillspector-unavailable")
-                      .map((finding) => (
+                    {securityFindings.map((finding) => (
                       <li className={`list-item finding ${finding.severity}`} key={finding.id}>
                         <div className="card-head">
                           <strong>{finding.title}</strong>

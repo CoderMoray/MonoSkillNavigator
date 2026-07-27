@@ -54,7 +54,7 @@ function evaluation(score: number): FunctionalEvaluationReport {
 }
 
 describe("review score dimensions", () => {
-  test("combines platform compliance and quality rules while keeping HaluCatch in reliability", async () => {
+  test("persists placeholder scores while findings and evaluation drive verdict and UI elsewhere", async () => {
     const previous = process.env.SKILLSPECTOR_ENABLED;
     const previousLicenseValidation = process.env.SKILL_LICENSE_VALIDATION_ENABLED;
     process.env.SKILLSPECTOR_ENABLED = "false";
@@ -87,15 +87,13 @@ describe("review score dimensions", () => {
         evaluation(90)
       );
 
-      expect(lowReliability.scores.qualityScore).toBe(highReliability.scores.qualityScore);
-      expect(missingLicenseAndTags.scores.qualityScore).toBe(lowReliability.scores.qualityScore - 6);
-      expect(privacyFallback.scores.securityScore).toBe(lowReliability.scores.securityScore - 25);
-      expect(lowReliability.scores.reliabilityScore).toBe(62);
-      expect(highReliability.scores.reliabilityScore).toBe(90);
+      expect(lowReliability.scores).toEqual({ qualityScore: 100, securityScore: 100, reliabilityScore: 100 });
+      expect(highReliability.scores).toEqual(lowReliability.scores);
+      expect(missingLicenseAndTags.scores).toEqual(lowReliability.scores);
+      expect(privacyFallback.scores).toEqual(lowReliability.scores);
+      expect(privacyFallback.findings.some((finding) => finding.category === "privacy")).toBe(true);
       expect(lowReliability.scores).not.toHaveProperty("complianceScore");
-      expect(lowReliability.scores).not.toHaveProperty("privacyScore");
       expect(lowReliability.scores).not.toHaveProperty("overallScore");
-      expect(lowReliability.scores).not.toHaveProperty("functionalScore");
     } finally {
       if (previousLicenseValidation === undefined) {
         delete process.env.SKILL_LICENSE_VALIDATION_ENABLED;

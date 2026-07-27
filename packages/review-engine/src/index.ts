@@ -345,20 +345,16 @@ function reviewQualityEvidence(snapshot: SkillSnapshot, findings: ReviewFinding[
 }
 
 function calculateScores(
-  findings: ReviewFinding[],
-  evaluation: FunctionalEvaluationReport,
-  skillSpector?: SkillSpectorScanSummary
+  _findings: ReviewFinding[],
+  _evaluation: FunctionalEvaluationReport,
+  _skillSpector?: SkillSpectorScanSummary
 ): ReviewScores {
-  const qualityScore = clampScore(100 - penalty(findings, ["compliance", "quality"]));
-  const securityScore = skillSpector
-    ? clampScore(100 - skillSpector.riskScore)
-    : clampScore(100 - penalty(findings, ["security", "privacy", "leakage"]));
-  const reliabilityScore = clampScore(evaluation.score);
-
+  // Published skills already passed package format validation at publish time.
+  // Quality is shown via HaluCatch five-dimensional radar; security via SkillSpector findings.
   return {
-    qualityScore,
-    securityScore,
-    reliabilityScore
+    qualityScore: 100,
+    securityScore: 100,
+    reliabilityScore: 100
   };
 }
 
@@ -372,29 +368,6 @@ function calculateVerdict(findings: ReviewFinding[]): ReviewVerdict {
   }
 
   return "published";
-}
-
-function penalty(findings: ReviewFinding[], categories: ReviewCategory[]): number {
-  return findings
-    .filter((finding) => categories.includes(finding.category))
-    .reduce((total, finding) => total + severityPenalty(finding.severity), 0);
-}
-
-function severityPenalty(severity: ReviewSeverity): number {
-  switch (severity) {
-    case "critical":
-      return 45;
-    case "high":
-      return 25;
-    case "medium":
-      return 10;
-    case "low":
-      return 3;
-  }
-}
-
-function clampScore(value: number): number {
-  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 function excerpt(content: string, index: number): string {

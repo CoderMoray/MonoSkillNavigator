@@ -23,8 +23,8 @@ import { getLeaderboard } from "../lib/api";
 import type { SkillSearchResult } from "../lib/types";
 
 const sortTabs = [
-  { value: "reliability", label: "Top" },
   { value: "downloads", label: "Trending" },
+  { value: "rating", label: "Top rated" },
   { value: "recent", label: "New" }
 ];
 
@@ -40,7 +40,7 @@ const appTiles = [
 export default function HomePage() {
   const router = useRouter();
   const [items, setItems] = useState<SkillSearchResult[]>([]);
-  const [sort, setSort] = useState("reliability");
+  const [sort, setSort] = useState("downloads");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -93,7 +93,7 @@ export default function HomePage() {
           </span>
           <h1>Discover trusted skills from standout creators.</h1>
           <p>
-            搜索、审查、安装和分发适用于 AI Agent 的 Skill。每个包都经过质量、安全和可靠性评估。
+            搜索、审查、安装和分发适用于 AI Agent 的 Skill。发布前通过包格式校验；发布后可在详情页查看 HaluCatch 五维质量与 SkillSpector 安全审查。
           </p>
 
           <form className="hero-search" onSubmit={handleSearch}>

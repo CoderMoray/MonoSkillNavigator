@@ -30,7 +30,7 @@ describe("SkillSpector security review adapter", () => {
   const run = canRunSkillSpector ? test : test.skip;
 
   run(
-    "maps SkillSpector static risk score into securityScore",
+    "attaches SkillSpector static scan summary and security findings",
     async () => {
       const snapshot = await readSkillPackage(resolve("examples/demo-skill"));
       const report = await reviewSkillSnapshot(snapshot, undefined, evaluation(80));
@@ -40,7 +40,7 @@ describe("SkillSpector security review adapter", () => {
       expect(report.skillSpector?.scanMode).toBe("static-only");
       expect(report.skillSpector?.riskScore).toBeGreaterThanOrEqual(0);
       expect(report.skillSpector?.riskScore).toBeLessThanOrEqual(100);
-      expect(report.scores.securityScore).toBe(100 - report.skillSpector!.riskScore);
+      expect(report.scores.securityScore).toBe(100);
       expect(report.findings.some((finding) => finding.id === "skillspector-unavailable")).toBe(false);
     },
     60_000

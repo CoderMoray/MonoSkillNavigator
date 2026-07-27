@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Download, EyeOff, MessageSquare, Star, Users } from "lucide-react";
 import { formatDateTime, formatNumber } from "../lib/format";
 import type { SkillSearchResult } from "../lib/types";
-import { ScoreBars } from "./ScoreBars";
 import { VerdictBadge } from "./StatusBadge";
 
 export function SkillCard({ skill, variant = "card" }: { skill: SkillSearchResult; variant?: "card" | "row" }) {
@@ -69,10 +68,6 @@ export function SkillCard({ skill, variant = "card" }: { skill: SkillSearchResul
           <MessageSquare size={13} />
           {skill.openIssues} issues
         </span>
-      </div>
-
-      <div style={{ marginTop: 18 }}>
-        <ScoreBars scores={skill.scores} />
       </div>
 
       <div className="card-foot">

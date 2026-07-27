@@ -16,7 +16,7 @@ export function HaluCatchRadar({ evaluation, averageScores, sampleSize }: HaluCa
 
   return (
     <ScoreRadar
-      ariaLabel="HaluCatch 五维可靠性雷达图，含当前 Skill 与平台均值对比"
+      ariaLabel="HaluCatch 五维质量雷达图，含当前 Skill 与平台均值对比"
       averageScores={averageScores}
       dimensions={HALUCATCH_RADAR_DIMENSIONS.map(({ key, label }) => ({ key, label }))}
       sampleSize={sampleSize}

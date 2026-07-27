@@ -2,11 +2,11 @@
 
 ## 输出分数
 
-审查报告包含三个独立维度，不计算综合分：
+审查报告在数据库中仍保留 `qualityScore`、`securityScore`、`reliabilityScore` 字段以兼容搜索与榜单 API，但**不再从 finding 或 HaluCatch 汇总计算**。含义如下：
 
-- `qualityScore`：平台规则对 Skill 包格式、frontmatter、标识、许可、说明、测试与示例的综合质量评分；合规问题和质量问题都计入此分。
-- `securityScore`：SkillSpector 静态扫描的整包安全分，覆盖危险行为、权限、供应链、prompt injection、隐私、泄露与数据外传。SkillSpector 风险分为 `riskScore` 时，安全分为 `100 - riskScore`。
-- `reliabilityScore`：HaluCatch（或 taskset 回退）的评估分，与 `evaluation.score` 一致，不叠加平台静态加减分。
+- **质量**：发布前由 `skill-spec` 包格式校验把关；发布后质量证据以 HaluCatch 五维雷达与报告为准。
+- **安全**：以 SkillSpector 静态扫描的 `riskScore` 与 security/privacy/leakage finding 为准，不生成单一安全分。
+- **可靠性 / HaluCatch**：详情页展示五维雷达，不使用单一 `reliabilityScore` 作为用户-facing 指标；字段固定占位以便旧客户端不报错。
 
 ## 严重级别
 

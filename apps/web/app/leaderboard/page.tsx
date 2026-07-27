@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Award, Download, ShieldCheck, Star, Trophy } from "lucide-react";
+import { Download, Star, Trophy } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
 import { VerdictBadge } from "../../components/StatusBadge";
 import { getLeaderboard } from "../../lib/api";
@@ -10,17 +10,14 @@ import { formatDateTime, formatNumber } from "../../lib/format";
 import type { SkillSearchResult } from "../../lib/types";
 
 const sortOptions = [
-  { value: "reliability", label: "可靠性分", icon: Award },
-  { value: "quality", label: "质量分", icon: Trophy },
-  { value: "security", label: "安全分", icon: ShieldCheck },
-  { value: "rating", label: "用户评分", icon: Star },
   { value: "downloads", label: "下载量", icon: Download },
+  { value: "rating", label: "用户评分", icon: Star },
   { value: "recent", label: "最近更新", icon: Trophy }
 ];
 
 export default function LeaderboardPage() {
   const [items, setItems] = useState<SkillSearchResult[]>([]);
-  const [sort, setSort] = useState("reliability");
+  const [sort, setSort] = useState("downloads");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,7 +59,7 @@ export default function LeaderboardPage() {
               Leaderboard
             </span>
             <h2 style={{ marginTop: 14 }}>Skill 榜单</h2>
-            <p>按照不同质量信号排序，帮助团队优先发现可靠 Skill。</p>
+            <p>按下载量、用户评分或更新时间排序；质量与安全请在 Skill 详情的 HaluCatch 与 SkillSpector 区域查看。</p>
           </div>
           <label className="select-wrap">
             <select className="select" onChange={(event) => setSort(event.target.value)} value={sort}>
@@ -95,10 +92,7 @@ export default function LeaderboardPage() {
                       <Link href={`/skills/${encodeURIComponent(item.slug)}`}>
                         <strong>#{index + 1} {item.name}</strong>
                       </Link>
-                      <p className="description">
-                        质量 {item.scores.qualityScore} · 安全 {item.scores.securityScore} · 可靠性{" "}
-                        {item.scores.reliabilityScore}
-                      </p>
+                      <p className="description">{item.description}</p>
                     </div>
                     <VerdictBadge verdict={item.status} />
                   </div>
