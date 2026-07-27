@@ -56,7 +56,9 @@ function evaluation(score: number): FunctionalEvaluationReport {
 describe("review score dimensions", () => {
   test("combines platform compliance and quality rules while keeping HaluCatch in reliability", async () => {
     const previous = process.env.SKILLSPECTOR_ENABLED;
+    const previousLicenseValidation = process.env.SKILL_LICENSE_VALIDATION_ENABLED;
     process.env.SKILLSPECTOR_ENABLED = "false";
+    process.env.SKILL_LICENSE_VALIDATION_ENABLED = "true";
     try {
       const lowReliability = await reviewSkillSnapshot(snapshot, undefined, evaluation(62));
       const highReliability = await reviewSkillSnapshot(snapshot, undefined, evaluation(90));
@@ -95,6 +97,11 @@ describe("review score dimensions", () => {
       expect(lowReliability.scores).not.toHaveProperty("overallScore");
       expect(lowReliability.scores).not.toHaveProperty("functionalScore");
     } finally {
+      if (previousLicenseValidation === undefined) {
+        delete process.env.SKILL_LICENSE_VALIDATION_ENABLED;
+      } else {
+        process.env.SKILL_LICENSE_VALIDATION_ENABLED = previousLicenseValidation;
+      }
       if (previous === undefined) {
         delete process.env.SKILLSPECTOR_ENABLED;
       } else {

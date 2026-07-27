@@ -11,6 +11,12 @@ import {
   runSkillSpectorSecurityScan,
   type SkillSpectorScanSummary
 } from "./skillspector.js";
+import { collectSkillLicenseFindings, isSkillLicenseValidationEnabled } from "./license-compliance.js";
+
+export {
+  collectSkillLicenseFindings,
+  isSkillLicenseValidationEnabled
+} from "./license-compliance.js";
 
 export type ReviewCategory =
   | "compliance"
@@ -218,24 +224,8 @@ function reviewManifest(snapshot: SkillSnapshot, findings: ReviewFinding[]): voi
     });
   }
 
-  if (manifest.license && !/^MIT(-0)?$/i.test(manifest.license.trim())) {
-    findings.push({
-      id: "license-not-mit0",
-      category: "compliance",
-      severity: "low",
-      title: "Non-default license declared",
-      message: `ClawHub publishes all skills under MIT-0. This manifest declares ${manifest.license}.`,
-      recommendation: "Remove conflicting license terms from SKILL.md or align with MIT-0 redistribution terms."
-    });
-  } else if (!manifest.license) {
-    findings.push({
-      id: "license-missing",
-      category: "compliance",
-      severity: "low",
-      title: "License is missing",
-      message: "ClawHub skills are published under MIT-0.",
-      recommendation: "Add license: MIT-0 to frontmatter for clarity."
-    });
+  if (isSkillLicenseValidationEnabled()) {
+    findings.push(...collectSkillLicenseFindings(manifest));
   }
 
   if (!manifest.tags?.length) {
