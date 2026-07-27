@@ -27,6 +27,7 @@ export function normalizeRegistryData(data: RegistryData): RegistryData {
     skill.ratings ??= [];
     skill.ratingCount ??= skill.ratings.length;
     skill.published ??= true;
+    skill.deletedAt ??= undefined;
     skill.averageRating ??= calculateAverageRating(skill.ratings);
     updateRatingAggregate(skill);
 

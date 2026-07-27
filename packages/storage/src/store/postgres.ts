@@ -10,7 +10,7 @@ import {
   type SkillSnapshot
 } from "@skill-platform/skill-spec";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { eq, and, sql, desc, or, ilike, inArray } from "drizzle-orm";
+import { eq, and, sql, desc, or, ilike, inArray, isNull, isNotNull, lte } from "drizzle-orm";
 import pg from "pg";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../schema";
@@ -20,7 +20,9 @@ import type {
   PostgresRegistryStoreOptions,
   RegistryContributor, RegistryData, RegistryIssue, RegistryRating,
   RegistrySkill, RegistryVersion, SkillSearchResult, LeaderboardSort,
+  RecycleBinSkill,
 } from "../types";
+import { skillRecyclePurgeAt, skillRecycleRetentionMs } from "../recycle-bin";
 import { emptyRegistry, normalizeRegistryData, toSearchResult } from "../utils";
 import { JsonRegistryStore } from "./base";
 
@@ -181,6 +183,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       )
       .where(
         and(
+          isNull(schema.skills.deletedAt),
           eq(schema.skills.published, true),
           q
             ? or(
@@ -299,7 +302,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
           eq(schema.skillReviews.version, schema.skills.latestVersion)
         )
       )
-      .where(and(eq(schema.skills.published, false), ownerMatch))
+      .where(and(isNull(schema.skills.deletedAt), eq(schema.skills.published, false), ownerMatch))
       .groupBy(
         schema.skills.slug,
         schema.skills.name,
@@ -566,6 +569,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       })),
       averageRating: Number(row.averageRating), ratingCount: Number(row.ratingCount),
       published: row.published,
+      deletedAt: row.deletedAt ? String(row.deletedAt) : undefined,
       createdAt: String(row.createdAt), updatedAt: String(row.updatedAt),
     };
   }
@@ -807,6 +811,9 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     if (existingV) throw new Error(`Version already exists: ${slug}@${version}`);
 
     const [existingSkill] = await this.db.select().from(schema.skills).where(eq(schema.skills.slug, slug)).limit(1);
+    if (existingSkill?.deletedAt) {
+      throw new Error("skill_in_recycle_bin");
+    }
     if (!existingSkill && !releaseTags.includes("latest")) throw new Error("First version must include latest tag");
 
     // Artifact to MinIO
@@ -936,7 +943,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     for (const { slug, version } of versions) {
       const skill = await this.getSkill(slug);
       const rv = skill?.versions[version];
-      if (!rv) continue;
+      if (!skill || skill.deletedAt || !rv) continue;
 
       const review = await reviewFn(rv.snapshot, version);
       await this.upsertReview(slug, version, review);
@@ -1013,6 +1020,103 @@ export class PostgresRegistryStore extends JsonRegistryStore {
   }
 
   async deleteSkill(slug: string): Promise<void> {
+    await this.ensureSchema();
+    const now = new Date();
+    const updated = await this.db
+      .update(schema.skills)
+      .set({ deletedAt: now, published: false, updatedAt: now })
+      .where(and(eq(schema.skills.slug, slug), isNull(schema.skills.deletedAt)))
+      .returning({ slug: schema.skills.slug });
+
+    if (updated.length > 0) {
+      return;
+    }
+
+    const [existing] = await this.db
+      .select({ deletedAt: schema.skills.deletedAt })
+      .from(schema.skills)
+      .where(eq(schema.skills.slug, slug))
+      .limit(1);
+    if (!existing) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+    if (existing.deletedAt) {
+      return;
+    }
+    throw new Error(`Skill not found: ${slug}`);
+  }
+
+  async restoreSkill(slug: string): Promise<RegistrySkill> {
+    await this.ensureSchema();
+    const now = new Date();
+    const updated = await this.db
+      .update(schema.skills)
+      .set({ deletedAt: null, updatedAt: now })
+      .where(and(eq(schema.skills.slug, slug), isNotNull(schema.skills.deletedAt)))
+      .returning({ slug: schema.skills.slug });
+
+    if (updated.length === 0) {
+      throw new Error(`Skill not found in recycle bin: ${slug}`);
+    }
+
+    const skill = await this.getSkill(slug);
+    if (!skill) {
+      throw new Error(`Skill not found in recycle bin: ${slug}`);
+    }
+    return skill;
+  }
+
+  async listRecycleBinForOwner(ownerUserId: string): Promise<RecycleBinSkill[]> {
+    await this.ensureSchema();
+    const ownerMatch = or(
+      eq(schema.skills.ownerUserId, ownerUserId),
+      sql`exists (
+        select 1 from ${schema.skillContributors} sc
+        where sc.skill_slug = ${schema.skills.slug}
+        and sc.role = 'owner'
+        and sc.user_id = ${ownerUserId}
+      )`
+    );
+
+    const rows = await this.db
+      .select({
+        slug: schema.skills.slug,
+        name: schema.skills.name,
+        description: schema.skills.description,
+        latestVersion: schema.skills.latestVersion,
+        deletedAt: schema.skills.deletedAt,
+      })
+      .from(schema.skills)
+      .where(and(isNotNull(schema.skills.deletedAt), ownerMatch))
+      .orderBy(desc(schema.skills.deletedAt));
+
+    return rows
+      .filter((row) => row.deletedAt)
+      .map((row) => ({
+        slug: row.slug,
+        name: row.name,
+        description: row.description,
+        latestVersion: row.latestVersion,
+        deletedAt: String(row.deletedAt),
+        purgeAt: skillRecyclePurgeAt(new Date(row.deletedAt!)).toISOString(),
+      }));
+  }
+
+  async purgeExpiredRecycleBinSkills(): Promise<number> {
+    await this.ensureSchema();
+    const cutoff = new Date(Date.now() - skillRecycleRetentionMs());
+    const rows = await this.db
+      .select({ slug: schema.skills.slug })
+      .from(schema.skills)
+      .where(and(isNotNull(schema.skills.deletedAt), lte(schema.skills.deletedAt, cutoff)));
+
+    for (const row of rows) {
+      await this.permanentlyDeleteSkill(row.slug);
+    }
+    return rows.length;
+  }
+
+  protected async permanentlyDeleteSkill(slug: string): Promise<void> {
     await this.ensureSchema();
 
     const versions = await this.db.select({

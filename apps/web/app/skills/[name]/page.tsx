@@ -601,7 +601,7 @@ export default function SkillDetailPage() {
     try {
       await deleteSkill(token, skill.slug);
       setDeleteModalOpen(false);
-      router.push(viewer ? creatorProfilePath(viewer.username) : "/creators");
+      router.push(viewer ? `${creatorProfilePath(viewer.username)}?tab=recycle` : "/creators");
     } catch (err) {
       setManageError(err instanceof Error ? err.message : "删除失败");
     } finally {
@@ -1637,8 +1637,8 @@ export default function SkillDetailPage() {
               </div>
               <div className="modal-form">
                 <p className="description">
-                  此操作不可恢复。将永久删除 <strong>{skill.name}</strong>（<span className="mono">{skill.slug}</span>）
-                  的所有版本、审查记录、评分与 Issue，并移除 MinIO 中的 artifact。
+                  将把 <strong>{skill.name}</strong>（<span className="mono">{skill.slug}</span>）移入回收站，并从 Skill
+                  广场与搜索中隐藏。回收站保留 3 天，期间可在个人中心恢复；到期后将永久删除所有版本与数据。
                 </p>
                 {manageError ? <div className="error compact-error">{manageError}</div> : null}
                 <div className="modal-actions">
@@ -1653,7 +1653,7 @@ export default function SkillDetailPage() {
                     取消
                   </button>
                   <button className="button secondary danger" disabled={deletingSkill} onClick={() => void handleDelete()} type="button">
-                    {deletingSkill ? "删除中…" : "确认删除"}
+                    {deletingSkill ? "移入中…" : "确认移入回收站"}
                   </button>
                 </div>
               </div>

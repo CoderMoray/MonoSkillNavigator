@@ -275,11 +275,44 @@ export async function republishSkill(token: string, slug: string): Promise<Regis
   return data.skill;
 }
 
-export async function deleteSkill(token: string, slug: string): Promise<void> {
-  await request<{ ok: boolean }>(new URL(`/skills/${encodeURIComponent(slug)}`, API_BASE_URL), {
-    method: "DELETE",
+export async function deleteSkill(
+  token: string,
+  slug: string
+): Promise<{ ok: true; recycleBin: true; deletedAt: string; purgeAt: string }> {
+  return request<{ ok: true; recycleBin: true; deletedAt: string; purgeAt: string }>(
+    new URL(`/skills/${encodeURIComponent(slug)}`, API_BASE_URL),
+    {
+      method: "DELETE",
+      token
+    }
+  );
+}
+
+export async function restoreSkill(token: string, slug: string): Promise<RegistrySkill> {
+  const data = await request<{ skill: RegistrySkill }>(
+    new URL(`/skills/${encodeURIComponent(slug)}/restore`, API_BASE_URL),
+    {
+      method: "POST",
+      token
+    }
+  );
+  return data.skill;
+}
+
+export interface RecycleBinSkill {
+  slug: string;
+  name: string;
+  description: string;
+  latestVersion: string;
+  deletedAt: string;
+  purgeAt: string;
+}
+
+export async function getRecycleBin(token: string): Promise<RecycleBinSkill[]> {
+  const data = await request<{ items: RecycleBinSkill[] }>(new URL("/users/me/recycle-bin", API_BASE_URL), {
     token
   });
+  return data.items;
 }
 
 interface AuthResponse {

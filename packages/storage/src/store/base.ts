@@ -16,6 +16,7 @@ import type {
   RegistryVersion,
   RegistryStore,
   SkillSearchResult,
+  RecycleBinSkill,
 } from "../types";
 import {
   createId,
@@ -198,6 +199,7 @@ export abstract class JsonRegistryStore implements RegistryStore {
     const selectedCategories = [...new Set(categories.map((item) => item.trim()).filter(Boolean))].slice(0, 3);
     return Object.values(data.skills)
       .filter((s) => s.published !== false)
+      .filter((s) => !s.deletedAt)
       .filter((s) => !q || s.slug.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))
       .filter((s) => {
         const latest = s.versions[s.latestVersion];
@@ -210,7 +212,7 @@ export abstract class JsonRegistryStore implements RegistryStore {
   async listUnpublishedSkillsForOwner(ownerUserId: string): Promise<SkillSearchResult[]> {
     const data = await this.load();
     return Object.values(data.skills)
-      .filter((skill) => skill.published === false && isSkillOwner(skill, { id: ownerUserId, username: "" }))
+      .filter((skill) => skill.published === false && !skill.deletedAt && isSkillOwner(skill, { id: ownerUserId, username: "" }))
       .map((skill) => ({ ...toSearchResult(skill), published: false }))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
@@ -289,6 +291,75 @@ export abstract class JsonRegistryStore implements RegistryStore {
     if (!skill) {
       throw new Error(`Skill not found: ${slug}`);
     }
+    if (skill.deletedAt) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    skill.deletedAt = now;
+    skill.published = false;
+    skill.updatedAt = now;
+    await this.save(data);
+  }
+
+  async restoreSkill(slug: string): Promise<RegistrySkill> {
+    const data = await this.load();
+    const skill = data.skills[slug];
+    if (!skill || !skill.deletedAt) {
+      throw new Error(`Skill not found in recycle bin: ${slug}`);
+    }
+
+    skill.deletedAt = undefined;
+    skill.updatedAt = new Date().toISOString();
+    await this.save(data);
+    return skill;
+  }
+
+  async listRecycleBinForOwner(ownerUserId: string): Promise<RecycleBinSkill[]> {
+    const { skillRecyclePurgeAt } = await import("../recycle-bin");
+    const data = await this.load();
+    return Object.values(data.skills)
+      .filter((skill) => Boolean(skill.deletedAt) && isSkillOwner(skill, { id: ownerUserId, username: "" }))
+      .map((skill) => {
+        const deletedAt = new Date(skill.deletedAt!);
+        return {
+          slug: skill.slug,
+          name: skill.name,
+          description: skill.description,
+          latestVersion: skill.latestVersion,
+          deletedAt: skill.deletedAt!,
+          purgeAt: skillRecyclePurgeAt(deletedAt).toISOString(),
+        };
+      })
+      .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+  }
+
+  async purgeExpiredRecycleBinSkills(): Promise<number> {
+    const { skillRecycleRetentionMs } = await import("../recycle-bin");
+    const data = await this.load();
+    const cutoff = Date.now() - skillRecycleRetentionMs();
+    let purged = 0;
+
+    for (const skill of Object.values(data.skills)) {
+      if (!skill.deletedAt) {
+        continue;
+      }
+      if (new Date(skill.deletedAt).getTime() > cutoff) {
+        continue;
+      }
+      await this.permanentlyDeleteSkill(skill.slug);
+      purged += 1;
+    }
+
+    return purged;
+  }
+
+  protected async permanentlyDeleteSkill(slug: string): Promise<void> {
+    const data = await this.load();
+    const skill = data.skills[slug];
+    if (!skill) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
 
     if (this.artifactStore) {
       for (const version of Object.values(skill.versions)) {
@@ -311,6 +382,9 @@ export abstract class JsonRegistryStore implements RegistryStore {
     const data = await this.load();
     const reviewed: RegistryVersion[] = [];
     for (const skill of Object.values(data.skills)) {
+      if (skill.deletedAt) {
+        continue;
+      }
       for (const rv of Object.values(skill.versions)) {
         const snapshot = rv.artifact && this.artifactStore
           ? await this.artifactStore.getSnapshot(rv.artifact)

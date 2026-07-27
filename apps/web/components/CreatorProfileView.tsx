@@ -1,18 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { BadgeCheck, KeyRound, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { BadgeCheck, KeyRound, LogOut, RotateCcw, Trash2 } from "lucide-react";
 import { SkillCard } from "./SkillCard";
 import { clearAuthToken, getAuthToken } from "../lib/auth-token";
-import { logoutUser } from "../lib/api";
+import { getRecycleBin, logoutUser, restoreSkill, type RecycleBinSkill } from "../lib/api";
 import { normalizeHandle, type CreatorSummary } from "../lib/creators";
 import { formatDateTime, formatNumber } from "../lib/format";
 import type { PublicUser } from "../lib/types";
 
-type CreatorProfileTab = "skills" | "plugins" | "starred";
+const RECYCLE_RETENTION_DAYS = 3;
 
-const profileTabs: Array<{ id: CreatorProfileTab; label: (creator: CreatorSummary) => string }> = [
+type CreatorProfileTab = "skills" | "plugins" | "starred" | "recycle";
+
+const profileTabs: Array<{ id: Exclude<CreatorProfileTab, "recycle">; label: (creator: CreatorSummary) => string }> = [
   { id: "skills", label: (creator) => `Skills ${creator.published}` },
   { id: "plugins", label: () => "Plugins 0" },
   { id: "starred", label: () => "Starred 0" }
@@ -25,12 +28,64 @@ interface CreatorProfileViewProps {
 }
 
 export function CreatorProfileView({ creator, viewer = null, showBackLink = true }: CreatorProfileViewProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<CreatorProfileTab>("skills");
+  const [recycleItems, setRecycleItems] = useState<RecycleBinSkill[]>([]);
+  const [recycleLoading, setRecycleLoading] = useState(false);
+  const [recycleError, setRecycleError] = useState<string | null>(null);
+  const [recycleMessage, setRecycleMessage] = useState<string | null>(null);
+  const [restoringSlug, setRestoringSlug] = useState<string | null>(null);
   const isOwner = Boolean(viewer && normalizeHandle(viewer.username) === creator.handle);
   const topSkillNames = creator.skills
     .slice(0, 3)
     .map((skill) => skill.name)
     .join(" · ");
+
+  useEffect(() => {
+    if (!isOwner) {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tab") === "recycle") {
+      setActiveTab("recycle");
+    }
+  }, [isOwner]);
+
+  useEffect(() => {
+    if (!isOwner) {
+      setRecycleItems([]);
+      return;
+    }
+
+    let cancelled = false;
+    const token = getAuthToken();
+    if (!token) {
+      return;
+    }
+
+    setRecycleLoading(true);
+    setRecycleError(null);
+    void getRecycleBin(token)
+      .then((items) => {
+        if (!cancelled) {
+          setRecycleItems(items);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setRecycleError(err instanceof Error ? err.message : "加载回收站失败");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setRecycleLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOwner]);
 
   async function handleLogout() {
     const token = getAuthToken();
@@ -39,6 +94,28 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
       await logoutUser(token).catch(() => undefined);
     }
     window.location.href = "/";
+  }
+
+  async function handleRestore(slug: string) {
+    const token = getAuthToken();
+    if (!token) {
+      setRecycleError("请先登录后再恢复 Skill。");
+      return;
+    }
+
+    setRecycleError(null);
+    setRecycleMessage(null);
+    setRestoringSlug(slug);
+    try {
+      await restoreSkill(token, slug);
+      setRecycleItems((current) => current.filter((item) => item.slug !== slug));
+      setRecycleMessage(`已恢复 Skill「${slug}」。`);
+      router.refresh();
+    } catch (err) {
+      setRecycleError(err instanceof Error ? err.message : "恢复失败");
+    } finally {
+      setRestoringSlug(null);
+    }
   }
 
   return (
@@ -121,6 +198,15 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
                   {tab.label(creator)}
                 </button>
               ))}
+              {isOwner ? (
+                <button
+                  className={activeTab === "recycle" ? "active" : ""}
+                  onClick={() => setActiveTab("recycle")}
+                  type="button"
+                >
+                  回收站 {recycleItems.length}
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -145,6 +231,46 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
                 </div>
               </>
             )
+          ) : null}
+
+          {activeTab === "recycle" && isOwner ? (
+            <>
+              <p className="description" style={{ marginBottom: 12 }}>
+                删除的 Skill 会在回收站保留 {RECYCLE_RETENTION_DAYS} 天，之后永久删除。期间可恢复。
+              </p>
+              {recycleMessage ? <div className="notice">{recycleMessage}</div> : null}
+              {recycleError ? <div className="error compact-error">{recycleError}</div> : null}
+              {recycleLoading ? (
+                <div className="skeleton" />
+              ) : recycleItems.length === 0 ? (
+                <div className="empty">回收站为空。</div>
+              ) : (
+                <ul className="list">
+                  {recycleItems.map((item) => (
+                    <li className="list-item recycle-bin-item" key={item.slug}>
+                      <div className="card-head">
+                        <div>
+                          <strong>{item.name}</strong>
+                          <p className="description mono">{item.slug} · v{item.latestVersion}</p>
+                        </div>
+                        <button
+                          className="button secondary compact"
+                          disabled={restoringSlug === item.slug}
+                          onClick={() => void handleRestore(item.slug)}
+                          type="button"
+                        >
+                          <RotateCcw size={14} /> {restoringSlug === item.slug ? "恢复中…" : "恢复"}
+                        </button>
+                      </div>
+                      <p className="description">
+                        <Trash2 size={13} style={{ verticalAlign: "-2px" }} /> 删除于 {formatDateTime(item.deletedAt)}
+                        ，将于 {formatDateTime(item.purgeAt)} 永久删除
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           ) : null}
 
           {activeTab === "plugins" ? (

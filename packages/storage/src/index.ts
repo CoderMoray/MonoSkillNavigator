@@ -37,7 +37,14 @@ export type {
   FileRegistryStoreOptions,
   MinioArtifactStoreOptions,
   RegistryStore,
+  RecycleBinSkill,
 } from "./types";
+
+export {
+  SKILL_RECYCLE_RETENTION_DAYS,
+  skillRecyclePurgeAt,
+  skillRecycleRetentionMs,
+} from "./recycle-bin";
 
 export {
   isSkillContributor,

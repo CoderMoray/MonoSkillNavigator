@@ -88,6 +88,7 @@ export interface RegistrySkill {
   averageRating: number;
   ratingCount: number;
   published?: boolean;
+  deletedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -156,6 +157,15 @@ export interface MinioArtifactStoreOptions {
   region?: string;
 }
 
+export interface RecycleBinSkill {
+  slug: string;
+  name: string;
+  description: string;
+  latestVersion: string;
+  deletedAt: string;
+  purgeAt: string;
+}
+
 export interface RegistryStore {
   publishSnapshot(
     snapshot: SkillSnapshot,
@@ -178,6 +188,9 @@ export interface RegistryStore {
   unpublishSkill(slug: string): Promise<RegistrySkill>;
   republishSkill(slug: string): Promise<RegistrySkill>;
   deleteSkill(slug: string): Promise<void>;
+  restoreSkill(slug: string): Promise<RegistrySkill>;
+  listRecycleBinForOwner(ownerUserId: string): Promise<RecycleBinSkill[]>;
+  purgeExpiredRecycleBinSkills(): Promise<number>;
   reviewAll(
     reviewFn: (snapshot: SkillSnapshot, version: string) => ReviewReport | Promise<ReviewReport>,
     evaluationFn?: (snapshot: SkillSnapshot) => FunctionalEvaluationReport | Promise<FunctionalEvaluationReport>

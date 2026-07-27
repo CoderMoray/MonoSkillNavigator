@@ -9,11 +9,13 @@ export const skills = pgTable("skills", {
   averageRating: numeric("average_rating", { precision: 3, scale: 1 }).notNull().default("0"),
   ratingCount: integer("rating_count").notNull().default(0),
   published: boolean("published").notNull().default(true),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
 }, (table) => [
   index("skills_updated_at_idx").on(table.updatedAt.desc()),
   index("skills_owner_user_id_idx").on(table.ownerUserId),
+  index("skills_deleted_at_idx").on(table.deletedAt),
 ]);
 
 export const skillVersions = pgTable("skill_versions", {

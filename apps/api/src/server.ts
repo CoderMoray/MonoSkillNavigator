@@ -106,6 +106,22 @@ export function buildServer() {
   const store = createRegistryStoreFromEnv();
   const authStore = createAuthStoreFromEnv();
 
+  const runRecycleBinPurge = () => {
+    void store
+      .purgeExpiredRecycleBinSkills()
+      .then((count) => {
+        if (count > 0) {
+          app.log.info({ count }, "Purged expired recycle-bin skills");
+        }
+      })
+      .catch((error) => {
+        app.log.error({ err: error }, "Recycle-bin purge failed");
+      });
+  };
+  runRecycleBinPurge();
+  const recycleBinPurgeTimer = setInterval(runRecycleBinPurge, 6 * 60 * 60 * 1000);
+  recycleBinPurgeTimer.unref?.();
+
   app.register(cors, {
     origin: true,
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
@@ -447,6 +463,10 @@ export function buildServer() {
       }
     }
 
+    if (skill.deletedAt) {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
+
     return skill;
   });
 
@@ -470,6 +490,10 @@ export function buildServer() {
     if (!skill) {
       return reply.code(404).send({ error: "skill_not_found" });
     }
+    if (skill.deletedAt) {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
+
     if (skill.published === false && !isSkillOwner(skill, user)) {
       return reply.code(404).send({ error: "skill_unpublished" });
     }
@@ -549,10 +573,48 @@ export function buildServer() {
 
     try {
       await store.deleteSkill(request.params.slug);
-      return { ok: true };
+      const deletedAt = new Date();
+      const { skillRecyclePurgeAt } = await import("@skill-platform/storage");
+      return {
+        ok: true,
+        recycleBin: true,
+        deletedAt: deletedAt.toISOString(),
+        purgeAt: skillRecyclePurgeAt(deletedAt).toISOString()
+      };
     } catch {
       return reply.code(404).send({ error: "skill_not_found" });
     }
+  });
+
+  app.post<{ Params: SkillParams }>("/skills/:slug/restore", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
+    const skill = await store.getSkill(request.params.slug);
+    if (!skill?.deletedAt) {
+      return reply.code(404).send({ error: "skill_not_in_recycle_bin" });
+    }
+    if (!isSkillOwner(skill, user)) {
+      return reply.code(403).send({ error: "Forbidden" });
+    }
+
+    try {
+      const restored = await store.restoreSkill(request.params.slug);
+      return { skill: restored };
+    } catch {
+      return reply.code(404).send({ error: "skill_not_in_recycle_bin" });
+    }
+  });
+
+  app.get("/users/me/recycle-bin", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
+    return { items: await store.listRecycleBinForOwner(user.id) };
   });
 
   return app;
