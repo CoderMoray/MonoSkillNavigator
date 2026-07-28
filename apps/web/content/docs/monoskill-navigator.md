@@ -1,0 +1,46 @@
+# MonoSkillNavigator 介绍
+
+MonoSkillNavigator（Skill 管理平台）是一个用于 **发布、审查、评估、搜索和下载** Agent Skill 的注册中心。Skill 以 `SKILL.md` 为入口的文件夹或 ZIP 包形式分发，平台为每个 Skill 分配不可变的 **slug**，并保留完整的版本历史与审查记录。
+
+## 适合谁使用
+
+- **Skill 作者**：打包 Skill、填写元数据、发布新版本，并在详情页查看安全与质量结果。
+- **团队与使用者**：在安装或引用 Skill 前，通过审查结论、HaluCatch 雷达与 SkillSpector finding 判断是否可信。
+- **集成方**：通过 HTTP API 或 CLI 搜索、拉取 ZIP、触发重审（与 Web 共用同一套后端）。
+
+## 核心概念
+
+| 概念 | 说明 |
+| --- | --- |
+| **slug** | Skill 的唯一标识，用于 URL、API 与存储；发布后不应随意更改。 |
+| **name** | 展示名称，可随版本更新。 |
+| **version** | 语义化版本（SemVer），同一 slug 下每个版本不可变。 |
+| **审查（review）** | 发布时对包格式、静态安全（SkillSpector）与合规 finding 的记录。 |
+| **评估（evaluation）** | 默认由 HaluCatch 对包做五维静态质量检查；环境未配置时可回退到 `tests/*.json` 任务集。 |
+
+## 你在 Web 上能做什么
+
+1. **浏览与搜索**：首页、Skill 列表、榜单（下载量、评分、最新等）。
+2. **查看详情**：Skill 说明、文件树、版本切换、审查与评估、评分与 Issue。
+3. **发布**：登录后上传 ZIP 或文件夹，填写分类与版本信息（见 [发布流程](./publish-workflow.md)）。
+4. **审查中心**：聚合各 Skill 最新版本的 finding 与 HaluCatch 雷达对比。
+5. **下载**：按 slug + 版本下载 ZIP，供本地 Agent 或 CI 使用。
+
+## 审查与评分如何理解
+
+平台 **不** 向用户展示单一的「综合安全分」或「综合质量分」作为主结论，而是：
+
+- **安全**：以 SkillSpector 的 **包级风险分 / 风险等级 / 安装建议** 与逐条 **finding** 为准（见 [安全检测](./security-scan.md)）。
+- **质量**：以 **HaluCatch 五维雷达** 与 Markdown 报告为准（见 [HaluCatch 审查](./halucatch-review.md)）。
+- **发布状态（verdict）**：由全部审查 finding 的最高严重度决定——存在严重或高危 finding 时可能为「已拒绝」或「需复核」。
+
+## 技术说明（简要）
+
+- Web（默认端口 **3001**）仅通过 API 访问数据，不直连数据库或对象存储。
+- 可选 **PostgreSQL** 持久化注册表；可选 **MinIO** 存储 Skill ZIP。
+- 平台 **不会执行** Skill 包内脚本；SkillSpector 与 HaluCatch 均为 **静态** 分析。
+
+## 下一步阅读
+
+- 准备包结构 → [Skill 格式](./skill-format.md)
+- 准备上线 → [发布流程](./publish-workflow.md)
