@@ -8,8 +8,16 @@ SKILL_PATH="examples/demo-skill"
 
 echo "=== Skill Platform Setup ==="
 
+# 0. SkillSpector (PyPI or GitHub fallback)
+echo "[0/6] Installing SkillSpector..."
+if bash "$(dirname "$0")/install-skillspector.sh"; then
+  echo "  ✅ SkillSpector install step finished"
+else
+  echo "  ⚠️  SkillSpector install failed — security scans may fall back to built-in rules"
+fi
+
 # 1. Check API is running
-echo "[1/5] Checking API..."
+echo "[1/6] Checking API..."
 if ! curl -sf "$API/health" > /dev/null; then
   echo "  ❌ API not running at $API — start it first: npm run dev:api"
   exit 1
@@ -17,7 +25,7 @@ fi
 echo "  ✅ API running"
 
 # 2. Register test user
-echo "[2/5] Registering user '$USERNAME'..."
+echo "[2/6] Registering user '$USERNAME'..."
 RESP=$(curl -sf -X POST "$API/auth/register" \
   -H "Content-Type: application/json" \
   -d "{\"username\":\"$USERNAME\",\"password\":\"$PASSWORD\"}") || true
@@ -37,13 +45,13 @@ fi
 echo "  ✅ Token obtained"
 
 # 3. Publish demo skill
-echo "[3/5] Publishing demo skill..."
+echo "[3/6] Publishing demo skill..."
 export SKILL_AUTH_TOKEN="$TOKEN"
 npm run skill -- publish "$SKILL_PATH" 2>&1 | grep -E "Published|Verdict|Scores" || echo "  ❌ Publish failed"
 echo "  ✅ Published"
 
 # 4. Search to verify
-echo "[4/5] Verifying search..."
+echo "[4/6] Verifying search..."
 RESULT=$(curl -sf "$API/skills?query=demo" | cat)
 if echo "$RESULT" | grep -q '"name"'; then
   COUNT=$(echo "$RESULT" | grep -o '"name"' | wc -l | tr -d ' ')
@@ -53,7 +61,7 @@ else
 fi
 
 # 5. Done
-echo "[5/5] Setup complete!"
+echo "[6/6] Setup complete!"
 
 echo ""
 echo "Open http://127.0.0.1:3001 to see the skill in the web UI"

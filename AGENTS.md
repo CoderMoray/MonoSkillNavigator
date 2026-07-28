@@ -44,7 +44,8 @@ examples/
 ```bash
 npm install             # 安装依赖
 npm run dev             # 同时启动前后端（热重载）
-npm run setup           # 种子数据
+npm run setup           # 安装 SkillSpector（PyPI 或 GitHub）并写入种子数据
+npm run setup:skillspector  # 仅安装 SkillSpector Python 依赖
 npm run test            # 8 个 API 烟雾测试
 npm run typecheck       # TypeScript 编译检查
 npm run infra:up        # Docker 备选（PostgreSQL + MinIO）

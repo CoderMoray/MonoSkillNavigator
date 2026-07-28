@@ -18,7 +18,11 @@ import types
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--skill-dir", required=True)
-    parser.add_argument("--skillspector-dir", required=True)
+    parser.add_argument(
+        "--skillspector-dir",
+        default="",
+        help="SkillSpector source checkout (with src/). Optional when skillspector is pip-installed.",
+    )
     return parser.parse_args()
 
 
@@ -47,23 +51,28 @@ def _ensure_yara_stub() -> None:
     sys.modules["yara"] = yara_mod
 
 
-def _bootstrap_skillspector(skillspector_dir: str) -> str:
-    src_dir = os.path.join(skillspector_dir, "src")
-    if not os.path.isdir(src_dir):
-        raise ValueError(f"SkillSpector source directory not found: {src_dir}")
-
+def _bootstrap_skillspector(skillspector_dir: str) -> None:
     _ensure_yara_stub()
 
-    if src_dir not in sys.path:
-        sys.path.insert(0, src_dir)
+    src_dir = os.path.join(skillspector_dir, "src") if skillspector_dir else ""
+    if skillspector_dir and os.path.isdir(src_dir):
+        if src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
 
-    if "skillspector" not in sys.modules:
-        package = types.ModuleType("skillspector")
-        package.__path__ = [os.path.join(src_dir, "skillspector")]  # type: ignore[attr-defined]
-        package.__version__ = _read_skillspector_version(skillspector_dir)
-        sys.modules["skillspector"] = package
+        if "skillspector" not in sys.modules:
+            package = types.ModuleType("skillspector")
+            package.__path__ = [os.path.join(src_dir, "skillspector")]  # type: ignore[attr-defined]
+            package.__version__ = _read_skillspector_version(skillspector_dir)
+            sys.modules["skillspector"] = package
+        return
 
-    return src_dir
+    try:
+        import skillspector.graph  # noqa: F401
+    except ModuleNotFoundError as error:
+        raise ValueError(
+            "SkillSpector is not installed. Run `npm run setup` or "
+            "`pip install skillspector` / clone https://github.com/nvidia/skillspector."
+        ) from error
 
 
 def _read_skillspector_version(skillspector_dir: str) -> str:

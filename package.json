@@ -21,7 +21,8 @@
     "review:demo": "npm --workspace @skill-platform/cli run dev -- review examples/demo-skill",
     "test": "vitest run",
     "test:watch": "vitest",
-    "setup": "bash scripts/setup.sh"
+    "setup": "bash scripts/setup.sh",
+    "setup:skillspector": "bash scripts/install-skillspector.sh"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
