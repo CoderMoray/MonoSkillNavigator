@@ -935,6 +935,21 @@ button {
   font-weight: 600;
 }
 
+.audit-table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.audit-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 :root[data-theme="dark"] .audit-table thead {
   background: rgba(255, 255, 255, 0.04);
 }

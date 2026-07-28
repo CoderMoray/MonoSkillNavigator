@@ -2,27 +2,23 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ShieldCheck } from "lucide-react";
+import { Download, FileSpreadsheet, ShieldCheck } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
+import {
+  buildAuditRows,
+  downloadAuditCsv,
+  downloadAuditXlsx,
+  type AuditRow
+} from "../../lib/audit-table";
 import { getSkill, getSkills } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
-import type { FunctionalEvaluationReport, RegistrySkill } from "../../lib/types";
-
-interface AuditRow {
-  slug: string;
-  skillName: string;
-  creatorLabel: string;
-  creatorHandle?: string;
-  version: string;
-  publishDate: string;
-  skillSpectorRiskScore: number | null;
-  haluCatchScore: number | null;
-}
+import type { RegistrySkill } from "../../lib/types";
 
 export default function ReviewsPage() {
   const [skills, setSkills] = useState<RegistrySkill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<"csv" | "xlsx" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,32 +49,33 @@ export default function ReviewsPage() {
     };
   }, []);
 
-  const auditRows = useMemo(() => {
-    const rows: AuditRow[] = [];
+  const auditRows = useMemo(() => buildAuditRows(skills), [skills]);
 
-    for (const skill of skills) {
-      const latest = skill.versions[skill.latestVersion];
-      if (!latest) {
-        continue;
-      }
-
-      const owner =
-        skill.contributors.find((contributor) => contributor.role === "owner") ?? skill.contributors[0];
-
-      rows.push({
-        slug: skill.slug,
-        skillName: skill.name,
-        creatorLabel: owner?.name ?? owner?.username ?? "—",
-        creatorHandle: owner?.username,
-        version: latest.version,
-        publishDate: latest.createdAt,
-        skillSpectorRiskScore: latest.review.skillSpector?.riskScore ?? null,
-        haluCatchScore: resolveHaluCatchScore(latest.evaluation)
-      });
+  async function handleExportCsv() {
+    if (auditRows.length === 0) {
+      return;
     }
+    setExporting("csv");
+    try {
+      downloadAuditCsv(auditRows);
+    } finally {
+      setExporting(null);
+    }
+  }
 
-    return rows.sort((left, right) => right.publishDate.localeCompare(left.publishDate));
-  }, [skills]);
+  async function handleExportXlsx() {
+    if (auditRows.length === 0) {
+      return;
+    }
+    setExporting("xlsx");
+    try {
+      await downloadAuditXlsx(auditRows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "导出 Excel 失败");
+    } finally {
+      setExporting(null);
+    }
+  }
 
   return (
     <AppShell title="审查中心">
@@ -102,6 +99,35 @@ export default function ReviewsPage() {
         {error ? <div className="error">{error}。请确认 API 已通过 npm run dev:api 启动。</div> : null}
 
         <section className="market-panel">
+          <div className="audit-table-toolbar">
+            <div className="section-head" style={{ marginBottom: 0 }}>
+              <div>
+                <h2>审查列表</h2>
+                <p>与下方表格列一致，可导出 CSV 或 Excel。</p>
+              </div>
+            </div>
+            <div className="audit-export-actions">
+              <button
+                className="button secondary compact"
+                disabled={loading || auditRows.length === 0 || exporting !== null}
+                onClick={() => void handleExportCsv()}
+                type="button"
+              >
+                <Download size={15} />
+                {exporting === "csv" ? "导出中…" : "导出 CSV"}
+              </button>
+              <button
+                className="button secondary compact"
+                disabled={loading || auditRows.length === 0 || exporting !== null}
+                onClick={() => void handleExportXlsx()}
+                type="button"
+              >
+                <FileSpreadsheet size={15} />
+                {exporting === "xlsx" ? "导出中…" : "导出 Excel"}
+              </button>
+            </div>
+          </div>
+
           {loading ? (
             <div className="audit-table-wrap">
               {Array.from({ length: 8 }).map((_, index) => (
@@ -126,25 +152,7 @@ export default function ReviewsPage() {
                 </thead>
                 <tbody>
                   {auditRows.map((row, index) => (
-                    <tr key={row.slug}>
-                      <td className="audit-table-rank">{index + 1}</td>
-                      <td>
-                        <Link className="audit-table-skill-link" href={`/skills/${encodeURIComponent(row.slug)}`}>
-                          {row.skillName}
-                        </Link>
-                      </td>
-                      <td>
-                        {row.creatorHandle ? (
-                          <Link href={`/creators/${encodeURIComponent(row.creatorHandle)}`}>{row.creatorLabel}</Link>
-                        ) : (
-                          row.creatorLabel
-                        )}
-                      </td>
-                      <td className="mono">{row.version}</td>
-                      <td>{formatDateTime(row.publishDate)}</td>
-                      <td>{formatRiskScore(row.skillSpectorRiskScore)}</td>
-                      <td>{formatHaluCatchScore(row.haluCatchScore)}</td>
-                    </tr>
+                    <AuditTableRow key={row.slug} rank={index + 1} row={row} />
                   ))}
                 </tbody>
               </table>
@@ -156,6 +164,30 @@ export default function ReviewsPage() {
   );
 }
 
+function AuditTableRow({ rank, row }: { rank: number; row: AuditRow }) {
+  return (
+    <tr>
+      <td className="audit-table-rank">{rank}</td>
+      <td>
+        <Link className="audit-table-skill-link" href={`/skills/${encodeURIComponent(row.slug)}`}>
+          {row.skillName}
+        </Link>
+      </td>
+      <td>
+        {row.creatorHandle ? (
+          <Link href={`/creators/${encodeURIComponent(row.creatorHandle)}`}>{row.creatorLabel}</Link>
+        ) : (
+          row.creatorLabel
+        )}
+      </td>
+      <td className="mono">{row.version}</td>
+      <td>{formatDateTime(row.publishDate)}</td>
+      <td>{formatRiskScore(row.skillSpectorRiskScore)}</td>
+      <td>{formatHaluCatchScore(row.haluCatchScore)}</td>
+    </tr>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="stat">
@@ -163,13 +195,6 @@ function Stat({ label, value }: { label: string; value: number }) {
       <p className="stat-label">{label}</p>
     </div>
   );
-}
-
-function resolveHaluCatchScore(evaluation: FunctionalEvaluationReport | undefined): number | null {
-  if (!evaluation || evaluation.provider !== "halucatch-adapter") {
-    return null;
-  }
-  return evaluation.score;
 }
 
 function formatRiskScore(score: number | null): string {
