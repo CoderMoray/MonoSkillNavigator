@@ -19,6 +19,7 @@ import { creatorProfilePath } from "../../../lib/creators";
 import { readSkillFrontmatterFromZip } from "../../../lib/parse-skill-archive";
 import {
   buildSkillZipFileFromBrowserFiles,
+  findDroppedZipFile,
   isZipFile,
   relativeFilesFromDataTransferItems,
   relativeFilesFromFileList
@@ -324,13 +325,19 @@ function PublishSkillPageContent() {
       }
 
       if (!archiveFile && options.dataTransfer) {
-        const relativeFiles = await relativeFilesFromDataTransferItems(options.dataTransfer.items);
-        if (relativeFiles.length > 0) {
-          archiveFile = await buildSkillZipFileFromBrowserFiles(relativeFiles);
-        } else {
-          const dropped = options.dataTransfer.files.item(0);
-          if (dropped && isZipFile(dropped)) {
-            archiveFile = dropped;
+        archiveFile = findDroppedZipFile(options.dataTransfer);
+
+        if (!archiveFile) {
+          const relativeFiles = await relativeFilesFromDataTransferItems(options.dataTransfer.items);
+          if (relativeFiles.length === 1 && isZipFile(relativeFiles[0]!.file)) {
+            archiveFile = relativeFiles[0]!.file;
+          } else if (relativeFiles.length > 0) {
+            archiveFile = await buildSkillZipFileFromBrowserFiles(relativeFiles);
+          } else {
+            const dropped = options.dataTransfer.files.item(0);
+            if (dropped && isZipFile(dropped)) {
+              archiveFile = dropped;
+            }
           }
         }
       }

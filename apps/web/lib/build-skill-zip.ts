@@ -137,3 +137,12 @@ export function isZipFile(file: File): boolean {
   const lower = file.name.toLowerCase();
   return lower.endsWith(".zip") || file.type === "application/zip";
 }
+
+/** When the user drops a single .zip, use it directly instead of re-zipping the archive file. */
+export function findDroppedZipFile(dataTransfer: DataTransfer): File | null {
+  if (dataTransfer.files.length !== 1) {
+    return null;
+  }
+  const only = dataTransfer.files.item(0);
+  return only && isZipFile(only) ? only : null;
+}
