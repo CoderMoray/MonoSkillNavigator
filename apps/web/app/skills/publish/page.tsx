@@ -17,6 +17,12 @@ import { savePublishNotice } from "../../../lib/publish-notice";
 import { getAuthToken } from "../../../lib/auth-token";
 import { creatorProfilePath } from "../../../lib/creators";
 import { readSkillFrontmatterFromZip } from "../../../lib/parse-skill-archive";
+import {
+  buildSkillZipFileFromBrowserFiles,
+  isZipFile,
+  relativeFilesFromDataTransferItems,
+  relativeFilesFromFileList
+} from "../../../lib/build-skill-zip";
 import type { PublicUser, RegistrySkill } from "../../../lib/types";
 import { SKILL_ENTRY_BASENAMES, validatePublishMetadataInput } from "@skill-platform/skill-spec/skill-format";
 import { SKILL_CATEGORY_OPTIONS } from "../../../lib/skill-categories";
@@ -53,6 +59,7 @@ function PublishSkillPageContent() {
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [topics, setTopics] = useState("");
   const [version, setVersion] = useState("1.0.0");
   const [releaseTags, setReleaseTags] = useState("latest");
@@ -214,11 +221,14 @@ function PublishSkillPageContent() {
   );
 
   const fileLabel = useMemo(() => {
+    if (parsingArchive) {
+      return "正在打包并解析 Skill…";
+    }
     if (!file) {
-      return "选择 .zip Skill 包";
+      return "选择 Skill 文件夹或 .zip 包";
     }
     return `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
-  }, [file]);
+  }, [file, parsingArchive]);
 
   const showPublishForm = Boolean(file && !parsingArchive);
 
@@ -264,23 +274,10 @@ function PublishSkillPageContent() {
 
   const canPublish = publishBlockReason === null;
 
-  async function selectArchive(fileToUpload: File | null) {
-    if (!fileToUpload) {
-      setError(null);
-      setArchiveHint(null);
-      setFile(null);
-      return;
-    }
-    if (!fileToUpload.name.toLowerCase().endsWith(".zip")) {
-      setError("当前页面仅支持上传 .zip 包。文件夹发布可使用 CLI。");
-      setFile(null);
-      return;
-    }
-
+  async function applyArchiveFile(fileToUpload: File) {
     setError(null);
     setArchiveHint(null);
     setFile(fileToUpload);
-    setParsingArchive(true);
 
     try {
       const frontmatter = await loadFrontmatterFromArchive(fileToUpload);
@@ -296,15 +293,77 @@ function PublishSkillPageContent() {
       if (filledFields.length > 0) {
         setArchiveHint(`已从 Skill 入口文件自动填入：${filledFields.join("、")}。`);
       } else {
-        setArchiveHint("已上传 zip，但未读取到可用的 frontmatter 字段。");
+        setArchiveHint("已上传 Skill 包，但未读取到可用的 frontmatter 字段。");
       }
     } catch (err) {
       setArchiveHint(
-        err instanceof Error ? `已上传 zip，但无法解析 Skill 入口文件：${err.message}` : "已上传 zip，但无法解析 Skill 入口文件。"
+        err instanceof Error ? `已上传 Skill 包，但无法解析 Skill 入口文件：${err.message}` : "已上传 Skill 包，但无法解析 Skill 入口文件。"
       );
+    }
+  }
+
+  async function ingestUpload(options: {
+    zipFile?: File | null;
+    folderFileList?: FileList | null;
+    dataTransfer?: DataTransfer | null;
+  }) {
+    setError(null);
+    setArchiveHint(null);
+
+    if (!options.zipFile && !options.folderFileList?.length && !options.dataTransfer?.items.length) {
+      setFile(null);
+      return;
+    }
+
+    setParsingArchive(true);
+    try {
+      let archiveFile: File | null = options.zipFile ?? null;
+
+      if (!archiveFile && options.folderFileList?.length) {
+        archiveFile = await buildSkillZipFileFromBrowserFiles(relativeFilesFromFileList(options.folderFileList));
+      }
+
+      if (!archiveFile && options.dataTransfer) {
+        const relativeFiles = await relativeFilesFromDataTransferItems(options.dataTransfer.items);
+        if (relativeFiles.length > 0) {
+          archiveFile = await buildSkillZipFileFromBrowserFiles(relativeFiles);
+        } else {
+          const dropped = options.dataTransfer.files.item(0);
+          if (dropped && isZipFile(dropped)) {
+            archiveFile = dropped;
+          }
+        }
+      }
+
+      if (!archiveFile) {
+        setError("请上传 Skill 文件夹或 .zip 包。");
+        setFile(null);
+        return;
+      }
+
+      if (!isZipFile(archiveFile)) {
+        setError("仅支持 Skill 文件夹或 .zip 包。");
+        setFile(null);
+        return;
+      }
+
+      await applyArchiveFile(archiveFile);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "无法读取 Skill 包");
+      setFile(null);
     } finally {
       setParsingArchive(false);
     }
+  }
+
+  async function selectArchive(fileToUpload: File | null) {
+    await ingestUpload({ zipFile: fileToUpload });
+  }
+
+  function handleFolderChange(event: ChangeEvent<HTMLInputElement>) {
+    const selected = event.target.files;
+    void ingestUpload({ folderFileList: selected });
+    event.target.value = "";
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -313,28 +372,28 @@ function PublishSkillPageContent() {
     event.target.value = "";
   }
 
-  function handleFileDragEnter(event: DragEvent<HTMLLabelElement>) {
+  function handleFileDragEnter(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     if (event.dataTransfer.types.includes("Files")) {
       setIsDraggingFile(true);
     }
   }
 
-  function handleFileDragOver(event: DragEvent<HTMLLabelElement>) {
+  function handleFileDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
   }
 
-  function handleFileDragLeave(event: DragEvent<HTMLLabelElement>) {
+  function handleFileDragLeave(event: DragEvent<HTMLDivElement>) {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
       setIsDraggingFile(false);
     }
   }
 
-  function handleFileDrop(event: DragEvent<HTMLLabelElement>) {
+  function handleFileDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setIsDraggingFile(false);
-    void selectArchive(event.dataTransfer.files.item(0));
+    void ingestUpload({ dataTransfer: event.dataTransfer });
   }
 
   function toggleCategory(option: string) {
@@ -367,12 +426,12 @@ function PublishSkillPageContent() {
     }
 
     if (!file) {
-      setError("请先选择一个 .zip Skill 包");
+      setError("请先选择 Skill 文件夹或 .zip 包");
       return;
     }
 
-    if (!file.name.toLowerCase().endsWith(".zip")) {
-      setError("当前页面仅支持上传 .zip 包。文件夹发布可使用 CLI。");
+    if (!isZipFile(file)) {
+      setError("请重新选择有效的 Skill 包");
       return;
     }
 
@@ -428,8 +487,8 @@ function PublishSkillPageContent() {
             </h2>
             <p>
               {isNewVersion
-                ? "先上传新的 zip 包，确认发布信息后再提交审查与归档。"
-                : "先上传 zip 包，平台会自动解析 Skill 入口文件并填入发布信息。"}
+                ? "先上传新的 Skill 文件夹或 zip 包，确认发布信息后再提交审查与归档。"
+                : "上传 Skill 文件夹或 .zip 包，平台会自动解析 Skill 入口文件并填入发布信息。"}
             </p>
           </div>
         </section>
@@ -471,7 +530,7 @@ function PublishSkillPageContent() {
           <section className="market-panel">
             <div className="profile-content publish-content">
               <form className="publish-form" onSubmit={handleSubmit}>
-                <label
+                <div
                   className={`upload-dropzone ${file ? "selected" : ""} ${isDraggingFile ? "dragging" : ""} ${parsingArchive ? "dragging" : ""}`}
                   onDragEnter={handleFileDragEnter}
                   onDragLeave={handleFileDragLeave}
@@ -479,18 +538,45 @@ function PublishSkillPageContent() {
                   onDrop={handleFileDrop}
                 >
                   <UploadCloud size={28} />
-                  <strong>{parsingArchive ? "正在解析 Skill 包…" : fileLabel}</strong>
+                  <strong>{fileLabel}</strong>
                   <span>
-                    拖拽 .zip 包到此处，或点击选择。压缩包根目录须包含 {SKILL_ENTRY_BASENAMES.join("、")} 之一。
-                    {file ? " 重新选择文件将覆盖当前包并重新解析。" : ""}
+                    拖拽 Skill 文件夹或 .zip 到此处；须包含 {SKILL_ENTRY_BASENAMES.join("、")}（可在根目录或单一顶层目录下）。
+                    {file ? " 重新选择将覆盖当前包并重新解析。" : ""}
                   </span>
+                  <div className="upload-dropzone-actions">
+                    <button
+                      className="button secondary compact"
+                      disabled={parsingArchive}
+                      onClick={() => folderInputRef.current?.click()}
+                      type="button"
+                    >
+                      选择文件夹
+                    </button>
+                    <button
+                      className="button secondary compact"
+                      disabled={parsingArchive}
+                      onClick={() => fileInputRef.current?.click()}
+                      type="button"
+                    >
+                      选择 .zip
+                    </button>
+                  </div>
                   <input
                     accept=".zip,application/zip"
+                    hidden
                     onChange={handleFileChange}
                     ref={fileInputRef}
                     type="file"
                   />
-                </label>
+                  <input
+                    hidden
+                    multiple
+                    onChange={handleFolderChange}
+                    ref={folderInputRef}
+                    type="file"
+                    webkitdirectory=""
+                  />
+                </div>
 
                 {!showPublishForm && error ? <div className="error compact-error">{error}</div> : null}
 

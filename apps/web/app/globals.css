@@ -1576,6 +1576,14 @@ button {
   display: none;
 }
 
+.upload-dropzone-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
 .publish-form-fields {
   display: grid;
   gap: 18px;
