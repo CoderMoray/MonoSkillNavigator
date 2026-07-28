@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { BarChart3, Boxes, LayoutDashboard, ShieldCheck, Sparkles, UserCircle } from "lucide-react";
+import { BarChart3, BookOpen, Boxes, LayoutDashboard, ShieldCheck, Sparkles, UserCircle } from "lucide-react";
 import { AuthStatus } from "./AuthStatus";
 
 const navItems = [
@@ -11,7 +11,8 @@ const navItems = [
   { href: "/skills", label: "Skills", icon: Boxes },
   { href: "/creators", label: "Creators", icon: UserCircle },
   { href: "/leaderboard", label: "榜单", icon: BarChart3 },
-  { href: "/reviews", label: "Audits", icon: ShieldCheck }
+  { href: "/reviews", label: "Audits", icon: ShieldCheck },
+  { href: "/docs", label: "文档", icon: BookOpen }
 ];
 
 export function AppShell({ children, title = "概览" }: { children: ReactNode; title?: string }) {
