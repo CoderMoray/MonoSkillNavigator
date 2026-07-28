@@ -57,7 +57,12 @@ export function buildAuditRows(skills: RegistrySkill[]): AuditRow[] {
     });
   }
 
-  return rows.sort((left, right) => right.publishDate.localeCompare(left.publishDate));
+  return rows.sort((left, right) => publishTime(right.publishDate) - publishTime(left.publishDate));
+}
+
+function publishTime(value: string): number {
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 export function auditRowsToExportRecords(rows: AuditRow[]): AuditExportRecord[] {
