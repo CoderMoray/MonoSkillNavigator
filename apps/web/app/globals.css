@@ -950,6 +950,19 @@ button {
   gap: 10px;
 }
 
+.audit-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0 8px;
+}
+
+.audit-load-more-hint {
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
 .audit-toolbar-actions {
   display: flex;
   flex-wrap: wrap;

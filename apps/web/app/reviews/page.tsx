@@ -15,7 +15,9 @@ import {
 } from "../../lib/audit-table";
 import { getSkill, getSkills } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
-import type { RegistrySkill } from "../../lib/types";
+import type { RegistrySkill, SkillSearchResult } from "../../lib/types";
+
+const AUDIT_PAGE_SIZE = 20;
 
 const SORT_FIELD_OPTIONS: { value: AuditSortField; label: string }[] = [
   { value: "publish_date", label: "publish_date" },
@@ -24,24 +26,41 @@ const SORT_FIELD_OPTIONS: { value: AuditSortField; label: string }[] = [
 ];
 
 export default function ReviewsPage() {
+  const [summaries, setSummaries] = useState<SkillSearchResult[]>([]);
   const [skills, setSkills] = useState<RegistrySkill[]>([]);
+  const [detailOffset, setDetailOffset] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<"csv" | "xlsx" | null>(null);
   const [sortField, setSortField] = useState<AuditSortField>("publish_date");
   const [sortDirection, setSortDirection] = useState<AuditSortDirection>("desc");
 
+  const hasMore = detailOffset < summaries.length;
+
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
+    async function loadInitial() {
       setLoading(true);
       setError(null);
+      setSkills([]);
+      setDetailOffset(0);
       try {
-        const summaries = await getSkills();
-        const details = await Promise.all(summaries.map((item) => getSkill(item.slug)));
+        const items = await getSkills();
+        if (cancelled) {
+          return;
+        }
+        setSummaries(items);
+        const batch = items.slice(0, AUDIT_PAGE_SIZE);
+        if (batch.length === 0) {
+          setDetailOffset(0);
+          return;
+        }
+        const details = await fetchSkillDetails(batch.map((item) => item.slug));
         if (!cancelled) {
           setSkills(details);
+          setDetailOffset(batch.length);
         }
       } catch (err) {
         if (!cancelled) {
@@ -54,11 +73,29 @@ export default function ReviewsPage() {
       }
     }
 
-    void load();
+    void loadInitial();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  async function handleLoadMore() {
+    if (loadingMore || !hasMore) {
+      return;
+    }
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const batch = summaries.slice(detailOffset, detailOffset + AUDIT_PAGE_SIZE);
+      const details = await fetchSkillDetails(batch.map((item) => item.slug));
+      setSkills((current) => [...current, ...details]);
+      setDetailOffset((current) => current + batch.length);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "加载更多失败");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   const auditRows = useMemo(
     () => sortAuditRows(buildAuditRows(skills), sortField, sortDirection),
@@ -117,7 +154,8 @@ export default function ReviewsPage() {
           </div>
           <div className="stats-card hero-card">
             <div className="stat-grid">
-              <Stat label="Skill 数" value={auditRows.length} />
+              <Stat label="已加载" value={auditRows.length} />
+              <Stat label="Skill 总数" value={summaries.length} />
             </div>
           </div>
         </section>
@@ -196,26 +234,42 @@ export default function ReviewsPage() {
           ) : auditRows.length === 0 ? (
             <div className="empty">暂无审查数据。可以先发布 demo skill。</div>
           ) : (
-            <div className="audit-table-wrap">
-              <table className="audit-table">
-                <thead>
-                  <tr>
-                    <th scope="col">排序</th>
-                    <th scope="col">skill_name</th>
-                    <th scope="col">creator</th>
-                    <th scope="col">version</th>
-                    <th scope="col">publish_date</th>
-                    <th scope="col">skillspector_risk_score</th>
-                    <th scope="col">halucatch_score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auditRows.map((row, index) => (
-                    <AuditTableRow key={row.slug} rank={index + 1} row={row} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="audit-table-wrap">
+                <table className="audit-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">排序</th>
+                      <th scope="col">skill_name</th>
+                      <th scope="col">creator</th>
+                      <th scope="col">version</th>
+                      <th scope="col">publish_date</th>
+                      <th scope="col">skillspector_risk_score</th>
+                      <th scope="col">halucatch_score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditRows.map((row, index) => (
+                      <AuditTableRow key={row.slug} rank={index + 1} row={row} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {hasMore ? (
+                <div className="audit-load-more">
+                  <button
+                    className="button secondary"
+                    disabled={loadingMore}
+                    onClick={() => void handleLoadMore()}
+                    type="button"
+                  >
+                    {loadingMore ? "加载中…" : `加载更多（${detailOffset}/${summaries.length}）`}
+                  </button>
+                </div>
+              ) : summaries.length > AUDIT_PAGE_SIZE ? (
+                <p className="audit-load-more-hint">已显示全部 {summaries.length} 条记录。</p>
+              ) : null}
+            </>
           )}
         </section>
       </div>
@@ -281,4 +335,11 @@ function formatHaluCatchScore(score: number | null): string {
     return "—";
   }
   return String(score);
+}
+
+async function fetchSkillDetails(slugs: string[]): Promise<RegistrySkill[]> {
+  if (slugs.length === 0) {
+    return [];
+  }
+  return Promise.all(slugs.map((slug) => getSkill(slug)));
 }
