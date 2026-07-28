@@ -39,6 +39,12 @@ import { creatorProfilePath } from "../../../lib/creators";
 import { formatDateTime, formatNumber } from "../../../lib/format";
 import { buildHaluCatchReportPath, extractHaluCatchSummary } from "../../../lib/halucatch-report";
 import { localizeSkillSpectorFinding } from "@skill-platform/review-engine/skillspector-i18n";
+import {
+  formatSkillSpectorRecommendation,
+  formatSkillSpectorRiskSeverity,
+  formatSkillSpectorScanMode,
+  formatSkillSpectorSummaryLine
+} from "../../../lib/skillspector-summary";
 import { averageHaluCatchRadarScores, type HaluCatchRadarScores } from "../../../lib/halucatch-scores";
 import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill } from "../../../lib/types";
 
@@ -1157,9 +1163,7 @@ export default function SkillDetailPage() {
                     <h3>安全审查</h3>
                     <p className="description">
                       由 SkillSpector 对发布包做静态安全扫描；以下 finding 与风险分用于解释阻断或复核原因，不再汇总为单一安全分。
-                      {skillSpectorScan
-                        ? ` 当前风险分 ${skillSpectorScan.riskScore}/100（${skillSpectorScan.riskSeverity}）。`
-                        : null}
+                      {skillSpectorScan ? ` ${formatSkillSpectorSummaryLine(skillSpectorScan)}` : null}
                       {hiddenPlatformFindingCount > 0
                         ? ` 另有 ${hiddenPlatformFindingCount} 条平台质量/合规提示（如 description、tags、tests）计入审查记录，但不在此安全区域展示。`
                         : null}
@@ -1177,12 +1181,16 @@ export default function SkillDetailPage() {
                       <strong>{skillSpectorScan.riskScore}/100</strong>
                     </div>
                     <div>
-                      <span>建议</span>
-                      <strong>{skillSpectorScan.recommendation}</strong>
+                      <span>包级风险</span>
+                      <strong>{formatSkillSpectorRiskSeverity(skillSpectorScan.riskSeverity)}</strong>
+                    </div>
+                    <div>
+                      <span>安装建议</span>
+                      <strong>{formatSkillSpectorRecommendation(skillSpectorScan.recommendation)}</strong>
                     </div>
                     <div>
                       <span>模式</span>
-                      <strong>{skillSpectorScan.scanMode}</strong>
+                      <strong>{formatSkillSpectorScanMode(skillSpectorScan.scanMode)}</strong>
                     </div>
                   </div>
                 ) : null}

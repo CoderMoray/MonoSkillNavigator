@@ -23,6 +23,7 @@ import type {
   RecycleBinSkill,
 } from "../types";
 import { skillRecyclePurgeAt, skillRecycleRetentionMs } from "../recycle-bin";
+import { parseSkillSpectorReviewRow, skillSpectorReviewColumns } from "../skillspector-review";
 import { emptyRegistry, normalizeRegistryData, toSearchResult } from "../utils";
 import { JsonRegistryStore } from "./base";
 
@@ -511,6 +512,8 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         "release-tags": v.releaseTags,
       } as RegistryVersion["manifest"];
 
+      const skillSpectorSummary = review ? parseSkillSpectorReviewRow(review) : undefined;
+
       versionMap[v.version] = {
         version: v.version,
         manifest,
@@ -544,6 +547,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
               ? { confidence: Number(f.confidence) }
               : {}),
           })),
+          ...(skillSpectorSummary ? { skillSpector: skillSpectorSummary } : {}),
           createdAt: String(review.createdAt),
         } : {} as RegistryVersion["review"],
         evaluation: hydratedEvaluation,
@@ -725,12 +729,16 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     await this.ensureSchema();
     const createdAt = new Date();
 
+    const skillSpectorCols = skillSpectorReviewColumns(review.skillSpector);
+
     await this.db.insert(schema.skillReviews).values({
       skillSlug: slug, version, reviewId: review.id, reportVersion: review.version ?? "1.0",
       contentHash: review.contentHash ?? "", verdict: review.verdict,
       qualityScore: review.scores.qualityScore,
       securityScore: review.scores.securityScore,
-      reliabilityScore: review.scores.reliabilityScore, createdAt,
+      reliabilityScore: review.scores.reliabilityScore,
+      ...skillSpectorCols,
+      createdAt,
     }).onConflictDoUpdate({
       target: [schema.skillReviews.skillSlug, schema.skillReviews.version],
       set: {
@@ -739,6 +747,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         qualityScore: review.scores.qualityScore,
         securityScore: review.scores.securityScore,
         reliabilityScore: review.scores.reliabilityScore,
+        ...skillSpectorCols,
       },
     });
 
@@ -895,7 +904,9 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         verdict: review.verdict,
         qualityScore: review.scores.qualityScore,
         securityScore: review.scores.securityScore,
-        reliabilityScore: review.scores.reliabilityScore, createdAt: now,
+        reliabilityScore: review.scores.reliabilityScore,
+        ...skillSpectorReviewColumns(review.skillSpector),
+        createdAt: now,
       });
 
       if (review.findings?.length) {

@@ -11,6 +11,11 @@ export const skillReviews = pgTable("skill_reviews", {
   qualityScore: integer("quality_score").notNull(),
   securityScore: integer("security_score").notNull(),
   reliabilityScore: integer("reliability_score").notNull(),
+  skillspectorProvider: text("skillspector_provider"),
+  skillspectorRiskScore: integer("skillspector_risk_score"),
+  skillspectorRiskSeverity: text("skillspector_risk_severity"),
+  skillspectorRecommendation: text("skillspector_recommendation"),
+  skillspectorScanMode: text("skillspector_scan_mode"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
   uniqueIndex("skill_reviews_pkey").on(table.skillSlug, table.version),
