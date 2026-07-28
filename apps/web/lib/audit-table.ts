@@ -57,7 +57,54 @@ export function buildAuditRows(skills: RegistrySkill[]): AuditRow[] {
     });
   }
 
-  return rows.sort((left, right) => publishTime(right.publishDate) - publishTime(left.publishDate));
+  return rows;
+}
+
+export type AuditSortField = "publish_date" | "skillspector_risk_score" | "halucatch_score";
+export type AuditSortDirection = "asc" | "desc";
+
+export function sortAuditRows(
+  rows: AuditRow[],
+  field: AuditSortField,
+  direction: AuditSortDirection
+): AuditRow[] {
+  const sorted = [...rows];
+  sorted.sort((left, right) => {
+    switch (field) {
+      case "publish_date":
+        return comparePublishDate(left.publishDate, right.publishDate, direction);
+      case "skillspector_risk_score":
+        return compareNullableNumber(left.skillSpectorRiskScore, right.skillSpectorRiskScore, direction);
+      case "halucatch_score":
+        return compareNullableNumber(left.haluCatchScore, right.haluCatchScore, direction);
+      default:
+        return 0;
+    }
+  });
+  return sorted;
+}
+
+function comparePublishDate(left: string, right: string, direction: AuditSortDirection): number {
+  const diff = publishTime(left) - publishTime(right);
+  return direction === "asc" ? diff : -diff;
+}
+
+function compareNullableNumber(
+  left: number | null,
+  right: number | null,
+  direction: AuditSortDirection
+): number {
+  if (left === null && right === null) {
+    return 0;
+  }
+  if (left === null) {
+    return 1;
+  }
+  if (right === null) {
+    return -1;
+  }
+  const diff = left - right;
+  return direction === "asc" ? diff : -diff;
 }
 
 function publishTime(value: string): number {

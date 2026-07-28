@@ -2,23 +2,34 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Download, FileSpreadsheet, ShieldCheck } from "lucide-react";
+import { ArrowDownUp, Download, FileSpreadsheet, ShieldCheck } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
 import {
   buildAuditRows,
   downloadAuditCsv,
   downloadAuditXlsx,
-  type AuditRow
+  sortAuditRows,
+  type AuditRow,
+  type AuditSortDirection,
+  type AuditSortField
 } from "../../lib/audit-table";
 import { getSkill, getSkills } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
 import type { RegistrySkill } from "../../lib/types";
+
+const SORT_FIELD_OPTIONS: { value: AuditSortField; label: string }[] = [
+  { value: "publish_date", label: "publish_date" },
+  { value: "skillspector_risk_score", label: "skillspector_risk_score" },
+  { value: "halucatch_score", label: "halucatch_score" }
+];
 
 export default function ReviewsPage() {
   const [skills, setSkills] = useState<RegistrySkill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<"csv" | "xlsx" | null>(null);
+  const [sortField, setSortField] = useState<AuditSortField>("publish_date");
+  const [sortDirection, setSortDirection] = useState<AuditSortDirection>("desc");
 
   useEffect(() => {
     let cancelled = false;
@@ -49,7 +60,22 @@ export default function ReviewsPage() {
     };
   }, []);
 
-  const auditRows = useMemo(() => buildAuditRows(skills), [skills]);
+  const auditRows = useMemo(
+    () => sortAuditRows(buildAuditRows(skills), sortField, sortDirection),
+    [skills, sortField, sortDirection]
+  );
+
+  const directionOptions = useMemo(
+    () => directionOptionsForField(sortField),
+    [sortField]
+  );
+
+  function handleSortFieldChange(nextField: AuditSortField) {
+    setSortField(nextField);
+    if (nextField === "publish_date") {
+      setSortDirection("desc");
+    }
+  }
 
   async function handleExportCsv() {
     if (auditRows.length === 0) {
@@ -103,28 +129,61 @@ export default function ReviewsPage() {
             <div className="section-head" style={{ marginBottom: 0 }}>
               <div>
                 <h2>审查列表</h2>
-                <p>与下方表格列一致，可导出 CSV 或 Excel。</p>
+                <p>与下方表格列一致，可排序并导出 CSV 或 Excel。</p>
               </div>
             </div>
-            <div className="audit-export-actions">
-              <button
-                className="button secondary compact"
-                disabled={loading || auditRows.length === 0 || exporting !== null}
-                onClick={() => void handleExportCsv()}
-                type="button"
-              >
-                <Download size={15} />
-                {exporting === "csv" ? "导出中…" : "导出 CSV"}
-              </button>
-              <button
-                className="button secondary compact"
-                disabled={loading || auditRows.length === 0 || exporting !== null}
-                onClick={() => void handleExportXlsx()}
-                type="button"
-              >
-                <FileSpreadsheet size={15} />
-                {exporting === "xlsx" ? "导出中…" : "导出 Excel"}
-              </button>
+            <div className="audit-toolbar-actions">
+              <div className="audit-sort-controls">
+                <label className="select-wrap compact">
+                  <ArrowDownUp size={16} />
+                  <select
+                    aria-label="排序字段"
+                    className="select"
+                    onChange={(event) => handleSortFieldChange(event.target.value as AuditSortField)}
+                    value={sortField}
+                  >
+                    {SORT_FIELD_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="select-wrap compact">
+                  <select
+                    aria-label="排序方向"
+                    className="select"
+                    onChange={(event) => setSortDirection(event.target.value as AuditSortDirection)}
+                    value={sortDirection}
+                  >
+                    {directionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="audit-export-actions">
+                <button
+                  className="button secondary compact"
+                  disabled={loading || auditRows.length === 0 || exporting !== null}
+                  onClick={() => void handleExportCsv()}
+                  type="button"
+                >
+                  <Download size={15} />
+                  {exporting === "csv" ? "导出中…" : "导出 CSV"}
+                </button>
+                <button
+                  className="button secondary compact"
+                  disabled={loading || auditRows.length === 0 || exporting !== null}
+                  onClick={() => void handleExportXlsx()}
+                  type="button"
+                >
+                  <FileSpreadsheet size={15} />
+                  {exporting === "xlsx" ? "导出中…" : "导出 Excel"}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -162,6 +221,19 @@ export default function ReviewsPage() {
       </div>
     </AppShell>
   );
+}
+
+function directionOptionsForField(field: AuditSortField): { value: AuditSortDirection; label: string }[] {
+  if (field === "publish_date") {
+    return [
+      { value: "desc", label: "最新 → 最旧" },
+      { value: "asc", label: "最旧 → 最新" }
+    ];
+  }
+  return [
+    { value: "desc", label: "高 → 低" },
+    { value: "asc", label: "低 → 高" }
+  ];
 }
 
 function AuditTableRow({ rank, row }: { rank: number; row: AuditRow }) {
