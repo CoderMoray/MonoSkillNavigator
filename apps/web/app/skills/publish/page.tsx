@@ -508,6 +508,7 @@ function PublishSkillPageContent() {
                           required
                           value={displayName}
                         />
+                        <small>展示名称，用于列表与详情页标题。</small>
                       </label>
 
                       <div className="publish-field-with-hint">
@@ -524,6 +525,7 @@ function PublishSkillPageContent() {
                           />
                         </label>
                         <small>
+                          唯一标识 ID。
                           {isNewVersion ? "新版本沿用原 Skill 的不可变 Slug。" : "仅小写字母、数字和短横线；发布后不可修改。"}
                         </small>
                       </div>
@@ -539,6 +541,7 @@ function PublishSkillPageContent() {
                         rows={4}
                         value={summary}
                       />
+                      <small>Skill 摘要，说明能做什么及适用场景。</small>
                     </label>
 
                     <div className="publish-form-grid">
@@ -584,7 +587,9 @@ function PublishSkillPageContent() {
                             })}
                           </div>
                         ) : null}
-                        <small>最多可选择 {MAX_CATEGORIES} 个分类。</small>
+                        <small>
+                          Skill 功能类别，可用以搜索的标签。最多可选择 {MAX_CATEGORIES} 个。
+                        </small>
                       </div>
 
                       <label className="field">
@@ -595,7 +600,7 @@ function PublishSkillPageContent() {
                           placeholder="例如 github, issues, automation"
                           value={topics}
                         />
-                        <small>使用逗号分隔，每项最多 64 个字符。</small>
+                        <small>Skill 业务内容、用户自定义标签。使用逗号分隔，每项最多 64 个字符。</small>
                       </label>
                     </div>
 
