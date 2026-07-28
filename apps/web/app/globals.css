@@ -870,6 +870,7 @@ button {
 :root[data-theme="dark"] .category-chip,
 :root[data-theme="dark"] .creator-card,
 :root[data-theme="dark"] .app-tile,
+:root[data-theme="dark"] .audit-table-wrap,
 :root[data-theme="dark"] .skill-row,
 :root[data-theme="dark"] .publisher-row,
 :root[data-theme="dark"] .profile-stat-grid div {
@@ -879,6 +880,67 @@ button {
 .claw-list {
   display: grid;
   gap: 10px;
+}
+
+.audit-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.audit-table {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.audit-table thead {
+  border-bottom: 1px solid var(--border);
+  background: rgba(17, 24, 39, 0.04);
+}
+
+.audit-table th,
+.audit-table td {
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.audit-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+
+.audit-table tbody tr:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.audit-table tbody tr:hover {
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.audit-table-rank {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  width: 56px;
+}
+
+.audit-table-skill-link {
+  font-weight: 600;
+}
+
+:root[data-theme="dark"] .audit-table thead {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+:root[data-theme="dark"] .audit-table tbody tr:hover {
+  background: rgba(96, 165, 250, 0.08);
 }
 
 .skill-row {

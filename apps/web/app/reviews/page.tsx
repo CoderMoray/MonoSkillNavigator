@@ -2,22 +2,21 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Activity, CheckCircle2, ShieldAlert, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
-import { FindingConfidenceBadge } from "../../components/FindingConfidenceBadge";
-import { HaluCatchRadar } from "../../components/HaluCatchRadar";
-import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../components/StatusBadge";
 import { getSkill, getSkills } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
-import { averageHaluCatchRadarScores } from "../../lib/halucatch-scores";
-import type { RegistrySkill, ReviewFinding } from "../../lib/types";
-import { localizeSkillSpectorFinding } from "@skill-platform/review-engine/skillspector-i18n";
+import type { FunctionalEvaluationReport, RegistrySkill } from "../../lib/types";
 
-interface AggregatedFinding {
-  finding: ReviewFinding;
-  skillSlug: string;
+interface AuditRow {
+  slug: string;
   skillName: string;
+  creatorLabel: string;
+  creatorHandle?: string;
   version: string;
+  publishDate: string;
+  skillSpectorRiskScore: number | null;
+  haluCatchScore: number | null;
 }
 
 export default function ReviewsPage() {
@@ -54,43 +53,32 @@ export default function ReviewsPage() {
     };
   }, []);
 
-  const reviewStats = useMemo(() => {
-    const versions = skills
-      .map((skill) => skill.versions[skill.latestVersion])
-      .filter((version): version is NonNullable<typeof version> => Boolean(version));
-    const findings: AggregatedFinding[] = skills.flatMap((skill) => {
+  const auditRows = useMemo(() => {
+    const rows: AuditRow[] = [];
+
+    for (const skill of skills) {
       const latest = skill.versions[skill.latestVersion];
       if (!latest) {
-        return [];
+        continue;
       }
-      return latest.review.findings.map((finding) => ({
-        finding,
-        skillSlug: skill.slug,
+
+      const owner =
+        skill.contributors.find((contributor) => contributor.role === "owner") ?? skill.contributors[0];
+
+      rows.push({
+        slug: skill.slug,
         skillName: skill.name,
-        version: latest.version
-      }));
-    });
-    const blockers = findings.filter(
-      ({ finding }) => finding.severity === "critical" || finding.severity === "high"
-    ).length;
-    const passed = versions.filter((version) => version.status === "published").length;
+        creatorLabel: owner?.name ?? owner?.username ?? "—",
+        creatorHandle: owner?.username,
+        version: latest.version,
+        publishDate: latest.createdAt,
+        skillSpectorRiskScore: latest.review.skillSpector?.riskScore ?? null,
+        haluCatchScore: resolveHaluCatchScore(latest.evaluation)
+      });
+    }
 
-    return { versions: versions.length, findings, blockers, passed };
+    return rows.sort((left, right) => right.publishDate.localeCompare(left.publishDate));
   }, [skills]);
-
-  const platformAverageHaluCatch = useMemo(() => {
-    const evaluations = skills
-      .map((skill) => skill.versions[skill.latestVersion]?.evaluation)
-      .filter((evaluation): evaluation is NonNullable<typeof evaluation> => Boolean(evaluation));
-    return averageHaluCatchRadarScores(evaluations);
-  }, [skills]);
-
-  const platformHaluCatchSampleSize = useMemo(
-    () =>
-      skills.filter((skill) => skill.versions[skill.latestVersion]?.evaluation?.provider === "halucatch-adapter")
-        .length,
-    [skills]
-  );
 
   return (
     <AppShell title="审查中心">
@@ -99,114 +87,69 @@ export default function ReviewsPage() {
           <div className="hero-card">
             <span className="eyebrow">
               <ShieldCheck size={14} />
-              Review Center
+              Audits
             </span>
-            <h1>审查与 HaluCatch 质量评估集中视图。</h1>
-            <p>
-              这里聚合最新版本的审查结果，帮助你快速定位高风险 finding、确认发布状态，并对比 HaluCatch 五维质量雷达。
-            </p>
+            <h1>审查中心</h1>
+            <p>按 Skill 汇总最新版本的发布时间与 SkillSpector 风险分、HaluCatch 质量分。</p>
           </div>
           <div className="stats-card hero-card">
             <div className="stat-grid">
-              <Stat label="版本数" value={reviewStats.versions} />
-              <Stat label="已发布" value={reviewStats.passed} />
-              <Stat label="阻断项" value={reviewStats.blockers} />
+              <Stat label="Skill 数" value={auditRows.length} />
             </div>
           </div>
         </section>
 
         {error ? <div className="error">{error}。请确认 API 已通过 npm run dev:api 启动。</div> : null}
 
-        {loading ? (
-          <div className="loading-grid">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div className="skeleton" key={index} />
-            ))}
-          </div>
-        ) : skills.length === 0 ? (
-          <div className="empty">暂无审查数据。可以先发布 demo skill。</div>
-        ) : (
-          <section className="two-column">
-            <div className="card">
-              <h2>最新版本审查</h2>
-              <ul className="list">
-                {skills.map((skill) => {
-                  const latest = skill.versions[skill.latestVersion];
-                  if (!latest) {
-                    return null;
-                  }
-
-                  return (
-                    <li className="list-item" key={skill.slug}>
-                      <div className="card-head">
-                        <div>
-                          <Link href={`/skills/${encodeURIComponent(skill.slug)}`}>
-                            <strong>{skill.name}</strong>
-                          </Link>
-                          <p className="description">
-                            v{latest.version} · {formatDateTime(latest.review.createdAt)}
-                          </p>
-                        </div>
-                        <div className="tag-row" style={{ marginTop: 0 }}>
-                          <VerdictBadge verdict={latest.status} />
-                          {latest.evaluation ? <EvaluationBadge status={latest.evaluation.status} /> : null}
-                        </div>
-                      </div>
-                      <div style={{ marginTop: 16 }}>
-                        <HaluCatchRadar
-                          averageScores={platformAverageHaluCatch}
-                          evaluation={latest.evaluation}
-                          sampleSize={platformHaluCatchSampleSize}
-                        />
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+        <section className="market-panel">
+          {loading ? (
+            <div className="audit-table-wrap">
+              {Array.from({ length: 8 }).map((_, index) => (
+                <div className="skeleton-row" key={index} style={{ marginBottom: 10 }} />
+              ))}
             </div>
-
-            <div className="card">
-              <h2>风险 Finding</h2>
-              {reviewStats.findings.length === 0 ? (
-                <div className="empty">
-                  <CheckCircle2 size={18} color="var(--green)" /> 当前没有 finding。
-                </div>
-              ) : (
-                <ul className="list">
-                  {reviewStats.findings.slice(0, 12).map((item) => (
-                    <FindingItem
-                      finding={item.finding}
-                      key={`${item.skillSlug}:${item.finding.id}`}
-                      skillName={item.skillName}
-                      skillSlug={item.skillSlug}
-                      version={item.version}
-                    />
+          ) : auditRows.length === 0 ? (
+            <div className="empty">暂无审查数据。可以先发布 demo skill。</div>
+          ) : (
+            <div className="audit-table-wrap">
+              <table className="audit-table">
+                <thead>
+                  <tr>
+                    <th scope="col">排序</th>
+                    <th scope="col">skill_name</th>
+                    <th scope="col">creator</th>
+                    <th scope="col">version</th>
+                    <th scope="col">publish_date</th>
+                    <th scope="col">skillspector_risk_score</th>
+                    <th scope="col">halucatch_score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditRows.map((row, index) => (
+                    <tr key={row.slug}>
+                      <td className="audit-table-rank">{index + 1}</td>
+                      <td>
+                        <Link className="audit-table-skill-link" href={`/skills/${encodeURIComponent(row.slug)}`}>
+                          {row.skillName}
+                        </Link>
+                      </td>
+                      <td>
+                        {row.creatorHandle ? (
+                          <Link href={`/creators/${encodeURIComponent(row.creatorHandle)}`}>{row.creatorLabel}</Link>
+                        ) : (
+                          row.creatorLabel
+                        )}
+                      </td>
+                      <td className="mono">{row.version}</td>
+                      <td>{formatDateTime(row.publishDate)}</td>
+                      <td>{formatRiskScore(row.skillSpectorRiskScore)}</td>
+                      <td>{formatHaluCatchScore(row.haluCatchScore)}</td>
+                    </tr>
                   ))}
-                </ul>
-              )}
+                </tbody>
+              </table>
             </div>
-          </section>
-        )}
-
-        <section className="card">
-          <div className="section-head">
-            <div>
-              <h2>审查规则摘要</h2>
-              <p>发布前包格式校验；质量看 HaluCatch 五维雷达，安全看 SkillSpector finding 与风险分，必要时回退到 tests/*.json 任务集。</p>
-            </div>
-            <ShieldAlert color="var(--amber)" />
-          </div>
-          <ul className="list" style={{ marginTop: 18 }}>
-            <li className="list-item">
-              <ShieldCheck size={16} color="var(--green)" /> Critical / High finding 会阻断发布。
-            </li>
-            <li className="list-item">
-              <Activity size={16} color="var(--blue)" /> HaluCatch 对地基、代码、规则、护栏与复杂度做五维静态质量评估；无 Python 运行时时使用任务集检查。
-            </li>
-            <li className="list-item">
-              <ShieldAlert size={16} color="var(--amber)" /> 网络、凭证、危险命令、持久化、混淆代码会被重点标记。
-            </li>
-          </ul>
+          )}
         </section>
       </div>
     </AppShell>
@@ -222,32 +165,23 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-function FindingItem({
-  finding,
-  skillName,
-  skillSlug,
-  version
-}: {
-  finding: ReviewFinding;
-  skillName: string;
-  skillSlug: string;
-  version: string;
-}) {
-  const displayFinding = localizeSkillSpectorFinding(finding);
-  return (
-    <li className={`list-item finding ${finding.severity}`}>
-      <div className="card-head">
-        <strong>{displayFinding.title}</strong>
-        <div className="tag-row" style={{ marginTop: 0 }}>
-          <SeverityBadge severity={finding.severity} />
-          <FindingConfidenceBadge finding={finding} />
-        </div>
-      </div>
-      <p className="description">
-        <Link href={`/skills/${encodeURIComponent(skillSlug)}`}>{skillName}</Link>
-        {" · "}v{version}
-      </p>
-      <p className="description">{displayFinding.message}</p>
-    </li>
-  );
+function resolveHaluCatchScore(evaluation: FunctionalEvaluationReport | undefined): number | null {
+  if (!evaluation || evaluation.provider !== "halucatch-adapter") {
+    return null;
+  }
+  return evaluation.score;
+}
+
+function formatRiskScore(score: number | null): string {
+  if (score === null) {
+    return "—";
+  }
+  return String(score);
+}
+
+function formatHaluCatchScore(score: number | null): string {
+  if (score === null) {
+    return "—";
+  }
+  return String(score);
 }
