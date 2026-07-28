@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@skill-platform/review-engine": "0.1.0",
     "katex": "^0.18.1",
     "lucide-react": "^1.23.0",
     "next": "^16.2.10",

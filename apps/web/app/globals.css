@@ -1984,6 +1984,20 @@ button {
   margin-top: 12px;
 }
 
+.halucatch-action-download-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(59, 130, 246, 0.06);
+  padding: 14px 16px;
+}
+
+.halucatch-action-download-panel .description {
+  margin: 0;
+}
+
 .halucatch-report-content {
   margin-top: 16px;
   border: 1px solid var(--border);

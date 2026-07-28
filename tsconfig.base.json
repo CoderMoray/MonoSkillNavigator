@@ -20,6 +20,9 @@
       "@skill-platform/review-engine": [
         "packages/review-engine/src/index.ts"
       ],
+      "@skill-platform/review-engine/skillspector-i18n": [
+        "packages/review-engine/src/skillspector-i18n.ts"
+      ],
       "@skill-platform/storage": [
         "packages/storage/src/index.ts"
       ]

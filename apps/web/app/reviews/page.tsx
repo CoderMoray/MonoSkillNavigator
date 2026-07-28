@@ -11,6 +11,7 @@ import { getSkill, getSkills } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
 import { averageHaluCatchRadarScores } from "../../lib/halucatch-scores";
 import type { RegistrySkill, ReviewFinding } from "../../lib/types";
+import { localizeSkillSpectorFinding } from "@skill-platform/review-engine/skillspector-i18n";
 
 interface AggregatedFinding {
   finding: ReviewFinding;
@@ -232,10 +233,11 @@ function FindingItem({
   skillSlug: string;
   version: string;
 }) {
+  const displayFinding = localizeSkillSpectorFinding(finding);
   return (
     <li className={`list-item finding ${finding.severity}`}>
       <div className="card-head">
-        <strong>{finding.title}</strong>
+        <strong>{displayFinding.title}</strong>
         <div className="tag-row" style={{ marginTop: 0 }}>
           <SeverityBadge severity={finding.severity} />
           <FindingConfidenceBadge finding={finding} />
@@ -245,7 +247,7 @@ function FindingItem({
         <Link href={`/skills/${encodeURIComponent(skillSlug)}`}>{skillName}</Link>
         {" · "}v{version}
       </p>
-      <p className="description">{finding.message}</p>
+      <p className="description">{displayFinding.message}</p>
     </li>
   );
 }

@@ -38,6 +38,7 @@ import { getAuthToken } from "../../../lib/auth-token";
 import { creatorProfilePath } from "../../../lib/creators";
 import { formatDateTime, formatNumber } from "../../../lib/format";
 import { buildHaluCatchReportPath, extractHaluCatchSummary } from "../../../lib/halucatch-report";
+import { localizeSkillSpectorFinding } from "@skill-platform/review-engine/skillspector-i18n";
 import { averageHaluCatchRadarScores, type HaluCatchRadarScores } from "../../../lib/halucatch-scores";
 import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill } from "../../../lib/types";
 
@@ -1189,20 +1190,23 @@ export default function SkillDetailPage() {
                   <div className="empty detail-empty">未发现安全相关 finding。</div>
                 ) : (
                   <ul className="list detail-list">
-                    {securityFindings.map((finding) => (
+                    {securityFindings.map((finding) => {
+                      const displayFinding = localizeSkillSpectorFinding(finding);
+                      return (
                       <li className={`list-item finding ${finding.severity}`} key={finding.id}>
                         <div className="card-head">
-                          <strong>{finding.title}</strong>
+                          <strong>{displayFinding.title}</strong>
                           <div className="tag-row" style={{ marginTop: 0 }}>
                             <SeverityBadge severity={finding.severity} />
                             <FindingConfidenceBadge finding={finding} />
                           </div>
                         </div>
-                        <p className="description">{finding.message}</p>
-                        <p className="description">建议：{finding.recommendation}</p>
+                        <p className="description">{displayFinding.message}</p>
+                        <p className="description">建议：{displayFinding.recommendation}</p>
                         {finding.evidence ? <pre className="pre">{finding.evidence}</pre> : null}
                       </li>
-                    ))}
+                    );
+                    })}
                   </ul>
                 )}
               </div>

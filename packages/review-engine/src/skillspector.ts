@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { SkillSnapshot } from "@skill-platform/skill-spec";
+import { localizeSkillSpectorFindingByRuleId } from "./skillspector-i18n.js";
 
 type ReviewCategory =
   | "compliance"
@@ -118,19 +119,22 @@ function mapSkillSpectorFinding(issue: SkillSpectorIssue, index: number): Review
   const evidence = issue.code_snippet?.trim() || issue.finding?.trim() || undefined;
   const confidence = normalizeConfidence(issue.confidence);
 
-  return {
-    id: `skillspector-${sanitizeId(ruleId)}-${sanitizeId(file)}-${index}`,
-    category: mapSkillSpectorCategory(issue.category, ruleId),
-    severity: mapSkillSpectorSeverity(issue.severity),
-    title,
-    message: line ? `${message} (${file}:${line})` : message,
-    path: file,
-    evidence,
-    recommendation:
-      issue.remediation?.trim() ||
-      "Review this SkillSpector finding and remove or justify the flagged behavior before publishing.",
-    ...(confidence !== undefined ? { confidence } : {})
-  };
+  return localizeSkillSpectorFindingByRuleId(
+    {
+      id: `skillspector-${sanitizeId(ruleId)}-${sanitizeId(file)}-${index}`,
+      category: mapSkillSpectorCategory(issue.category, ruleId),
+      severity: mapSkillSpectorSeverity(issue.severity),
+      title,
+      message: line ? `${message} (${file}:${line})` : message,
+      path: file,
+      evidence,
+      recommendation:
+        issue.remediation?.trim() ||
+        "Review this SkillSpector finding and remove or justify the flagged behavior before publishing.",
+      ...(confidence !== undefined ? { confidence } : {})
+    },
+    ruleId
+  );
 }
 
 function mapSkillSpectorCategory(category: string | null | undefined, ruleId: string): ReviewCategory {

@@ -8,6 +8,7 @@ import { AppShell } from "../../../../components/AppShell";
 import { HaluCatchReportViewer } from "../../../../components/HaluCatchReportViewer";
 import { EvaluationBadge } from "../../../../components/StatusBadge";
 import { getSkill } from "../../../../lib/api";
+import { buildHaluCatchActionReportFileName } from "../../../../lib/halucatch-report";
 import { getAuthToken } from "../../../../lib/auth-token";
 import { formatDateTime } from "../../../../lib/format";
 import type { RegistrySkill, RegistryVersion } from "../../../../lib/types";
@@ -149,7 +150,10 @@ function HaluCatchReportPageContent() {
               <p className="description">包含 HaluCatch 生成的专业版、标准版与 AI 行动版 Markdown 报告。</p>
             </div>
           </div>
-          <HaluCatchReportViewer report={haluCatchReport} />
+          <HaluCatchReportViewer
+            actionDownloadFileName={buildHaluCatchActionReportFileName(skill.slug, version.version)}
+            report={haluCatchReport}
+          />
         </div>
       </section>
     </AppShell>
