@@ -588,12 +588,22 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     if (rating.score < 1 || rating.score > 5) throw new Error("Rating score must be between 1 and 5");
 
     const [skillRow] = await this.db
-      .select({ slug: schema.skills.slug })
+      .select({ slug: schema.skills.slug, latestVersion: schema.skills.latestVersion })
       .from(schema.skills)
       .where(eq(schema.skills.slug, slug))
       .limit(1);
     if (!skillRow) {
       throw new Error(`Skill not found: ${slug}`);
+    }
+
+    const version = rating.version?.trim() || skillRow.latestVersion;
+    const [versionRow] = await this.db
+      .select({ version: schema.skillVersions.version })
+      .from(schema.skillVersions)
+      .where(and(eq(schema.skillVersions.skillSlug, slug), eq(schema.skillVersions.version, version)))
+      .limit(1);
+    if (!versionRow) {
+      throw new Error(`Version not found: ${version}`);
     }
 
     const [existing] = await this.db
@@ -602,6 +612,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       .where(
         and(
           eq(schema.skillRatings.skillSlug, slug),
+          eq(schema.skillRatings.version, version),
           sql`lower(${schema.skillRatings.userName}) = lower(${rating.user})`
         )
       )
@@ -614,7 +625,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     const createdAt = new Date();
 
     await this.db.insert(schema.skillRatings).values({
-      id, skillSlug: slug, version: rating.version ?? null,
+      id, skillSlug: slug, version,
       userName: rating.user, score: rating.score, comment: rating.comment ?? null, createdAt,
     });
 
@@ -631,7 +642,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       .set({ averageRating: String(agg?.avg ?? 0), ratingCount: agg?.count ?? 0, updatedAt: now })
       .where(eq(schema.skills.slug, slug));
 
-    return { id, version: rating.version, user: rating.user, score: rating.score, comment: rating.comment, createdAt: createdAt.toISOString() };
+    return { id, version, user: rating.user, score: rating.score, comment: rating.comment, createdAt: createdAt.toISOString() };
   }
 
   async createIssue(slug: string, issue: { type: string; severity?: string; title: string; body?: string; createdBy?: string }): Promise<RegistryIssue> {

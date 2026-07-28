@@ -86,7 +86,7 @@ function stripFrontmatter(markdown: string): string {
 
 function formatRatingError(message: string): string {
   if (message === "rating_already_submitted") {
-    return "你已对该 Skill 提交过评分，每位用户仅可评分一次。";
+    return "你已对该版本提交过评分，每个版本每位用户仅可评分一次。";
   }
   return message;
 }
@@ -234,12 +234,15 @@ export default function SkillDetailPage() {
   }, [selectedVersionName, skill]);
 
   const viewerExistingRating = useMemo(() => {
-    if (!viewer || !skill) {
+    if (!viewer || !skill || !currentVersion) {
       return undefined;
     }
     const handle = viewer.username.trim().toLowerCase();
-    return skill.ratings.find((rating) => rating.user.trim().toLowerCase() === handle);
-  }, [skill, viewer]);
+    return skill.ratings.find(
+      (rating) =>
+        rating.user.trim().toLowerCase() === handle && rating.version === currentVersion.version
+    );
+  }, [currentVersion, skill, viewer]);
 
   const versions = useMemo(
     () => (skill ? Object.values(skill.versions).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : []),
@@ -372,7 +375,9 @@ export default function SkillDetailPage() {
 
   function openRatingModal() {
     if (viewerExistingRating) {
-      setRatingMessage(`你已对该 Skill 评分（${viewerExistingRating.score}/5），每位用户仅可提交一次。`);
+      setRatingMessage(
+        `你已对该版本评分（v${currentVersion.version} · ${viewerExistingRating.score}/5），切换版本后可对其它版本再评。`
+      );
       return;
     }
     setRatingError(null);
@@ -1347,7 +1352,9 @@ export default function SkillDetailPage() {
                       <span className="badge">{skill.ratingCount}</span>
                       {viewer ? (
                         viewerExistingRating ? (
-                          <span className="badge">你已评分 {viewerExistingRating.score}/5</span>
+                          <span className="badge">
+                            v{currentVersion.version} · 你已评分 {viewerExistingRating.score}/5
+                          </span>
                         ) : (
                           <button className="button secondary compact" onClick={openRatingModal} type="button">
                             <Star size={14} /> 提交评分

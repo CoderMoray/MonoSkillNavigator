@@ -200,22 +200,27 @@ test("未登录评分应拒绝", async () => {
   expect(res.status).toBe(401);
 });
 
-test("同一用户对同一 Skill 重复评分应拒绝", async () => {
+test("同一用户对同一版本重复评分应拒绝", async () => {
   const headers = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
   };
+  const skillRes = await fetch(`${API}/skills/demo-skill`);
+  expect(skillRes.status).toBe(200);
+  const skill = (await skillRes.json()) as { latestVersion: string };
+  const version = skill.latestVersion;
+
   const first = await fetch(`${API}/skills/demo-skill/ratings`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ score: 4 }),
+    body: JSON.stringify({ score: 4, version }),
   });
   expect([201, 409]).toContain(first.status);
 
   const second = await fetch(`${API}/skills/demo-skill/ratings`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ score: 5 }),
+    body: JSON.stringify({ score: 5, version }),
   });
   expect(second.status).toBe(409);
   const body = (await second.json()) as { error?: string };

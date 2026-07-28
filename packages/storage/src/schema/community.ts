@@ -31,14 +31,15 @@ export const skillIssues = pgTable("skill_issues", {
 export const skillRatings = pgTable("skill_ratings", {
   id: text("id").primaryKey(),
   skillSlug: text("skill_slug").notNull().references(() => skills.slug, { onDelete: "cascade" }),
-  version: text("version"),
+  version: text("version").notNull(),
   userName: text("user_name").notNull(),
   score: smallint("score").notNull(),
   comment: text("comment"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
-  uniqueIndex("skill_ratings_skill_slug_user_name_unique").on(
+  uniqueIndex("skill_ratings_skill_slug_version_user_name_unique").on(
     table.skillSlug,
+    table.version,
     sql`lower(${table.userName})`
   ),
 ]);
