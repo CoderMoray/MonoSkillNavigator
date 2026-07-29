@@ -78,7 +78,8 @@ function summarizeReviewFindings(findings: ReviewFinding[]): string {
 function summarizeSkillSpector(review: ReviewReport): string {
   if (review.skillSpector) {
     const { riskScore, riskSeverity } = review.skillSpector;
-    return `SkillSpector risk=${riskScore} (${riskSeverity})`;
+    const safetyScore = 100 - Math.min(100, Math.max(0, riskScore));
+    return `SkillSpector safety=${safetyScore} (${riskSeverity})`;
   }
   if (review.findings.some((finding) => finding.id === "skillspector-unavailable")) {
     return "SkillSpector unavailable (regex fallback)";

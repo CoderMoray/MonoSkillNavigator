@@ -21,7 +21,7 @@ const AUDIT_PAGE_SIZE = 20;
 
 const SORT_FIELD_OPTIONS: { value: AuditSortField; label: string }[] = [
   { value: "publish_date", label: "publish_date" },
-  { value: "skillspector_risk_score", label: "skillspector_risk_score" },
+  { value: "skillspector_safety_score", label: "skillspector_safety_score" },
   { value: "halucatch_score", label: "halucatch_score" }
 ];
 
@@ -150,7 +150,7 @@ export default function ReviewsPage() {
               Audits
             </span>
             <h1>审查中心</h1>
-            <p>按 Skill 汇总最新版本的发布时间与 SkillSpector 风险分、HaluCatch 质量分。</p>
+            <p>按 Skill 汇总最新版本的发布时间与 SkillSpector 安全分（100 − 风险分）、HaluCatch 质量分。</p>
           </div>
           <div className="stats-card hero-card">
             <div className="stat-grid">
@@ -244,7 +244,7 @@ export default function ReviewsPage() {
                       <th scope="col">creator</th>
                       <th scope="col">version</th>
                       <th scope="col">publish_date</th>
-                      <th scope="col">skillspector_risk_score</th>
+                      <th scope="col">skillspector_safety_score</th>
                       <th scope="col">halucatch_score</th>
                     </tr>
                   </thead>
@@ -308,7 +308,7 @@ function AuditTableRow({ rank, row }: { rank: number; row: AuditRow }) {
       </td>
       <td className="mono">{row.version}</td>
       <td>{formatDateTime(row.publishDate)}</td>
-      <td>{formatRiskScore(row.skillSpectorRiskScore)}</td>
+      <td>{formatScore(row.skillSpectorSafetyScore)}</td>
       <td>{formatHaluCatchScore(row.haluCatchScore)}</td>
     </tr>
   );
@@ -323,7 +323,7 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-function formatRiskScore(score: number | null): string {
+function formatScore(score: number | null): string {
   if (score === null) {
     return "—";
   }

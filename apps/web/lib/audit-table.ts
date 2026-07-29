@@ -1,5 +1,6 @@
 import { saveBlobAsFile } from "./api";
 import { formatDateTime } from "./format";
+import { toSkillSpectorSafetyScore } from "./skillspector-summary";
 import type { FunctionalEvaluationReport, RegistrySkill } from "./types";
 
 export interface AuditRow {
@@ -9,7 +10,7 @@ export interface AuditRow {
   creatorHandle?: string;
   version: string;
   publishDate: string;
-  skillSpectorRiskScore: number | null;
+  skillSpectorSafetyScore: number | null;
   haluCatchScore: number | null;
 }
 
@@ -19,7 +20,7 @@ export interface AuditExportRecord {
   creator: string;
   version: string;
   publish_date: string;
-  skillspector_risk_score: number | "";
+  skillspector_safety_score: number | "";
   halucatch_score: number | "";
 }
 
@@ -29,7 +30,7 @@ const EXPORT_HEADERS: (keyof AuditExportRecord)[] = [
   "creator",
   "version",
   "publish_date",
-  "skillspector_risk_score",
+  "skillspector_safety_score",
   "halucatch_score"
 ];
 
@@ -52,7 +53,9 @@ export function buildAuditRows(skills: RegistrySkill[]): AuditRow[] {
       creatorHandle: owner?.username,
       version: latest.version,
       publishDate: latest.createdAt,
-      skillSpectorRiskScore: latest.review.skillSpector?.riskScore ?? null,
+      skillSpectorSafetyScore: latest.review.skillSpector
+        ? toSkillSpectorSafetyScore(latest.review.skillSpector.riskScore)
+        : null,
       haluCatchScore: resolveHaluCatchScore(latest.evaluation)
     });
   }
@@ -60,7 +63,7 @@ export function buildAuditRows(skills: RegistrySkill[]): AuditRow[] {
   return rows;
 }
 
-export type AuditSortField = "publish_date" | "skillspector_risk_score" | "halucatch_score";
+export type AuditSortField = "publish_date" | "skillspector_safety_score" | "halucatch_score";
 export type AuditSortDirection = "asc" | "desc";
 
 export function sortAuditRows(
@@ -73,8 +76,8 @@ export function sortAuditRows(
     switch (field) {
       case "publish_date":
         return comparePublishDate(left.publishDate, right.publishDate, direction);
-      case "skillspector_risk_score":
-        return compareNullableNumber(left.skillSpectorRiskScore, right.skillSpectorRiskScore, direction);
+      case "skillspector_safety_score":
+        return compareNullableNumber(left.skillSpectorSafetyScore, right.skillSpectorSafetyScore, direction);
       case "halucatch_score":
         return compareNullableNumber(left.haluCatchScore, right.haluCatchScore, direction);
       default:
@@ -119,7 +122,7 @@ export function auditRowsToExportRecords(rows: AuditRow[]): AuditExportRecord[] 
     creator: formatCreatorForExport(row),
     version: row.version,
     publish_date: formatDateTime(row.publishDate),
-    skillspector_risk_score: row.skillSpectorRiskScore ?? "",
+    skillspector_safety_score: row.skillSpectorSafetyScore ?? "",
     halucatch_score: row.haluCatchScore ?? ""
   }));
 }

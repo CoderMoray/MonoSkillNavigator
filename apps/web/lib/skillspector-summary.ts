@@ -39,6 +39,13 @@ export function formatSkillSpectorScanMode(scanMode: string | undefined): string
   return scanMode;
 }
 
+/** Package-level SkillSpector risk (0–100) inverted to a safety score. */
+export function toSkillSpectorSafetyScore(riskScore: number): number {
+  const clamped = Math.min(100, Math.max(0, riskScore));
+  return 100 - clamped;
+}
+
 export function formatSkillSpectorSummaryLine(summary: SkillSpectorScanSummary): string {
-  return `当前风险分 ${summary.riskScore}/100（${formatSkillSpectorRiskSeverity(summary.riskSeverity)}）。`;
+  const safetyScore = toSkillSpectorSafetyScore(summary.riskScore);
+  return `当前安全分 ${safetyScore}/100（${formatSkillSpectorRiskSeverity(summary.riskSeverity)}）。`;
 }

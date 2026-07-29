@@ -43,7 +43,8 @@ import {
   formatSkillSpectorRecommendation,
   formatSkillSpectorRiskSeverity,
   formatSkillSpectorScanMode,
-  formatSkillSpectorSummaryLine
+  formatSkillSpectorSummaryLine,
+  toSkillSpectorSafetyScore
 } from "../../../lib/skillspector-summary";
 import { averageHaluCatchRadarScores, type HaluCatchRadarScores } from "../../../lib/halucatch-scores";
 import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill } from "../../../lib/types";
@@ -1167,7 +1168,7 @@ export default function SkillDetailPage() {
                   <div>
                     <h3>安全审查</h3>
                     <p className="description">
-                      由 SkillSpector 对发布包做静态安全扫描；以下 finding 与风险分用于解释阻断或复核原因，不再汇总为单一安全分。
+                      由 SkillSpector 对发布包做静态安全扫描；以下 finding 与包级安全分用于解释阻断或复核原因，不再汇总为单一安全分。
                       {skillSpectorScan ? ` ${formatSkillSpectorSummaryLine(skillSpectorScan)}` : null}
                       {hiddenPlatformFindingCount > 0
                         ? ` 另有 ${hiddenPlatformFindingCount} 条平台质量/合规提示（如 description、tags、tests）计入审查记录，但不在此安全区域展示。`
@@ -1182,8 +1183,8 @@ export default function SkillDetailPage() {
                       <strong>SkillSpector</strong>
                     </div>
                     <div>
-                      <span>风险分</span>
-                      <strong>{skillSpectorScan.riskScore}/100</strong>
+                      <span>安全分</span>
+                      <strong>{toSkillSpectorSafetyScore(skillSpectorScan.riskScore)}/100</strong>
                     </div>
                     <div>
                       <span>包级风险</span>
