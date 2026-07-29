@@ -168,17 +168,19 @@ export async function reviewSkillSnapshot(
     });
   }
 
-  reviewManifest(snapshot, findings);
-  reviewQualityEvidence(snapshot, findings);
+  const evaluation = evaluationOverride ?? (await evaluateSkillSnapshot(snapshot));
+  const haluCatchAvailable = evaluation.provider === "halucatch-adapter";
 
   let skillSpector: SkillSpectorScanSummary | undefined;
+  let skillSpectorAvailable = false;
+
   if (isSkillSpectorEnabled()) {
     try {
       const scan = await runSkillSpectorSecurityScan(snapshot);
       skillSpector = scan.summary;
+      skillSpectorAvailable = true;
       findings.push(...scan.findings);
     } catch (error) {
-      reviewContent(snapshot, findings);
       findings.push({
         id: "skillspector-unavailable",
         category: "security",
@@ -186,14 +188,16 @@ export async function reviewSkillSnapshot(
         title: "SkillSpector security scan unavailable",
         message: `SkillSpector static security scan could not run: ${truncateError(error)}`,
         recommendation:
-          "Install Python 3.12+ with SkillSpector dependencies, keep packages/SkillSpector-main available, or set SKILLSPECTOR_PYTHON. Falling back to built-in regex checks."
+          "Install Python 3.12+ with SkillSpector dependencies, keep packages/SkillSpector-main available, or set SKILLSPECTOR_PYTHON. Falling back to built-in platform review rules."
       });
     }
-  } else {
-    reviewContent(snapshot, findings);
   }
 
-  const evaluation = evaluationOverride ?? await evaluateSkillSnapshot(snapshot);
+  const shouldRunPlatformRules = !haluCatchAvailable || !skillSpectorAvailable;
+  if (shouldRunPlatformRules) {
+    runPlatformRulesReview(snapshot, findings, { includeContentRules: !skillSpectorAvailable });
+  }
+
   const scores = calculateScores(findings, evaluation, skillSpector);
   const verdict = calculateVerdict(findings);
 
@@ -209,6 +213,18 @@ export async function reviewSkillSnapshot(
     skillSpector,
     createdAt: new Date().toISOString()
   };
+}
+
+function runPlatformRulesReview(
+  snapshot: SkillSnapshot,
+  findings: ReviewFinding[],
+  options: { includeContentRules: boolean }
+): void {
+  reviewManifest(snapshot, findings);
+  reviewQualityEvidence(snapshot, findings);
+  if (options.includeContentRules) {
+    reviewContent(snapshot, findings);
+  }
 }
 
 function reviewManifest(snapshot: SkillSnapshot, findings: ReviewFinding[]): void {
@@ -351,8 +367,8 @@ function calculateScores(
   _evaluation: FunctionalEvaluationReport,
   _skillSpector?: SkillSpectorScanSummary
 ): ReviewScores {
-  // Published skills already passed package format validation at publish time.
-  // Quality is shown via HaluCatch five-dimensional radar; security via SkillSpector findings.
+  // Placeholder DB scores; quality via HaluCatch, security via SkillSpector when available.
+  // Platform manifest/quality/content rules run only when HaluCatch or SkillSpector is unavailable.
   return {
     qualityScore: 100,
     securityScore: 100,
