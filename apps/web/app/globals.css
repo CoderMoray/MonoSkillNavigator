@@ -931,6 +931,19 @@ button {
   width: 56px;
 }
 
+.audit-table-select-col {
+  width: 44px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.audit-row-checkbox {
+  accent-color: var(--accent, #3b82f6);
+  cursor: pointer;
+  height: 16px;
+  width: 16px;
+}
+
 .audit-table-skill-link {
   font-weight: 600;
 }

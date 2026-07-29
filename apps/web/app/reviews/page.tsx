@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownUp, Download, FileSpreadsheet, ShieldCheck } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
 import {
@@ -35,8 +35,62 @@ export default function ReviewsPage() {
   const [exporting, setExporting] = useState<"csv" | "xlsx" | null>(null);
   const [sortField, setSortField] = useState<AuditSortField>("publish_date");
   const [sortDirection, setSortDirection] = useState<AuditSortDirection>("desc");
+  const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(() => new Set());
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   const hasMore = detailOffset < summaries.length;
+
+  const auditRows = useMemo(
+    () => sortAuditRows(buildAuditRows(skills), sortField, sortDirection),
+    [skills, sortField, sortDirection]
+  );
+
+  const hasExplicitSelection = selectedSlugs.size > 0;
+
+  const exportRows = useMemo(() => {
+    if (!hasExplicitSelection) {
+      return auditRows;
+    }
+    return auditRows.filter((row) => selectedSlugs.has(row.slug));
+  }, [auditRows, hasExplicitSelection, selectedSlugs]);
+
+  const allVisibleSelected =
+    auditRows.length > 0 && auditRows.every((row) => selectedSlugs.has(row.slug));
+  const someVisibleSelected = auditRows.some((row) => selectedSlugs.has(row.slug));
+
+  useEffect(() => {
+    const input = selectAllRef.current;
+    if (input) {
+      input.indeterminate = someVisibleSelected && !allVisibleSelected;
+    }
+  }, [allVisibleSelected, someVisibleSelected]);
+
+  function toggleSlug(slug: string, checked: boolean) {
+    setSelectedSlugs((current) => {
+      const next = new Set(current);
+      if (checked) {
+        next.add(slug);
+      } else {
+        next.delete(slug);
+      }
+      return next;
+    });
+  }
+
+  function setAllVisibleSelected(checked: boolean) {
+    const visibleSlugs = auditRows.map((row) => row.slug);
+    setSelectedSlugs((current) => {
+      const next = new Set(current);
+      for (const slug of visibleSlugs) {
+        if (checked) {
+          next.add(slug);
+        } else {
+          next.delete(slug);
+        }
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +100,7 @@ export default function ReviewsPage() {
       setError(null);
       setSkills([]);
       setDetailOffset(0);
+      setSelectedSlugs(new Set());
       try {
         const items = await getSkills();
         if (cancelled) {
@@ -97,11 +152,6 @@ export default function ReviewsPage() {
     }
   }
 
-  const auditRows = useMemo(
-    () => sortAuditRows(buildAuditRows(skills), sortField, sortDirection),
-    [skills, sortField, sortDirection]
-  );
-
   const directionOptions = useMemo(
     () => directionOptionsForField(sortField),
     [sortField]
@@ -115,24 +165,24 @@ export default function ReviewsPage() {
   }
 
   async function handleExportCsv() {
-    if (auditRows.length === 0) {
+    if (exportRows.length === 0) {
       return;
     }
     setExporting("csv");
     try {
-      downloadAuditCsv(auditRows);
+      downloadAuditCsv(exportRows);
     } finally {
       setExporting(null);
     }
   }
 
   async function handleExportXlsx() {
-    if (auditRows.length === 0) {
+    if (exportRows.length === 0) {
       return;
     }
     setExporting("xlsx");
     try {
-      await downloadAuditXlsx(auditRows);
+      await downloadAuditXlsx(exportRows);
     } catch (err) {
       setError(err instanceof Error ? err.message : "导出 Excel 失败");
     } finally {
@@ -155,6 +205,8 @@ export default function ReviewsPage() {
           <div className="stats-card hero-card">
             <div className="stat-grid">
               <Stat label="已加载" value={auditRows.length} />
+              <Stat label="已勾选" value={selectedSlugs.size} />
+              <Stat label="将导出" value={exportRows.length} />
               <Stat label="Skill 总数" value={summaries.length} />
             </div>
           </div>
@@ -167,7 +219,9 @@ export default function ReviewsPage() {
             <div className="section-head" style={{ marginBottom: 0 }}>
               <div>
                 <h2>审查列表</h2>
-                <p>与下方表格列一致，可排序并导出 CSV 或 Excel。</p>
+                <p>
+                  与下方表格列一致，可排序。未勾选任何行时导出当前已加载的全部记录；有勾选时仅导出已勾选行。
+                </p>
               </div>
             </div>
             <div className="audit-toolbar-actions">
@@ -205,7 +259,7 @@ export default function ReviewsPage() {
               <div className="audit-export-actions">
                 <button
                   className="button secondary compact"
-                  disabled={loading || auditRows.length === 0 || exporting !== null}
+                  disabled={loading || exportRows.length === 0 || exporting !== null}
                   onClick={() => void handleExportCsv()}
                   type="button"
                 >
@@ -214,7 +268,7 @@ export default function ReviewsPage() {
                 </button>
                 <button
                   className="button secondary compact"
-                  disabled={loading || auditRows.length === 0 || exporting !== null}
+                  disabled={loading || exportRows.length === 0 || exporting !== null}
                   onClick={() => void handleExportXlsx()}
                   type="button"
                 >
@@ -239,6 +293,16 @@ export default function ReviewsPage() {
                 <table className="audit-table">
                   <thead>
                     <tr>
+                      <th className="audit-table-select-col" scope="col">
+                        <input
+                          aria-label="全选当前列表"
+                          checked={allVisibleSelected}
+                          className="audit-row-checkbox"
+                          onChange={(event) => setAllVisibleSelected(event.target.checked)}
+                          ref={selectAllRef}
+                          type="checkbox"
+                        />
+                      </th>
                       <th scope="col">排序</th>
                       <th scope="col">skill_name</th>
                       <th scope="col">creator</th>
@@ -250,7 +314,13 @@ export default function ReviewsPage() {
                   </thead>
                   <tbody>
                     {auditRows.map((row, index) => (
-                      <AuditTableRow key={row.slug} rank={index + 1} row={row} />
+                      <AuditTableRow
+                        key={row.slug}
+                        onToggle={(checked) => toggleSlug(row.slug, checked)}
+                        rank={index + 1}
+                        row={row}
+                        selected={selectedSlugs.has(row.slug)}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -290,9 +360,28 @@ function directionOptionsForField(field: AuditSortField): { value: AuditSortDire
   ];
 }
 
-function AuditTableRow({ rank, row }: { rank: number; row: AuditRow }) {
+function AuditTableRow({
+  rank,
+  row,
+  selected,
+  onToggle
+}: {
+  rank: number;
+  row: AuditRow;
+  selected: boolean;
+  onToggle: (checked: boolean) => void;
+}) {
   return (
     <tr>
+      <td className="audit-table-select-col">
+        <input
+          aria-label={`选择 ${row.skillName}`}
+          checked={selected}
+          className="audit-row-checkbox"
+          onChange={(event) => onToggle(event.target.checked)}
+          type="checkbox"
+        />
+      </td>
       <td className="audit-table-rank">{rank}</td>
       <td>
         <Link className="audit-table-skill-link" href={`/skills/${encodeURIComponent(row.slug)}`}>
