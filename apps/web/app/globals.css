@@ -2656,14 +2656,14 @@ button {
   border: 1px solid var(--border);
   border-top: 0;
   border-radius: 0 0 var(--radius-md) var(--radius-md);
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--background);
   padding: 16px;
 }
 
 .changelog-content {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--background-strong);
   color: var(--muted-strong);
   padding: 16px;
   white-space: pre-wrap;
@@ -2872,7 +2872,6 @@ button {
 :root[data-theme="dark"] .file-preview,
 :root[data-theme="dark"] .version-row,
 :root[data-theme="dark"] .version-entry-head,
-:root[data-theme="dark"] .version-changelog,
 :root[data-theme="dark"] .changelog-content,
 :root[data-theme="dark"] .requirement-card,
 :root[data-theme="dark"] .review-score-card,
