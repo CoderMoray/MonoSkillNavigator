@@ -109,7 +109,6 @@ export default function SkillDetailPage() {
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [contributorName, setContributorName] = useState("");
   const [contributorRole, setContributorRole] = useState<RegistryContributor["role"]>("contributor");
-  const [contributorMessage, setContributorMessage] = useState<string | null>(null);
   const [contributorError, setContributorError] = useState<string | null>(null);
   const [addingContributor, setAddingContributor] = useState(false);
   const [issueType, setIssueType] = useState<RegistryIssue["type"]>("bug");
@@ -398,7 +397,6 @@ export default function SkillDetailPage() {
   async function handleAddContributor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setContributorError(null);
-    setContributorMessage(null);
 
     const token = getAuthToken();
     if (!token) {
@@ -435,7 +433,7 @@ export default function SkillDetailPage() {
       });
       setContributorName("");
       setContributorRole("contributor");
-      setContributorMessage(`已添加 ${contributor.name} 为 ${contributor.role}`);
+      setSuccessToast(`已添加 ${contributor.name} 为 ${contributor.role}`);
     } catch (err) {
       setContributorError(err instanceof Error ? err.message : "添加 contributor 失败");
     } finally {
@@ -931,7 +929,6 @@ export default function SkillDetailPage() {
                           <option value="owner">owner</option>
                         </select>
                       </label>
-                      {contributorMessage ? <div className="notice">{contributorMessage}</div> : null}
                       {contributorError ? <div className="error compact-error">{contributorError}</div> : null}
                       <button className="button primary" disabled={addingContributor} type="submit">
                         <Plus size={15} />
