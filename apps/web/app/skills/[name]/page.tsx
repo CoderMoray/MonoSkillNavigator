@@ -279,7 +279,9 @@ export default function SkillDetailPage() {
   const files = snapshot?.files ?? [];
   const skillMdFile = files.find((file) => isSkillEntryPath(file.path));
   const skillEntryLabel = skillMdFile?.path ?? "SKILL.md";
-  const markdownContent = snapshot?.readme?.trim() || stripFrontmatter(skillMdFile?.content ?? "");
+  const markdownContent = skillMdFile
+    ? stripFrontmatter(skillMdFile.content).trim()
+    : (snapshot?.readme?.trim() ?? "");
   const selectedFile = files.find((file) => file.path === selectedFilePath) ?? files[0];
   const isOwner = Boolean(
     viewer &&
@@ -854,21 +856,11 @@ export default function SkillDetailPage() {
           role="tabpanel"
         >
           {activePanel === "skill-md" ? (
-            <>
-              <div className="detail-panel-head">
-                <div>
-                  <span className="eyebrow">Document</span>
-                  <h2>{skillEntryLabel}</h2>
-                  <p className="description">渲染当前版本的 Skill 说明文档。</p>
-                </div>
-                {skillMdFile ? <span className="badge mono">{formatFileSize(skillMdFile.size)}</span> : null}
-              </div>
-              {markdownContent ? (
-                <MarkdownContent>{markdownContent}</MarkdownContent>
-              ) : (
-                <div className="empty detail-empty">当前版本没有可渲染的 Skill 入口文件内容。</div>
-              )}
-            </>
+            markdownContent ? (
+              <MarkdownContent>{markdownContent}</MarkdownContent>
+            ) : (
+              <div className="empty detail-empty">当前版本没有可渲染的 Skill 入口文件内容。</div>
+            )
           ) : null}
 
           {activePanel === "skill-card" ? (
