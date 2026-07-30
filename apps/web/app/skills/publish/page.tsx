@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChangeEvent, DragEvent, FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, ChevronDown, KeyRound, UploadCloud } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
+import { SuccessToast } from "../../../components/SuccessToast";
 import {
   getCurrentUser,
   getSkill,
@@ -73,6 +74,7 @@ function PublishSkillPageContent() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [archiveHint, setArchiveHint] = useState<string | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
   const [parsingArchive, setParsingArchive] = useState(false);
   const [existingSkillBySlug, setExistingSkillBySlug] = useState<RegistrySkill | null>(null);
   const [loadingExistingSlug, setLoadingExistingSlug] = useState(false);
@@ -353,6 +355,7 @@ function PublishSkillPageContent() {
   async function applyArchiveFile(fileToUpload: File) {
     setError(null);
     setArchiveHint(null);
+    setSuccessToast(null);
     setFile(fileToUpload);
 
     try {
@@ -367,7 +370,7 @@ function PublishSkillPageContent() {
       });
 
       if (filledFields.length > 0) {
-        setArchiveHint(`已从 Skill 入口文件自动填入：${filledFields.join("、")}。`);
+        setSuccessToast(`已从 Skill 入口文件自动填入：${filledFields.join("、")}。`);
       } else {
         setArchiveHint("已上传 Skill 包，但未读取到可用的 frontmatter 字段。");
       }
@@ -385,6 +388,7 @@ function PublishSkillPageContent() {
   }) {
     setError(null);
     setArchiveHint(null);
+    setSuccessToast(null);
 
     if (!options.zipFile && !options.folderFileList?.length && !options.dataTransfer?.items.length) {
       setFile(null);
@@ -567,6 +571,7 @@ function PublishSkillPageContent() {
 
   return (
     <AppShell title={isNewVersion ? "New version" : "Publish"}>
+      {successToast ? <SuccessToast message={successToast} onClose={() => setSuccessToast(null)} /> : null}
       <div className="market-stack">
         <section className="section-head">
           <div>
