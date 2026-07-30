@@ -1,21 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { ArrowLeft, KeyRound } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
-import { SuccessToast } from "../../../components/SuccessToast";
 import { changePassword, getCurrentUser } from "../../../lib/api";
 import { clearAuthToken, getAuthToken } from "../../../lib/auth-token";
+import { creatorProfilePath } from "../../../lib/creators";
+import { saveFlashToast } from "../../../lib/flash-toast";
 import type { PublicUser } from "../../../lib/types";
 
 export default function ChangePasswordPage() {
+  const router = useRouter();
   const [user, setUser] = useState<PublicUser | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(true);
-  const [successToast, setSuccessToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -71,7 +73,8 @@ export default function ChangePasswordPage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setSuccessToast("密码已更新");
+      saveFlashToast("密码已更新");
+      router.push(creatorProfilePath(updatedUser.username));
     } catch (err) {
       setError(err instanceof Error ? err.message : "修改失败");
     } finally {
@@ -81,7 +84,6 @@ export default function ChangePasswordPage() {
 
   return (
     <AppShell title="修改密码">
-      {successToast ? <SuccessToast message={successToast} onClose={() => setSuccessToast(null)} /> : null}
       <div className="auth-page">
         {loading ? (
           <div className="skeleton auth-card" />

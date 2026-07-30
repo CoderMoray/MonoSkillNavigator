@@ -6,7 +6,9 @@ import { useEffect, useState } from "react";
 import { AppShell } from "../../../components/AppShell";
 import { CreatorProfileView } from "../../../components/CreatorProfileView";
 import { PublishNoticeToast } from "../../../components/PublishNoticeToast";
+import { SuccessToast } from "../../../components/SuccessToast";
 import { getCreatorProfile, getCurrentUser } from "../../../lib/api";
+import { readFlashToast } from "../../../lib/flash-toast";
 import { clearPublishNotice, readPublishNotice, type PublishNotice } from "../../../lib/publish-notice";
 import { getAuthToken } from "../../../lib/auth-token";
 import { normalizeHandle, type CreatorSummary } from "../../../lib/creators";
@@ -20,9 +22,11 @@ export default function CreatorProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [publishNotice, setPublishNotice] = useState<PublishNotice | null>(null);
+  const [flashToast, setFlashToast] = useState<string | null>(null);
 
   useEffect(() => {
     setPublishNotice(readPublishNotice());
+    setFlashToast(readFlashToast());
   }, []);
 
   useEffect(() => {
@@ -93,6 +97,7 @@ export default function CreatorProfilePage() {
           }}
         />
       ) : null}
+      {flashToast ? <SuccessToast message={flashToast} onClose={() => setFlashToast(null)} /> : null}
       <CreatorProfileView creator={creator} viewer={viewer} />
     </AppShell>
   );
