@@ -126,7 +126,6 @@ export default function SkillDetailPage() {
   const [issueModalOpen, setIssueModalOpen] = useState(false);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [downloadingVersion, setDownloadingVersion] = useState<string | null>(null);
-  const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [unpublishModalOpen, setUnpublishModalOpen] = useState(false);
   const [republishModalOpen, setRepublishModalOpen] = useState(false);
@@ -544,7 +543,6 @@ export default function SkillDetailPage() {
 
   async function handleDownload(version: string) {
     setDownloadError(null);
-    setDownloadMessage(null);
 
     const token = getAuthToken();
     if (!token) {
@@ -558,7 +556,7 @@ export default function SkillDetailPage() {
       saveBlobAsFile(blob, fileName);
       const updated = await getSkill(skill.slug, token);
       setSkill(updated);
-      setDownloadMessage(`已下载 v${version}（${fileName}）`);
+      setSuccessToast(`已下载 v${version}（${fileName}）`);
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : "下载失败");
     } finally {
@@ -767,7 +765,6 @@ export default function SkillDetailPage() {
                 </Link>
               )}
             </div>
-            {downloadMessage ? <div className="notice">{downloadMessage}</div> : null}
             {downloadError ? <div className="error">{downloadError}</div> : null}
             {manageMessage ? <div className="notice">{manageMessage}</div> : null}
             {manageError ? <div className="error">{manageError}</div> : null}
