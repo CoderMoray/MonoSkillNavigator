@@ -31,6 +31,7 @@ import {
   X
 } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
+import { SuccessToast } from "../../../components/SuccessToast";
 import { HaluCatchRadar } from "../../../components/HaluCatchRadar";
 import { FindingConfidenceBadge } from "../../../components/FindingConfidenceBadge";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
@@ -114,14 +115,13 @@ export default function SkillDetailPage() {
   const [issueSeverity, setIssueSeverity] = useState<RegistryIssue["severity"]>("medium");
   const [issueTitle, setIssueTitle] = useState("");
   const [issueBody, setIssueBody] = useState("");
-  const [issueMessage, setIssueMessage] = useState<string | null>(null);
   const [issueError, setIssueError] = useState<string | null>(null);
   const [submittingIssue, setSubmittingIssue] = useState(false);
   const [ratingScore, setRatingScore] = useState(0);
   const [ratingComment, setRatingComment] = useState("");
-  const [ratingMessage, setRatingMessage] = useState<string | null>(null);
   const [ratingError, setRatingError] = useState<string | null>(null);
   const [submittingRating, setSubmittingRating] = useState(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
   const [issueModalOpen, setIssueModalOpen] = useState(false);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [downloadingVersion, setDownloadingVersion] = useState<string | null>(null);
@@ -380,7 +380,7 @@ export default function SkillDetailPage() {
 
   function openRatingModal() {
     if (viewerExistingRating) {
-      setRatingMessage(
+      setSuccessToast(
         `你已对该版本评分（v${currentVersion.version} · ${viewerExistingRating.score}/5），切换版本后可对其它版本再评。`
       );
       return;
@@ -445,7 +445,6 @@ export default function SkillDetailPage() {
   async function handleSubmitIssue(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIssueError(null);
-    setIssueMessage(null);
 
     const token = getAuthToken();
     if (!token) {
@@ -485,7 +484,7 @@ export default function SkillDetailPage() {
       setIssueType("bug");
       setIssueSeverity("medium");
       setIssueModalOpen(false);
-      setIssueMessage("Issue 已提交。");
+      setSuccessToast("Issue 已提交。");
     } catch (err) {
       setIssueError(err instanceof Error ? err.message : "提交 Issue 失败");
     } finally {
@@ -496,7 +495,6 @@ export default function SkillDetailPage() {
   async function handleSubmitRating(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setRatingError(null);
-    setRatingMessage(null);
 
     const token = getAuthToken();
     if (!token) {
@@ -533,7 +531,7 @@ export default function SkillDetailPage() {
       setRatingScore(0);
       setRatingComment("");
       setRatingModalOpen(false);
-      setRatingMessage("评分已提交。");
+      setSuccessToast("评分已提交。");
     } catch (err) {
       setRatingError(formatRatingError(err instanceof Error ? err.message : "提交评分失败"));
     } finally {
@@ -660,6 +658,7 @@ export default function SkillDetailPage() {
 
   return (
     <AppShell title={skill.name}>
+      {successToast ? <SuccessToast message={successToast} onClose={() => setSuccessToast(null)} /> : null}
       <div className="page-stack">
         <Link className="button secondary" href="/skills" style={{ width: "fit-content" }}>
           <ArrowLeft size={16} /> 返回 Skill 广场
@@ -1366,7 +1365,6 @@ export default function SkillDetailPage() {
                       )}
                     </div>
                   </div>
-                  {issueMessage ? <div className="notice">{issueMessage}</div> : null}
                   {skill.issues.length === 0 ? (
                     <div className="empty detail-empty">暂无 issue。</div>
                   ) : (
@@ -1408,7 +1406,6 @@ export default function SkillDetailPage() {
                       )}
                     </div>
                   </div>
-                  {ratingMessage ? <div className="notice">{ratingMessage}</div> : null}
                   {skill.ratings.length === 0 ? (
                     <div className="empty detail-empty">暂无评分。</div>
                   ) : (
