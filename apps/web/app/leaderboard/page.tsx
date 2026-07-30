@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Download, Star, Trophy } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
+import { PillSelect } from "../../components/PillSelect";
 import { VerdictBadge } from "../../components/StatusBadge";
 import { getLeaderboard } from "../../lib/api";
 import { formatDateTime, formatNumber } from "../../lib/format";
@@ -49,6 +50,9 @@ export default function LeaderboardPage() {
     };
   }, [sort]);
 
+  const selectedSort = sortOptions.find((option) => option.value === sort) ?? sortOptions[0];
+  const SelectedSortIcon = selectedSort.icon;
+
   return (
     <AppShell title="榜单">
       <div className="page-stack">
@@ -61,15 +65,13 @@ export default function LeaderboardPage() {
             <h2 style={{ marginTop: 14 }}>Skill 榜单</h2>
             <p>按下载量、用户评分或更新时间排序；质量与安全请在 Skill 详情的 HaluCatch 与 SkillSpector 区域查看。</p>
           </div>
-          <label className="select-wrap">
-            <select className="select" onChange={(event) => setSort(event.target.value)} value={sort}>
-              {sortOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <PillSelect
+            ariaLabel="排序方式"
+            icon={<SelectedSortIcon size={16} />}
+            onChange={setSort}
+            options={sortOptions.map(({ value, label }) => ({ value, label }))}
+            value={sort}
+          />
         </section>
 
         {error ? <div className="error">{error}。请确认 API 已通过 npm run dev:api 启动。</div> : null}
