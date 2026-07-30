@@ -2,7 +2,21 @@ import Link from "next/link";
 import { Download, EyeOff, MessageSquare, Star, Users } from "lucide-react";
 import { formatDateTime, formatNumber } from "../lib/format";
 import type { SkillSearchResult } from "../lib/types";
+import { SkillCategoryIcon } from "./SkillCategoryIcon";
 import { VerdictBadge } from "./StatusBadge";
+
+function SkillListIcon({ skill }: { skill: SkillSearchResult }) {
+  const category = skill.categories[0];
+  if (category) {
+    return (
+      <div className="skill-icon">
+        <SkillCategoryIcon category={category} size={20} />
+      </div>
+    );
+  }
+
+  return <div className="skill-icon">{skill.name.slice(0, 1).toUpperCase()}</div>;
+}
 
 export function SkillCard({ skill, variant = "card" }: { skill: SkillSearchResult; variant?: "card" | "row" }) {
   const owner = skill.contributors.find((item) => item.role === "owner") ?? skill.contributors[0];
@@ -11,7 +25,7 @@ export function SkillCard({ skill, variant = "card" }: { skill: SkillSearchResul
     return (
       <Link className="skill-row" href={`/skills/${encodeURIComponent(skill.slug)}`}>
         <div className="skill-row-main">
-          <div className="skill-icon">{skill.name.slice(0, 1).toUpperCase()}</div>
+          <SkillListIcon skill={skill} />
           <div>
             <div className="skill-row-title">
               <strong>{skill.name}</strong>
