@@ -1104,6 +1104,155 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     return skill;
   }
 
+  async bookmarkSkill(userId: string, slug: string): Promise<void> {
+    await this.ensureSchema();
+
+    const [skillRow] = await this.db
+      .select({ slug: schema.skills.slug })
+      .from(schema.skills)
+      .where(and(eq(schema.skills.slug, slug), isNull(schema.skills.deletedAt)))
+      .limit(1);
+    if (!skillRow) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+
+    const id = `bookmark_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    await this.db
+      .insert(schema.skillBookmarks)
+      .values({ id, userId, skillSlug: slug, createdAt: new Date() })
+      .onConflictDoNothing({
+        target: [schema.skillBookmarks.userId, schema.skillBookmarks.skillSlug],
+      });
+  }
+
+  async unbookmarkSkill(userId: string, slug: string): Promise<void> {
+    await this.ensureSchema();
+    await this.db
+      .delete(schema.skillBookmarks)
+      .where(and(eq(schema.skillBookmarks.userId, userId), eq(schema.skillBookmarks.skillSlug, slug)));
+  }
+
+  async isSkillBookmarked(userId: string, slug: string): Promise<boolean> {
+    await this.ensureSchema();
+    const [row] = await this.db
+      .select({ id: schema.skillBookmarks.id })
+      .from(schema.skillBookmarks)
+      .where(and(eq(schema.skillBookmarks.userId, userId), eq(schema.skillBookmarks.skillSlug, slug)))
+      .limit(1);
+    return Boolean(row);
+  }
+
+  async listBookmarkedSkills(userId: string): Promise<SkillSearchResult[]> {
+    await this.ensureSchema();
+
+    const rows = await this.db
+      .select({
+        slug: schema.skills.slug,
+        name: schema.skills.name,
+        description: schema.skills.description,
+        latestVersion: schema.skills.latestVersion,
+        status: schema.skillVersions.status,
+        categories: schema.skillVersions.categories,
+        qualityScore: schema.skillReviews.qualityScore,
+        securityScore: schema.skillReviews.securityScore,
+        reliabilityScore: schema.skillReviews.reliabilityScore,
+        averageRating: schema.skills.averageRating,
+        ratingCount: schema.skills.ratingCount,
+        totalDownloads: sql<number>`coalesce(sum(${schema.skillVersions.downloads}), 0)`.mapWith(Number),
+        updatedAt: schema.skills.updatedAt,
+        openIssues: sql<number>`(
+          select count(*) from ${schema.skillIssues}
+          where ${schema.skillIssues.skillSlug} = ${schema.skills.slug}
+          and ${schema.skillIssues.status} != 'closed'
+        )`.mapWith(Number),
+        bookmarkedAt: schema.skillBookmarks.createdAt,
+      })
+      .from(schema.skillBookmarks)
+      .innerJoin(schema.skills, eq(schema.skillBookmarks.skillSlug, schema.skills.slug))
+      .innerJoin(
+        schema.skillVersions,
+        and(
+          eq(schema.skillVersions.skillSlug, schema.skills.slug),
+          eq(schema.skillVersions.version, schema.skills.latestVersion)
+        )
+      )
+      .innerJoin(
+        schema.skillReviews,
+        and(
+          eq(schema.skillReviews.skillSlug, schema.skills.slug),
+          eq(schema.skillReviews.version, schema.skills.latestVersion)
+        )
+      )
+      .where(
+        and(
+          eq(schema.skillBookmarks.userId, userId),
+          isNull(schema.skills.deletedAt),
+          eq(schema.skills.published, true)
+        )
+      )
+      .groupBy(
+        schema.skills.slug,
+        schema.skills.name,
+        schema.skills.description,
+        schema.skills.latestVersion,
+        schema.skillVersions.status,
+        schema.skillVersions.categories,
+        schema.skillReviews.qualityScore,
+        schema.skillReviews.securityScore,
+        schema.skillReviews.reliabilityScore,
+        schema.skills.averageRating,
+        schema.skills.ratingCount,
+        schema.skills.updatedAt,
+        schema.skillBookmarks.createdAt
+      )
+      .orderBy(desc(schema.skillBookmarks.createdAt));
+
+    const slugs = rows.map((r) => r.slug);
+    if (slugs.length === 0) {
+      return [];
+    }
+
+    const allContributors = await this.db
+      .select()
+      .from(schema.skillContributors)
+      .where(inArray(schema.skillContributors.skillSlug, slugs));
+
+    const contributorsMap = new Map<string, SkillSearchResult["contributors"]>();
+    for (const c of allContributors) {
+      const list = contributorsMap.get(c.skillSlug) ?? [];
+      list.push({
+        id: c.id,
+        userId: c.userId ?? undefined,
+        username: c.username ?? undefined,
+        name: c.name,
+        role: c.role as SkillSearchResult["contributors"][number]["role"],
+        addedAt: String(c.addedAt),
+      });
+      contributorsMap.set(c.skillSlug, list);
+    }
+
+    return rows.map((r) => ({
+      slug: r.slug,
+      name: r.name,
+      description: r.description,
+      latestVersion: r.latestVersion,
+      status: r.status as SkillSearchResult["status"],
+      scores: {
+        qualityScore: Number(r.qualityScore),
+        securityScore: Number(r.securityScore),
+        reliabilityScore: Number(r.reliabilityScore),
+      },
+      categories: r.categories ?? [],
+      averageRating: Number(r.averageRating),
+      ratingCount: Number(r.ratingCount),
+      openIssues: r.openIssues,
+      contributors: contributorsMap.get(r.slug) ?? [],
+      downloads: r.totalDownloads,
+      updatedAt: String(r.updatedAt),
+      published: true,
+    }));
+  }
+
   async listRecycleBinForOwner(ownerUserId: string): Promise<RecycleBinSkill[]> {
     await this.ensureSchema();
     const ownerMatch = or(

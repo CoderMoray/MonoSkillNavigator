@@ -9,6 +9,7 @@ import { isSkillEntryPath } from "@skill-platform/skill-spec/skill-format";
 import {
   ArrowLeft,
   BookOpen,
+  Bookmark,
   ChevronDown,
   ChevronRight,
   Copy,
@@ -33,7 +34,7 @@ import { AppShell } from "../../../components/AppShell";
 import { HaluCatchRadar } from "../../../components/HaluCatchRadar";
 import { FindingConfidenceBadge } from "../../../components/FindingConfidenceBadge";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
-import { addSkillContributor, addSkillRating, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, republishSkill, saveBlobAsFile, unpublishSkill } from "../../../lib/api";
+import { addSkillContributor, addSkillRating, bookmarkSkill, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, republishSkill, saveBlobAsFile, unpublishSkill, unbookmarkSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { creatorProfilePath } from "../../../lib/creators";
 import { formatDateTime, formatNumber } from "../../../lib/format";
@@ -134,6 +135,8 @@ export default function SkillDetailPage() {
   const [unpublishingSkill, setUnpublishingSkill] = useState(false);
   const [republishingSkill, setRepublishingSkill] = useState(false);
   const [deletingSkill, setDeletingSkill] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [platformAverageHaluCatch, setPlatformAverageHaluCatch] = useState<HaluCatchRadarScores | undefined>();
   const [platformHaluCatchSampleSize, setPlatformHaluCatchSampleSize] = useState(0);
 
@@ -183,6 +186,7 @@ export default function SkillDetailPage() {
         if (!cancelled) {
           setSkill(data);
           setViewer(currentUser);
+          setBookmarked(Boolean(data.bookmarkedByViewer));
           setSelectedVersionName(data.latestVersion);
           setExpandedVersionNames(new Set());
           setSelectedFilePath(null);
@@ -561,6 +565,31 @@ export default function SkillDetailPage() {
     }
   }
 
+  async function handleToggleBookmark() {
+    const token = getAuthToken();
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    setBookmarkLoading(true);
+    try {
+      if (bookmarked) {
+        await unbookmarkSkill(token, skill.slug);
+        setBookmarked(false);
+        setSkill((current) => (current ? { ...current, bookmarkedByViewer: false } : current));
+      } else {
+        await bookmarkSkill(token, skill.slug);
+        setBookmarked(true);
+        setSkill((current) => (current ? { ...current, bookmarkedByViewer: true } : current));
+      }
+    } catch (err) {
+      setManageError(err instanceof Error ? err.message : "收藏操作失败");
+    } finally {
+      setBookmarkLoading(false);
+    }
+  }
+
   async function handleUnpublish() {
     setManageError(null);
     setManageMessage(null);
@@ -671,58 +700,71 @@ export default function SkillDetailPage() {
                 ))}
               </div>
             ) : null}
-            {isOwner ? (
-              <div className="hero-actions">
-                {viewer ? (
-                  <button
-                    className="button secondary"
-                    disabled={downloadingVersion === currentVersion.version}
-                    onClick={() => void handleDownload(currentVersion.version)}
-                    type="button"
-                  >
-                    <Download size={16} />
-                    {downloadingVersion === currentVersion.version ? "下载中…" : "下载 Skill"}
-                  </button>
-                ) : (
-                  <Link className="button secondary" href="/login">
-                    登录后下载
-                  </Link>
-                )}
-                <Link className="button primary" href={`/skills/publish?skill=${encodeURIComponent(skill.slug)}`}>
-                  <Plus size={16} /> 发布新版本
-                </Link>
-                {!isUnpublished ? (
-                  <button className="button secondary" onClick={() => setUnpublishModalOpen(true)} type="button">
-                    <EyeOff size={16} /> 下架
-                  </button>
-                ) : (
-                  <button className="button secondary" onClick={() => setRepublishModalOpen(true)} type="button">
-                    <Upload size={16} /> 上架
-                  </button>
-                )}
-                <button className="button secondary danger" onClick={() => setDeleteModalOpen(true)} type="button">
-                  <Trash2 size={16} /> 删除
+            <div className="hero-actions">
+              {viewer ? (
+                <button
+                  className={`button secondary${bookmarked ? " bookmark-active" : ""}`}
+                  disabled={bookmarkLoading}
+                  onClick={() => void handleToggleBookmark()}
+                  type="button"
+                >
+                  <Bookmark size={16} fill={bookmarked ? "currentColor" : "none"} />
+                  {bookmarkLoading ? "处理中…" : bookmarked ? "已收藏" : "收藏"}
                 </button>
-              </div>
-            ) : (
-              <div className="hero-actions">
-                {viewer ? (
-                  <button
-                    className="button primary"
-                    disabled={downloadingVersion === currentVersion.version}
-                    onClick={() => void handleDownload(currentVersion.version)}
-                    type="button"
-                  >
-                    <Download size={16} />
-                    {downloadingVersion === currentVersion.version ? "下载中…" : "下载 Skill"}
-                  </button>
-                ) : (
-                  <Link className="button primary" href="/login">
-                    登录后下载
+              ) : (
+                <Link className="button secondary" href="/login">
+                  <Bookmark size={16} /> 登录后收藏
+                </Link>
+              )}
+              {isOwner ? (
+                <>
+                  {viewer ? (
+                    <button
+                      className="button secondary"
+                      disabled={downloadingVersion === currentVersion.version}
+                      onClick={() => void handleDownload(currentVersion.version)}
+                      type="button"
+                    >
+                      <Download size={16} />
+                      {downloadingVersion === currentVersion.version ? "下载中…" : "下载 Skill"}
+                    </button>
+                  ) : (
+                    <Link className="button secondary" href="/login">
+                      登录后下载
+                    </Link>
+                  )}
+                  <Link className="button primary" href={`/skills/publish?skill=${encodeURIComponent(skill.slug)}`}>
+                    <Plus size={16} /> 发布新版本
                   </Link>
-                )}
-              </div>
-            )}
+                  {!isUnpublished ? (
+                    <button className="button secondary" onClick={() => setUnpublishModalOpen(true)} type="button">
+                      <EyeOff size={16} /> 下架
+                    </button>
+                  ) : (
+                    <button className="button secondary" onClick={() => setRepublishModalOpen(true)} type="button">
+                      <Upload size={16} /> 上架
+                    </button>
+                  )}
+                  <button className="button secondary danger" onClick={() => setDeleteModalOpen(true)} type="button">
+                    <Trash2 size={16} /> 删除
+                  </button>
+                </>
+              ) : viewer ? (
+                <button
+                  className="button primary"
+                  disabled={downloadingVersion === currentVersion.version}
+                  onClick={() => void handleDownload(currentVersion.version)}
+                  type="button"
+                >
+                  <Download size={16} />
+                  {downloadingVersion === currentVersion.version ? "下载中…" : "下载 Skill"}
+                </button>
+              ) : (
+                <Link className="button primary" href="/login">
+                  登录后下载
+                </Link>
+              )}
+            </div>
             {downloadMessage ? <div className="notice">{downloadMessage}</div> : null}
             {downloadError ? <div className="error">{downloadError}</div> : null}
             {manageMessage ? <div className="notice">{manageMessage}</div> : null}

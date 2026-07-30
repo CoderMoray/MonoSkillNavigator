@@ -6,19 +6,18 @@ import { useEffect, useState } from "react";
 import { BadgeCheck, KeyRound, LogOut, RotateCcw, Trash2 } from "lucide-react";
 import { SkillCard } from "./SkillCard";
 import { clearAuthToken, getAuthToken } from "../lib/auth-token";
-import { getRecycleBin, logoutUser, restoreSkill, type RecycleBinSkill } from "../lib/api";
+import { getBookmarkedSkills, getRecycleBin, logoutUser, restoreSkill, type RecycleBinSkill } from "../lib/api";
 import { normalizeHandle, type CreatorSummary } from "../lib/creators";
 import { formatDateTime, formatNumber } from "../lib/format";
-import type { PublicUser } from "../lib/types";
+import type { PublicUser, SkillSearchResult } from "../lib/types";
 
 const RECYCLE_RETENTION_DAYS = 3;
 
-type CreatorProfileTab = "skills" | "plugins" | "starred" | "recycle";
+type CreatorProfileTab = "skills" | "plugins" | "bookmarks" | "recycle";
 
-const profileTabs: Array<{ id: Exclude<CreatorProfileTab, "recycle">; label: (creator: CreatorSummary) => string }> = [
+const profileTabs: Array<{ id: Exclude<CreatorProfileTab, "recycle" | "bookmarks">; label: (creator: CreatorSummary) => string }> = [
   { id: "skills", label: (creator) => `Skills ${creator.published}` },
-  { id: "plugins", label: () => "Plugins 0" },
-  { id: "starred", label: () => "Starred 0" }
+  { id: "plugins", label: () => "Plugins 0" }
 ];
 
 interface CreatorProfileViewProps {
@@ -35,6 +34,9 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
   const [recycleError, setRecycleError] = useState<string | null>(null);
   const [recycleMessage, setRecycleMessage] = useState<string | null>(null);
   const [restoringSlug, setRestoringSlug] = useState<string | null>(null);
+  const [bookmarkItems, setBookmarkItems] = useState<SkillSearchResult[]>([]);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const [bookmarkError, setBookmarkError] = useState<string | null>(null);
   const isOwner = Boolean(viewer && normalizeHandle(viewer.username) === creator.handle);
   const topSkillNames = creator.skills
     .slice(0, 3)
@@ -46,9 +48,48 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
       return;
     }
     const params = new URLSearchParams(window.location.search);
-    if (params.get("tab") === "recycle") {
+    const tab = params.get("tab");
+    if (tab === "recycle") {
       setActiveTab("recycle");
+    } else if (tab === "bookmarks") {
+      setActiveTab("bookmarks");
     }
+  }, [isOwner]);
+
+  useEffect(() => {
+    if (!isOwner) {
+      setBookmarkItems([]);
+      return;
+    }
+
+    let cancelled = false;
+    const token = getAuthToken();
+    if (!token) {
+      return;
+    }
+
+    setBookmarkLoading(true);
+    setBookmarkError(null);
+    void getBookmarkedSkills(token)
+      .then((items) => {
+        if (!cancelled) {
+          setBookmarkItems(items);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setBookmarkError(err instanceof Error ? err.message : "加载收藏失败");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBookmarkLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOwner]);
 
   useEffect(() => {
@@ -200,6 +241,15 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
               ))}
               {isOwner ? (
                 <button
+                  className={activeTab === "bookmarks" ? "active" : ""}
+                  onClick={() => setActiveTab("bookmarks")}
+                  type="button"
+                >
+                  收藏 {bookmarkItems.length}
+                </button>
+              ) : null}
+              {isOwner ? (
+                <button
                   className={activeTab === "recycle" ? "active" : ""}
                   onClick={() => setActiveTab("recycle")}
                   type="button"
@@ -277,8 +327,24 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
             <div className="empty">Plugins 功能暂未开放，当前平台仅支持 Skill 发布与浏览。</div>
           ) : null}
 
-          {activeTab === "starred" ? (
-            <div className="empty">Starred 功能暂未开放，暂不支持查看 Creator 的收藏列表。</div>
+          {activeTab === "bookmarks" && isOwner ? (
+            <>
+              <p className="description" style={{ marginBottom: 12 }}>
+                你收藏的 Skill 仅自己可见，方便快速回到常用包。
+              </p>
+              {bookmarkError ? <div className="error compact-error">{bookmarkError}</div> : null}
+              {bookmarkLoading ? (
+                <div className="skeleton" />
+              ) : bookmarkItems.length === 0 ? (
+                <div className="empty">暂无收藏。在 Skill 详情页点击「收藏」即可加入列表。</div>
+              ) : (
+                <div className="claw-list">
+                  {bookmarkItems.map((skill) => (
+                    <SkillCard key={skill.slug} skill={skill} variant="row" />
+                  ))}
+                </div>
+              )}
+            </>
           ) : null}
         </section>
       </section>

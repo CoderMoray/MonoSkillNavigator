@@ -315,6 +315,33 @@ export async function getRecycleBin(token: string): Promise<RecycleBinSkill[]> {
   return data.items;
 }
 
+export async function getBookmarkedSkills(token: string): Promise<SkillSearchResult[]> {
+  const data = await request<{ items: SkillSearchResult[] }>(new URL("/users/me/bookmarks", API_BASE_URL), {
+    token
+  });
+  return data.items;
+}
+
+export async function bookmarkSkill(token: string, slug: string): Promise<void> {
+  await request<{ ok: true; bookmarked: true }>(
+    new URL(`/skills/${encodeURIComponent(slug)}/bookmark`, API_BASE_URL),
+    {
+      method: "PUT",
+      token
+    }
+  );
+}
+
+export async function unbookmarkSkill(token: string, slug: string): Promise<void> {
+  await request<{ ok: true; bookmarked: false }>(
+    new URL(`/skills/${encodeURIComponent(slug)}/bookmark`, API_BASE_URL),
+    {
+      method: "DELETE",
+      token
+    }
+  );
+}
+
 interface AuthResponse {
   user: PublicUser;
   token: string;

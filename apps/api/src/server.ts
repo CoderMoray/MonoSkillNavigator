@@ -467,7 +467,15 @@ export function buildServer() {
       return reply.code(404).send({ error: "skill_not_found" });
     }
 
-    return skill;
+    const user = await getAuthenticatedUser(request.headers.authorization, authStore);
+    const bookmarkedByViewer = user
+      ? await store.isSkillBookmarked(user.id, request.params.slug)
+      : undefined;
+
+    return {
+      ...skill,
+      bookmarkedByViewer,
+    };
   });
 
   app.get<{ Params: VersionParams }>("/skills/:slug/versions/:version", async (request, reply) => {
@@ -615,6 +623,47 @@ export function buildServer() {
     }
 
     return { items: await store.listRecycleBinForOwner(user.id) };
+  });
+
+  app.get("/users/me/bookmarks", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
+    return { items: await store.listBookmarkedSkills(user.id) };
+  });
+
+  app.put<{ Params: SkillParams }>("/skills/:slug/bookmark", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
+    const skill = await store.getSkill(request.params.slug);
+    if (!skill || skill.deletedAt) {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
+    if (skill.published === false && !isSkillOwner(skill, user)) {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
+
+    try {
+      await store.bookmarkSkill(user.id, request.params.slug);
+      return { ok: true, bookmarked: true };
+    } catch (error) {
+      return reply.code(400).send({ error: errorMessage(error) });
+    }
+  });
+
+  app.delete<{ Params: SkillParams }>("/skills/:slug/bookmark", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
+    await store.unbookmarkSkill(user.id, request.params.slug);
+    return { ok: true, bookmarked: false };
   });
 
   return app;

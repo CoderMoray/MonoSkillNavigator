@@ -1,5 +1,6 @@
 import { pgTable, text, smallint, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { platformUsers } from "./auth";
 import { skills } from "./skills";
 
 export const skillContributors = pgTable("skill_contributors", {
@@ -42,4 +43,14 @@ export const skillRatings = pgTable("skill_ratings", {
     table.version,
     sql`lower(${table.userName})`
   ),
+]);
+
+export const skillBookmarks = pgTable("skill_bookmarks", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => platformUsers.id, { onDelete: "cascade" }),
+  skillSlug: text("skill_slug").notNull().references(() => skills.slug, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  uniqueIndex("skill_bookmarks_user_id_skill_slug_unique").on(table.userId, table.skillSlug),
+  index("skill_bookmarks_user_id_idx").on(table.userId),
 ]);

@@ -173,6 +173,7 @@ export interface RegistrySkill {
   published?: boolean;
   createdAt: string;
   updatedAt: string;
+  bookmarkedByViewer?: boolean;
 }
 
 export interface SkillSearchResult {

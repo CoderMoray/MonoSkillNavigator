@@ -535,6 +535,17 @@ button {
   color: var(--foreground);
 }
 
+.button.secondary.bookmark-active {
+  border-color: rgba(26, 115, 232, 0.35);
+  background: rgba(26, 115, 232, 0.08);
+  color: var(--blue);
+}
+
+:root[data-theme="dark"] .button.secondary.bookmark-active {
+  background: rgba(37, 99, 235, 0.18);
+  color: #93c5fd;
+}
+
 .button.secondary.danger {
   border-color: rgba(220, 38, 38, 0.28);
   background: var(--red-soft);

@@ -190,6 +190,10 @@ export interface RegistryStore {
   deleteSkill(slug: string): Promise<void>;
   restoreSkill(slug: string): Promise<RegistrySkill>;
   listRecycleBinForOwner(ownerUserId: string): Promise<RecycleBinSkill[]>;
+  bookmarkSkill(userId: string, slug: string): Promise<void>;
+  unbookmarkSkill(userId: string, slug: string): Promise<void>;
+  listBookmarkedSkills(userId: string): Promise<SkillSearchResult[]>;
+  isSkillBookmarked(userId: string, slug: string): Promise<boolean>;
   purgeExpiredRecycleBinSkills(): Promise<number>;
   reviewAll(
     reviewFn: (snapshot: SkillSnapshot, version: string) => ReviewReport | Promise<ReviewReport>,

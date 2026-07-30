@@ -350,6 +350,22 @@ export abstract class JsonRegistryStore implements RegistryStore {
       .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
   }
 
+  async bookmarkSkill(_userId: string, _slug: string): Promise<void> {
+    throw new Error("Bookmark storage requires PostgreSQL");
+  }
+
+  async unbookmarkSkill(_userId: string, _slug: string): Promise<void> {
+    throw new Error("Bookmark storage requires PostgreSQL");
+  }
+
+  async listBookmarkedSkills(_userId: string): Promise<SkillSearchResult[]> {
+    return [];
+  }
+
+  async isSkillBookmarked(_userId: string, _slug: string): Promise<boolean> {
+    return false;
+  }
+
   async purgeExpiredRecycleBinSkills(): Promise<number> {
     const { skillRecycleRetentionMs } = await import("../recycle-bin");
     const data = await this.load();
