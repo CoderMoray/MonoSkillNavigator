@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownUp, Download, FileSpreadsheet, ShieldCheck } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
+import { PillSelect } from "../../components/PillSelect";
 import {
   buildAuditRows,
   downloadAuditCsv,
@@ -226,35 +227,21 @@ export default function ReviewsPage() {
             </div>
             <div className="audit-toolbar-actions">
               <div className="audit-sort-controls">
-                <label className="select-wrap compact">
-                  <ArrowDownUp size={16} />
-                  <select
-                    aria-label="排序字段"
-                    className="select"
-                    onChange={(event) => handleSortFieldChange(event.target.value as AuditSortField)}
-                    value={sortField}
-                  >
-                    {SORT_FIELD_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="select-wrap compact">
-                  <select
-                    aria-label="排序方向"
-                    className="select"
-                    onChange={(event) => setSortDirection(event.target.value as AuditSortDirection)}
-                    value={sortDirection}
-                  >
-                    {directionOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <PillSelect
+                  ariaLabel="排序字段"
+                  className="compact"
+                  icon={<ArrowDownUp size={16} />}
+                  onChange={(value) => handleSortFieldChange(value as AuditSortField)}
+                  options={SORT_FIELD_OPTIONS}
+                  value={sortField}
+                />
+                <PillSelect
+                  ariaLabel="排序方向"
+                  className="compact"
+                  onChange={(value) => setSortDirection(value as AuditSortDirection)}
+                  options={directionOptions}
+                  value={sortDirection}
+                />
               </div>
               <div className="audit-export-actions">
                 <button

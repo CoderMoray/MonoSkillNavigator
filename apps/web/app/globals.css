@@ -1084,6 +1084,14 @@ button {
   min-width: 168px;
 }
 
+.pill-select.compact .pill-select-trigger {
+  min-width: 168px;
+}
+
+.pill-select.compact .pill-select-menu {
+  min-width: 100%;
+}
+
 :root[data-theme="dark"] .audit-table thead {
   background: rgba(255, 255, 255, 0.04);
 }
