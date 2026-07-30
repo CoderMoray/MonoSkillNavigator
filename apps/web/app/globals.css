@@ -1376,6 +1376,14 @@ button {
   line-height: 1.45;
 }
 
+.publish-slug-status {
+  color: var(--foreground);
+}
+
+.publish-slug-status.error-text {
+  color: var(--red, #dc2626);
+}
+
 .field textarea {
   width: 100%;
   border: 1px solid var(--border);

@@ -26,6 +26,7 @@ import {
 } from "../../../lib/build-skill-zip";
 import type { PublicUser, RegistrySkill } from "../../../lib/types";
 import { compareSemver, SKILL_ENTRY_BASENAMES, validatePublishMetadataInput } from "@skill-platform/skill-spec/skill-format";
+import { isSkillContributor } from "../../../lib/skill-contributors";
 import { SKILL_CATEGORY_OPTIONS } from "../../../lib/skill-categories";
 
 const CATEGORY_OPTIONS = [...SKILL_CATEGORY_OPTIONS];
@@ -74,6 +75,8 @@ function PublishSkillPageContent() {
   const [archiveHint, setArchiveHint] = useState<string | null>(null);
   const [parsingArchive, setParsingArchive] = useState(false);
   const [existingSkillBySlug, setExistingSkillBySlug] = useState<RegistrySkill | null>(null);
+  const [loadingExistingSlug, setLoadingExistingSlug] = useState(false);
+  const [slugPermissionError, setSlugPermissionError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -154,17 +157,20 @@ function PublishSkillPageContent() {
   useEffect(() => {
     if (isNewVersion) {
       setExistingSkillBySlug(null);
+      setLoadingExistingSlug(false);
       return;
     }
 
     const normalizedSlug = slug.trim();
     if (!normalizedSlug || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(normalizedSlug)) {
       setExistingSkillBySlug(null);
+      setLoadingExistingSlug(false);
       return;
     }
 
     let cancelled = false;
     const token = getAuthToken();
+    setLoadingExistingSlug(true);
     const timeout = window.setTimeout(() => {
       void getSkill(normalizedSlug, token ?? undefined)
         .then((skill) => {
@@ -176,14 +182,62 @@ function PublishSkillPageContent() {
           if (!cancelled) {
             setExistingSkillBySlug(null);
           }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setLoadingExistingSlug(false);
+          }
         });
     }, 280);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timeout);
+      setLoadingExistingSlug(false);
     };
   }, [isNewVersion, slug]);
+
+  useEffect(() => {
+    if (isNewVersion) {
+      if (!sourceSkill || loadingUser) {
+        return;
+      }
+      if (!user) {
+        setSlugPermissionError(null);
+        return;
+      }
+      setSlugPermissionError(
+        isSkillContributor(sourceSkill, user) ? null : "你没有权限向该 Skill 发布新版本。"
+      );
+      return;
+    }
+
+    const normalizedSlug = slug.trim();
+    if (!normalizedSlug || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(normalizedSlug)) {
+      setSlugPermissionError(null);
+      return;
+    }
+
+    if (loadingExistingSlug) {
+      return;
+    }
+
+    if (!existingSkillBySlug) {
+      setSlugPermissionError(null);
+      return;
+    }
+
+    if (!user) {
+      setSlugPermissionError("该 Slug 已被使用，请先登录以确认是否有权发布新版本。");
+      return;
+    }
+
+    setSlugPermissionError(
+      isSkillContributor(existingSkillBySlug, user)
+        ? null
+        : "你没有权限向该 Skill 发布新版本，请联系 contributor。"
+    );
+  }, [existingSkillBySlug, isNewVersion, loadingExistingSlug, loadingUser, slug, sourceSkill, user]);
 
   useEffect(() => {
     if (!categoryMenuOpen) {
@@ -210,16 +264,25 @@ function PublishSkillPageContent() {
     };
   }, [categoryMenuOpen]);
 
-  const isOwner = Boolean(
+  const canPublishToSkill = Boolean(
     user &&
-      sourceSkill &&
-      (sourceSkill.ownerUserId === user.id ||
-        sourceSkill.contributors.some(
-          (contributor) =>
-            contributor.role === "owner" &&
-            (contributor.userId === user.id || contributor.username === user.username)
-        ))
+      (isNewVersion
+        ? sourceSkill && isSkillContributor(sourceSkill, user)
+        : !existingSkillBySlug || isSkillContributor(existingSkillBySlug, user))
   );
+
+  const slugStatusMessage = useMemo(() => {
+    if (slugPermissionError) {
+      return slugPermissionError;
+    }
+    if (!isNewVersion && loadingExistingSlug) {
+      return "正在检查 Slug 是否可用…";
+    }
+    if (!isNewVersion && existingSkillBySlug && user && isSkillContributor(existingSkillBySlug, user)) {
+      return `该 Slug 已存在，将为此 Skill 发布新版本（当前最新 v${existingSkillBySlug.latestVersion}）。`;
+    }
+    return null;
+  }, [existingSkillBySlug, isNewVersion, loadingExistingSlug, slugPermissionError, user]);
 
   const fileLabel = useMemo(() => {
     if (parsingArchive) {
@@ -239,8 +302,16 @@ function PublishSkillPageContent() {
     if (!showPublishForm) {
       return null;
     }
-    if (isNewVersion && !isOwner) {
-      return "无权发布新版本。";
+    if (slugPermissionError) {
+      return slugPermissionError;
+    }
+    if ((isNewVersion && sourceSkill) || existingSkillBySlug) {
+      if (!user) {
+        return "请先登录后再发布。";
+      }
+      if (!canPublishToSkill) {
+        return "你没有权限向该 Skill 发布新版本。";
+      }
     }
 
     const metadata = createPublishMetadata({
@@ -262,14 +333,18 @@ function PublishSkillPageContent() {
   }, [
     categories,
     displayName,
+    canPublishToSkill,
+    existingSkillBySlug,
     isNewVersion,
-    isOwner,
     releaseTags,
     showPublishForm,
     skillForVersionCheck,
     slug,
+    slugPermissionError,
+    sourceSkill,
     summary,
     topics,
+    user,
     version
   ]);
 
@@ -427,9 +502,16 @@ function PublishSkillPageContent() {
       return;
     }
 
-    if (isNewVersion && !isOwner) {
-      setError("只有该 Skill 的 owner 可以发布新版本。");
+    if (slugPermissionError) {
+      setError(slugPermissionError);
       return;
+    }
+
+    if ((isNewVersion && sourceSkill) || existingSkillBySlug) {
+      if (!canPublishToSkill) {
+        setError("你没有权限向该 Skill 发布新版本。");
+        return;
+      }
     }
 
     if (!file) {
@@ -519,14 +601,14 @@ function PublishSkillPageContent() {
           </section>
         ) : sourceError ? (
           <section className="error">无法加载要发布新版本的 Skill：{sourceError}</section>
-        ) : isNewVersion && !isOwner ? (
+        ) : isNewVersion && sourceSkill && user && !isSkillContributor(sourceSkill, user) ? (
           <section className="auth-card card">
             <span className="eyebrow">
               <KeyRound size={14} />
-              Owner required
+              Contributor required
             </span>
             <h1>无权发布新版本</h1>
-            <p className="description">只有该 Skill 的 owner 可以从此页面发布新版本。</p>
+            <p className="description">只有该 Skill 的 contributor 可以从此页面发布新版本。</p>
             <div className="hero-actions">
               <Link className="button secondary" href={`/skills/${encodeURIComponent(sourceSlug)}`}>
                 返回 Skill 详情
@@ -609,7 +691,10 @@ function PublishSkillPageContent() {
                           <span>Slug <em>必填</em></span>
                           <input
                             maxLength={64}
-                            onChange={(event) => setSlug(event.target.value)}
+                            onChange={(event) => {
+                              setError(null);
+                              setSlug(event.target.value);
+                            }}
                             pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?"
                             placeholder="例如 github-issue-triage"
                             readOnly={isNewVersion}
@@ -619,7 +704,17 @@ function PublishSkillPageContent() {
                         </label>
                         <small>
                           唯一标识 ID。
-                          {isNewVersion ? "新版本沿用原 Skill 的不可变 Slug。" : "仅小写字母、数字和短横线；发布后不可修改。"}
+                          {isNewVersion
+                            ? "新版本沿用原 Skill 的不可变 Slug。"
+                            : "仅小写字母、数字和短横线；发布后不可修改。"}
+                          {slugStatusMessage ? (
+                            <>
+                              {" "}
+                              <span className={slugPermissionError ? "publish-slug-status error-text" : "publish-slug-status"}>
+                                {slugStatusMessage}
+                              </span>
+                            </>
+                          ) : null}
                         </small>
                       </div>
                     </div>
@@ -819,6 +914,9 @@ function formatPublishError(message: string): string {
   if (bumpMatch) {
     const [, , latestVersion, attemptedVersion] = bumpMatch;
     return `新版本号必须高于当前最新版本 v${latestVersion}（SemVer），不能使用 v${attemptedVersion}。`;
+  }
+  if (/Only skill contributors can publish new versions/i.test(message)) {
+    return "你没有权限向该 Skill 发布新版本。";
   }
   return message;
 }
