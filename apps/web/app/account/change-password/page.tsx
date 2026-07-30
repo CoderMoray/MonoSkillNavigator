@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { ArrowLeft, KeyRound } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
+import { SuccessToast } from "../../../components/SuccessToast";
 import { changePassword, getCurrentUser } from "../../../lib/api";
 import { clearAuthToken, getAuthToken } from "../../../lib/auth-token";
 import type { PublicUser } from "../../../lib/types";
@@ -14,7 +15,7 @@ export default function ChangePasswordPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState<string | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -51,7 +52,6 @@ export default function ChangePasswordPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setMessage(null);
 
     if (newPassword !== confirmPassword) {
       setError("两次输入的新密码不一致");
@@ -71,7 +71,7 @@ export default function ChangePasswordPage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setMessage("密码已更新");
+      setSuccessToast("密码已更新");
     } catch (err) {
       setError(err instanceof Error ? err.message : "修改失败");
     } finally {
@@ -81,6 +81,7 @@ export default function ChangePasswordPage() {
 
   return (
     <AppShell title="修改密码">
+      {successToast ? <SuccessToast message={successToast} onClose={() => setSuccessToast(null)} /> : null}
       <div className="auth-page">
         {loading ? (
           <div className="skeleton auth-card" />
@@ -140,7 +141,6 @@ export default function ChangePasswordPage() {
                   value={confirmPassword}
                 />
               </label>
-              {message ? <div className="notice">{message}</div> : null}
               {error ? <div className="error compact-error">{error}</div> : null}
               <button className="button primary" disabled={submitting} type="submit">
                 {submitting ? "保存中..." : "保存新密码"}
