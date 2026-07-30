@@ -2550,20 +2550,14 @@ button {
   transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
 
-.version-entry-head:hover,
-.version-entry-head.active {
+.version-entry:not(.active) .version-entry-head:hover {
   border-color: rgba(26, 115, 232, 0.34);
   background: var(--blue-soft);
-}
-
-.version-entry-head.active {
-  box-shadow: 0 10px 22px rgba(26, 115, 232, 0.08);
 }
 
 .version-entry.active .version-entry-head {
   border-bottom-right-radius: 0;
   border-bottom-left-radius: 0;
-  box-shadow: none;
 }
 
 .version-col-release {
@@ -2659,10 +2653,10 @@ button {
 }
 
 .version-changelog {
-  border: 1px solid rgba(26, 115, 232, 0.34);
+  border: 1px solid var(--border);
   border-top: 0;
   border-radius: 0 0 var(--radius-md) var(--radius-md);
-  background: var(--blue-soft);
+  background: rgba(255, 255, 255, 0.58);
   padding: 16px;
 }
 
@@ -2878,6 +2872,7 @@ button {
 :root[data-theme="dark"] .file-preview,
 :root[data-theme="dark"] .version-row,
 :root[data-theme="dark"] .version-entry-head,
+:root[data-theme="dark"] .version-changelog,
 :root[data-theme="dark"] .changelog-content,
 :root[data-theme="dark"] .requirement-card,
 :root[data-theme="dark"] .review-score-card,

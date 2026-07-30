@@ -1076,7 +1076,6 @@ export default function SkillDetailPage() {
                   <span className="version-table-header-spacer" />
                 </div>
                 {versions.map((version) => {
-                  const isSelected = version.version === currentVersion.version;
                   const isExpanded = expandedVersionNames.has(version.version);
                   const isLatest = version.version === skill.latestVersion;
 
@@ -1098,8 +1097,7 @@ export default function SkillDetailPage() {
                     <div className={`version-entry ${isExpanded ? "active" : ""}`} key={version.version}>
                       <div
                         aria-expanded={isExpanded}
-                        aria-pressed={isSelected}
-                        className={`version-entry-head ${isSelected ? "active" : ""}`}
+                        className="version-entry-head"
                         onClick={handleVersionRowClick}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
