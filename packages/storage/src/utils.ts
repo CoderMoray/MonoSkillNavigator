@@ -108,7 +108,7 @@ export function skillMatchesCategoryFilters(skillCategories: string[] | undefine
 
   const normalizedSelected = selectedCategories.map((item) => item.trim().toLowerCase());
   const normalizedSkill = (skillCategories ?? []).map((item) => item.trim().toLowerCase());
-  return normalizedSelected.every((item) => normalizedSkill.includes(item));
+  return normalizedSelected.some((item) => normalizedSkill.includes(item));
 }
 
 export function toSearchResult(skill: RegistrySkill): SkillSearchResult {

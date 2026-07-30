@@ -195,7 +195,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
               )
             : undefined,
           selectedCategories.length > 0
-            ? sql`${schema.skillVersions.categories} @> ARRAY[${sql.join(
+            ? sql`${schema.skillVersions.categories} && ARRAY[${sql.join(
                 selectedCategories.map((item) => sql`${item}`),
                 sql`, `
               )}]::text[]`
