@@ -21,7 +21,9 @@ import {
 export {
   findSkillEntryFile,
   findSkillEntryPath,
+  compareSemver,
   formatPublishMetadataError,
+  isSemverGreaterThan,
   isSkillEntryBasename,
   isSkillEntryPath,
   isValidSkillIdentifierName,

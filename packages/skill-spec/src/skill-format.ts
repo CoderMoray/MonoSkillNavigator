@@ -281,3 +281,61 @@ export function resolveZipSkillEntryPath(paths: string[]): string | undefined {
     return relative === entryRelative;
   });
 }
+
+interface SemVerParts {
+  major: number;
+  minor: number;
+  patch: number;
+  prerelease: string | null;
+}
+
+const SEMVER_CORE_PATTERN =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
+function parseSemver(version: string): SemVerParts | null {
+  const match = SEMVER_CORE_PATTERN.exec(version.trim());
+  if (!match) {
+    return null;
+  }
+
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+    prerelease: match[4] ?? null
+  };
+}
+
+/** Returns -1, 0, 1 when both inputs are valid SemVer; otherwise null. */
+export function compareSemver(left: string, right: string): number | null {
+  const a = parseSemver(left);
+  const b = parseSemver(right);
+  if (!a || !b) {
+    return null;
+  }
+
+  if (a.major !== b.major) {
+    return Math.sign(a.major - b.major);
+  }
+  if (a.minor !== b.minor) {
+    return Math.sign(a.minor - b.minor);
+  }
+  if (a.patch !== b.patch) {
+    return Math.sign(a.patch - b.patch);
+  }
+  if (a.prerelease === b.prerelease) {
+    return 0;
+  }
+  if (!a.prerelease) {
+    return 1;
+  }
+  if (!b.prerelease) {
+    return -1;
+  }
+  return a.prerelease.localeCompare(b.prerelease);
+}
+
+export function isSemverGreaterThan(next: string, current: string): boolean {
+  const compared = compareSemver(next, current);
+  return compared !== null && compared > 0;
+}

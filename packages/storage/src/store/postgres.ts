@@ -9,6 +9,7 @@ import {
   type SkillManifest,
   type SkillSnapshot
 } from "@skill-platform/skill-spec";
+import { compareSemver } from "@skill-platform/skill-spec/skill-format";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { eq, and, sql, desc, or, ilike, inArray, isNull, isNotNull, lte } from "drizzle-orm";
 import pg from "pg";
@@ -838,6 +839,16 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     if (existingSkill?.deletedAt) {
       throw new Error("skill_in_recycle_bin");
     }
+
+    if (existingSkill) {
+      const compared = compareSemver(version, existingSkill.latestVersion);
+      if (compared !== null && compared <= 0) {
+        throw new Error(
+          `Version must be greater than latest: ${slug}@${existingSkill.latestVersion}, got ${version}`
+        );
+      }
+    }
+
     if (!existingSkill && !releaseTags.includes("latest")) throw new Error("First version must include latest tag");
 
     // Artifact to MinIO

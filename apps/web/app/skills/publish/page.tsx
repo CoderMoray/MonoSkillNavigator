@@ -25,7 +25,7 @@ import {
   relativeFilesFromFileList
 } from "../../../lib/build-skill-zip";
 import type { PublicUser, RegistrySkill } from "../../../lib/types";
-import { SKILL_ENTRY_BASENAMES, validatePublishMetadataInput } from "@skill-platform/skill-spec/skill-format";
+import { compareSemver, SKILL_ENTRY_BASENAMES, validatePublishMetadataInput } from "@skill-platform/skill-spec/skill-format";
 import { SKILL_CATEGORY_OPTIONS } from "../../../lib/skill-categories";
 
 const CATEGORY_OPTIONS = [...SKILL_CATEGORY_OPTIONS];
@@ -710,7 +710,11 @@ function PublishSkillPageContent() {
                           required
                           value={version}
                         />
-                        <small>采用 SemVer 格式，例如 1.0.0。</small>
+                        <small>
+                          {isNewVersion && sourceSkill
+                            ? `须高于当前最新版本 v${sourceSkill.latestVersion}（SemVer），例如 ${suggestNextPatchVersion(sourceSkill.latestVersion)}。`
+                            : "采用 SemVer 格式，例如 1.0.0。"}
+                        </small>
                       </label>
 
                       <label className="field">
@@ -798,14 +802,23 @@ function getVersionConflictMessage(skill: RegistrySkill | null | undefined, vers
   if (skill.versions[nextVersion]) {
     return `版本号冲突：v${nextVersion} 已存在，请改用尚未发布的版本号（当前最新为 v${skill.latestVersion}）。`;
   }
+  const compared = compareSemver(nextVersion, skill.latestVersion);
+  if (compared !== null && compared <= 0) {
+    return `新版本号必须高于当前最新版本 v${skill.latestVersion}（SemVer），不能使用 v${nextVersion}。`;
+  }
   return null;
 }
 
 function formatPublishError(message: string): string {
-  const match = /^Version already exists: ([^@]+)@(.+)$/.exec(message);
-  if (match) {
-    const [, conflictSlug, conflictVersion] = match;
+  const duplicateMatch = /^Version already exists: ([^@]+)@(.+)$/.exec(message);
+  if (duplicateMatch) {
+    const [, conflictSlug, conflictVersion] = duplicateMatch;
     return `版本号冲突：v${conflictVersion} 已存在于 Skill「${conflictSlug}」，请改用尚未发布的版本号。`;
+  }
+  const bumpMatch = /^Version must be greater than latest: ([^@]+)@([^,]+), got (.+)$/.exec(message);
+  if (bumpMatch) {
+    const [, , latestVersion, attemptedVersion] = bumpMatch;
+    return `新版本号必须高于当前最新版本 v${latestVersion}（SemVer），不能使用 v${attemptedVersion}。`;
   }
   return message;
 }
