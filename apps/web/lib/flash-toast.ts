@@ -12,13 +12,7 @@ export function readFlashToast(): string | null {
     return null;
   }
 
-  const message = sessionStorage.getItem(STORAGE_KEY);
-  if (!message) {
-    return null;
-  }
-
-  sessionStorage.removeItem(STORAGE_KEY);
-  return message;
+  return sessionStorage.getItem(STORAGE_KEY);
 }
 
 export function clearFlashToast(): void {

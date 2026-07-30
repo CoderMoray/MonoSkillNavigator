@@ -8,7 +8,7 @@ import { CreatorProfileView } from "../../../components/CreatorProfileView";
 import { PublishNoticeToast } from "../../../components/PublishNoticeToast";
 import { SuccessToast } from "../../../components/SuccessToast";
 import { getCreatorProfile, getCurrentUser } from "../../../lib/api";
-import { readFlashToast } from "../../../lib/flash-toast";
+import { clearFlashToast, readFlashToast } from "../../../lib/flash-toast";
 import { clearPublishNotice, readPublishNotice, type PublishNotice } from "../../../lib/publish-notice";
 import { getAuthToken } from "../../../lib/auth-token";
 import { normalizeHandle, type CreatorSummary } from "../../../lib/creators";
@@ -21,13 +21,8 @@ export default function CreatorProfilePage() {
   const [viewer, setViewer] = useState<PublicUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [publishNotice, setPublishNotice] = useState<PublishNotice | null>(null);
-  const [flashToast, setFlashToast] = useState<string | null>(null);
-
-  useEffect(() => {
-    setPublishNotice(readPublishNotice());
-    setFlashToast(readFlashToast());
-  }, []);
+  const [publishNotice, setPublishNotice] = useState<PublishNotice | null>(() => readPublishNotice());
+  const [flashToast, setFlashToast] = useState<string | null>(() => readFlashToast());
 
   useEffect(() => {
     let cancelled = false;
@@ -88,7 +83,15 @@ export default function CreatorProfilePage() {
 
   return (
     <AppShell title={`@${creator.handle}`}>
-      {isOwner && publishNotice ? (
+      {flashToast ? (
+        <SuccessToast
+          message={flashToast}
+          onClose={() => {
+            clearFlashToast();
+            setFlashToast(null);
+          }}
+        />
+      ) : isOwner && publishNotice ? (
         <PublishNoticeToast
           notice={publishNotice}
           onClose={() => {
@@ -97,7 +100,6 @@ export default function CreatorProfilePage() {
           }}
         />
       ) : null}
-      {flashToast ? <SuccessToast message={flashToast} onClose={() => setFlashToast(null)} /> : null}
       <CreatorProfileView creator={creator} viewer={viewer} />
     </AppShell>
   );

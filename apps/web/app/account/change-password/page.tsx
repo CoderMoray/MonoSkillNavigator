@@ -9,6 +9,7 @@ import { changePassword, getCurrentUser } from "../../../lib/api";
 import { clearAuthToken, getAuthToken } from "../../../lib/auth-token";
 import { creatorProfilePath } from "../../../lib/creators";
 import { saveFlashToast } from "../../../lib/flash-toast";
+import { clearPublishNotice } from "../../../lib/publish-notice";
 import type { PublicUser } from "../../../lib/types";
 
 export default function ChangePasswordPage() {
@@ -74,6 +75,7 @@ export default function ChangePasswordPage() {
       setNewPassword("");
       setConfirmPassword("");
       saveFlashToast("密码已更新");
+      clearPublishNotice();
       router.push(creatorProfilePath(updatedUser.username));
     } catch (err) {
       setError(err instanceof Error ? err.message : "修改失败");
