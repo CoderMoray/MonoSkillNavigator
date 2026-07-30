@@ -381,12 +381,21 @@ export function buildServer() {
         return reply.code(403).send({ error: "Only skill contributors can add contributors" });
       }
 
-      const contributorUser = await authStore.getUserByUsername(request.body.name).catch(() => undefined);
+      const contributorName = request.body.name.trim();
+      if (!contributorName) {
+        return reply.code(400).send({ error: "contributor_username_required" });
+      }
+
+      const contributorUser = await authStore.getUserByUsername(contributorName);
+      if (!contributorUser) {
+        return reply.code(404).send({ error: "user_not_found" });
+      }
+
       const contributor = await store.addContributor(request.params.slug, {
         role: request.body.role,
-        name: contributorUser?.username ?? request.body.name,
-        username: contributorUser?.username,
-        userId: contributorUser?.id
+        name: contributorUser.username,
+        username: contributorUser.username,
+        userId: contributorUser.id
       });
       return reply.code(201).send({ contributor });
     } catch {

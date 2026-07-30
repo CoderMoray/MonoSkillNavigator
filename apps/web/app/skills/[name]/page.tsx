@@ -95,6 +95,16 @@ function formatRatingError(message: string): string {
   return message;
 }
 
+function formatContributorError(message: string): string {
+  if (message === "user_not_found") {
+    return "未找到该用户名，请确认对方已在平台注册。";
+  }
+  if (message === "contributor_username_required") {
+    return "请输入 contributor 用户名。";
+  }
+  return message;
+}
+
 export default function SkillDetailPage() {
   const params = useParams<{ name: string }>();
   const router = useRouter();
@@ -435,7 +445,7 @@ export default function SkillDetailPage() {
       setContributorRole("contributor");
       setSuccessToast(`已添加 ${contributor.name} 为 ${contributor.role}`);
     } catch (err) {
-      setContributorError(err instanceof Error ? err.message : "添加 contributor 失败");
+      setContributorError(formatContributorError(err instanceof Error ? err.message : "添加 contributor 失败"));
     } finally {
       setAddingContributor(false);
     }
@@ -915,6 +925,7 @@ export default function SkillDetailPage() {
                           placeholder="输入已注册用户名，例如 bob"
                           value={contributorName}
                         />
+                        <small>仅可添加已在平台注册的用户，用户名区分大小写不敏感。</small>
                       </label>
                       <label className="field">
                         <span>角色</span>
