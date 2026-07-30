@@ -130,7 +130,6 @@ export default function SkillDetailPage() {
   const [unpublishModalOpen, setUnpublishModalOpen] = useState(false);
   const [republishModalOpen, setRepublishModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [manageMessage, setManageMessage] = useState<string | null>(null);
   const [manageError, setManageError] = useState<string | null>(null);
   const [unpublishingSkill, setUnpublishingSkill] = useState(false);
   const [republishingSkill, setRepublishingSkill] = useState(false);
@@ -591,7 +590,6 @@ export default function SkillDetailPage() {
 
   async function handleUnpublish() {
     setManageError(null);
-    setManageMessage(null);
 
     const token = getAuthToken();
     if (!token) {
@@ -604,7 +602,7 @@ export default function SkillDetailPage() {
       const updated = await unpublishSkill(token, skill.slug);
       setSkill(updated);
       setUnpublishModalOpen(false);
-      setManageMessage("Skill 已下架，将不再出现在 Skill 广场与排行榜。");
+      setSuccessToast("Skill 已下架，将不再出现在 Skill 广场与排行榜。");
     } catch (err) {
       setManageError(err instanceof Error ? err.message : "下架失败");
     } finally {
@@ -614,7 +612,6 @@ export default function SkillDetailPage() {
 
   async function handleRepublish() {
     setManageError(null);
-    setManageMessage(null);
 
     const token = getAuthToken();
     if (!token) {
@@ -627,7 +624,7 @@ export default function SkillDetailPage() {
       const updated = await republishSkill(token, skill.slug);
       setSkill(updated);
       setRepublishModalOpen(false);
-      setManageMessage("Skill 已重新上架，将出现在 Skill 广场与排行榜。");
+      setSuccessToast("Skill 已重新上架，将出现在 Skill 广场与排行榜。");
     } catch (err) {
       setManageError(err instanceof Error ? err.message : "上架失败");
     } finally {
@@ -637,7 +634,6 @@ export default function SkillDetailPage() {
 
   async function handleDelete() {
     setManageError(null);
-    setManageMessage(null);
 
     const token = getAuthToken();
     if (!token) {
@@ -766,7 +762,6 @@ export default function SkillDetailPage() {
               )}
             </div>
             {downloadError ? <div className="error">{downloadError}</div> : null}
-            {manageMessage ? <div className="notice">{manageMessage}</div> : null}
             {manageError ? <div className="error">{manageError}</div> : null}
             {isOwner && isUnpublished ? (
               <p className="description">此 Skill 已下架，仅你可见。可直接上架恢复公开，或发布新版本后再上架。</p>
