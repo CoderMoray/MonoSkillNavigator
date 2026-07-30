@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Sparkles, Trophy, UploadCloud } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "../../components/AppShell";
+import { PillSelect } from "../../components/PillSelect";
 import { SkillCard } from "../../components/SkillCard";
 import { getLeaderboard, getSkills } from "../../lib/api";
 import {
@@ -14,6 +15,12 @@ import {
 import type { SkillSearchResult } from "../../lib/types";
 
 const tabs = ["Skills", "Plugins"];
+
+const sortOptions = [
+  { value: "recent", label: "New" },
+  { value: "rating", label: "Rating" },
+  { value: "downloads", label: "Trending" }
+];
 
 export default function SkillsPage() {
   const [skills, setSkills] = useState<SkillSearchResult[]>([]);
@@ -150,14 +157,14 @@ export default function SkillsPage() {
               value={query}
             />
             </div>
-            <label className="select-wrap">
-              <Trophy size={16} />
-              <select className="select" disabled={Boolean(query.trim())} onChange={(event) => setSort(event.target.value)} value={sort}>
-                <option value="recent">New</option>
-                <option value="rating">Rating</option>
-                <option value="downloads">Trending</option>
-              </select>
-            </label>
+            <PillSelect
+              ariaLabel="排序方式"
+              disabled={Boolean(query.trim())}
+              icon={<Trophy size={16} />}
+              onChange={setSort}
+              options={sortOptions}
+              value={sort}
+            />
           </div>
         </section>
 
