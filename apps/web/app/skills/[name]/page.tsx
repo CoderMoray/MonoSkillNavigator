@@ -34,6 +34,7 @@ import { AppShell } from "../../../components/AppShell";
 import { SuccessToast } from "../../../components/SuccessToast";
 import { HaluCatchRadar } from "../../../components/HaluCatchRadar";
 import { FindingConfidenceBadge } from "../../../components/FindingConfidenceBadge";
+import { SkillCategoryLabel } from "../../../components/SkillCategoryIcon";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
 import { addSkillContributor, addSkillRating, bookmarkSkill, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, republishSkill, saveBlobAsFile, unpublishSkill, unbookmarkSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
@@ -289,7 +290,7 @@ export default function SkillDetailPage() {
             (contributor.userId === viewer.id || contributor.username === viewer.username)
         ))
   );
-  const tags = currentVersion.manifest.tags ?? [];
+  const categories = currentVersion.manifest.categories ?? [];
   const openIssues = skill.issues.filter((issue) => issue.status !== "closed");
   const reviewFindings = currentVersion.review?.findings ?? [];
   const securityFindings = reviewFindings.filter(
@@ -690,11 +691,11 @@ export default function SkillDetailPage() {
                 <MessageSquare size={13} /> {openIssues.length} open
               </span>
             </div>
-            {tags.length > 0 ? (
+            {categories.length > 0 ? (
               <div className="tag-row">
-                {tags.map((tag) => (
-                  <span className="badge" key={tag}>
-                    {tag}
+                {categories.map((category) => (
+                  <span className="badge" key={category}>
+                    <SkillCategoryLabel category={category} iconSize={13} />
                   </span>
                 ))}
               </div>
