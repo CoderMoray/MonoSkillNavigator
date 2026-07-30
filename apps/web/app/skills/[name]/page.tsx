@@ -1069,57 +1069,77 @@ export default function SkillDetailPage() {
                 <span className="badge">{versions.length} 个版本</span>
               </div>
               <div className="version-list">
+                <div aria-hidden="true" className="version-table-header">
+                  <span>Version</span>
+                  <span>Release</span>
+                  <span>Download</span>
+                  <span className="version-table-header-spacer" />
+                </div>
                 {versions.map((version) => {
                   const isSelected = version.version === currentVersion.version;
                   const isExpanded = expandedVersionNames.has(version.version);
+                  const isLatest = version.version === skill.latestVersion;
+
+                  function handleVersionRowClick() {
+                    setSelectedVersionName(version.version);
+                    setSelectedFilePath(null);
+                    setExpandedVersionNames((expanded) => {
+                      const next = new Set(expanded);
+                      if (next.has(version.version)) {
+                        next.delete(version.version);
+                      } else {
+                        next.add(version.version);
+                      }
+                      return next;
+                    });
+                  }
+
                   return (
                     <div className={`version-entry ${isExpanded ? "active" : ""}`} key={version.version}>
-                      <div className="version-entry-head">
+                      <div className={`version-entry-head ${isSelected ? "active" : ""}`}>
                         <button
                           aria-expanded={isExpanded}
                           aria-pressed={isSelected}
-                          className={`version-row ${isSelected ? "active" : ""}`}
-                          onClick={() => {
-                            setSelectedVersionName(version.version);
-                            setSelectedFilePath(null);
-                            setExpandedVersionNames((expanded) => {
-                              const next = new Set(expanded);
-                              if (next.has(version.version)) {
-                                next.delete(version.version);
-                              } else {
-                                next.add(version.version);
-                              }
-                              return next;
-                            });
-                          }}
+                          className="version-row-select"
+                          onClick={handleVersionRowClick}
                           type="button"
                         >
                           <span className="version-row-main">
-                            <span className="version-name-row">
-                              <strong>v{version.version}</strong>
-                              {version.version === skill.latestVersion ? <span className="badge">latest</span> : null}
-                            </span>
+                            <strong>v{version.version}</strong>
                             <span>{formatDateTime(version.createdAt)}</span>
                           </span>
-                          <span className="version-row-meta">
-                            <span>
-                              <Download size={13} /> {formatNumber(version.downloads)}
-                            </span>
-                            <VerdictBadge verdict={version.status} />
-                            {isExpanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
-                          </span>
                         </button>
-                        {viewer ? (
-                          <button
-                            className="button secondary compact version-download-action"
-                            disabled={downloadingVersion === version.version}
-                            onClick={() => void handleDownload(version.version)}
-                            type="button"
-                          >
-                            <Download size={13} />
-                            {downloadingVersion === version.version ? "下载中…" : "下载"}
-                          </button>
-                        ) : null}
+                        <div className="version-col-release">
+                          {isLatest ? <span className="badge">Latest</span> : null}
+                          <VerdictBadge verdict={version.status} />
+                        </div>
+                        <div className="version-col-download">
+                          {viewer ? (
+                            <button
+                              className="button secondary compact version-download-button"
+                              disabled={downloadingVersion === version.version}
+                              onClick={() => void handleDownload(version.version)}
+                              type="button"
+                            >
+                              <Download size={14} />
+                              {downloadingVersion === version.version ? "Downloading…" : "Download version"}
+                            </button>
+                          ) : (
+                            <Link className="button secondary compact version-download-button" href="/login">
+                              <Download size={14} />
+                              Download version
+                            </Link>
+                          )}
+                        </div>
+                        <button
+                          aria-expanded={isExpanded}
+                          aria-label={isExpanded ? "收起 Changelog" : "展开 Changelog"}
+                          className="version-expand-toggle"
+                          onClick={handleVersionRowClick}
+                          type="button"
+                        >
+                          {isExpanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
+                        </button>
                       </div>
                       {isExpanded ? (
                         <div className="version-changelog">
