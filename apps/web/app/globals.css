@@ -3000,7 +3000,35 @@ button {
   border-left-color: var(--blue);
 }
 
+.list-item.finding {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.finding .card-head {
+  min-width: 0;
+}
+
+.finding .card-head strong {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.finding .description {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.finding .pre {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .pre {
+  max-width: 100%;
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
