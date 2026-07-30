@@ -2546,6 +2546,7 @@ button {
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.58);
   padding: 10px 14px;
+  cursor: pointer;
   transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
 
@@ -2563,20 +2564,6 @@ button {
   border-bottom-right-radius: 0;
   border-bottom-left-radius: 0;
   box-shadow: none;
-}
-
-.version-row-select {
-  display: grid;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  padding: 4px 0;
-  text-align: left;
-}
-
-.version-row-select:hover {
-  cursor: pointer;
 }
 
 .version-col-release {
@@ -2597,21 +2584,26 @@ button {
   white-space: nowrap;
 }
 
-.version-expand-toggle {
+.version-expand-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
   color: var(--muted-strong);
 }
 
-.version-expand-toggle:hover {
-  background: rgba(255, 255, 255, 0.55);
-  cursor: pointer;
+.version-row-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.version-row-main strong {
+  color: var(--foreground);
+  font-size: 15px;
 }
 
 .version-row {
@@ -2645,13 +2637,6 @@ button {
   box-shadow: none;
 }
 
-.version-row-main {
-  display: grid;
-  gap: 4px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
 .version-name-row,
 .version-row-meta,
 .version-row-meta > span:not(.badge) {
@@ -2661,11 +2646,6 @@ button {
 }
 
 .version-name-row strong {
-  color: var(--foreground);
-  font-size: 15px;
-}
-
-.version-row-main strong {
   color: var(--foreground);
   font-size: 15px;
 }
@@ -3565,7 +3545,7 @@ button {
     justify-content: flex-start;
   }
 
-  .version-expand-toggle {
+  .version-expand-icon {
     justify-self: end;
   }
 

@@ -1096,24 +1096,33 @@ export default function SkillDetailPage() {
 
                   return (
                     <div className={`version-entry ${isExpanded ? "active" : ""}`} key={version.version}>
-                      <div className={`version-entry-head ${isSelected ? "active" : ""}`}>
-                        <button
-                          aria-expanded={isExpanded}
-                          aria-pressed={isSelected}
-                          className="version-row-select"
-                          onClick={handleVersionRowClick}
-                          type="button"
-                        >
-                          <span className="version-row-main">
-                            <strong>v{version.version}</strong>
-                            <span>{formatDateTime(version.createdAt)}</span>
-                          </span>
-                        </button>
+                      <div
+                        aria-expanded={isExpanded}
+                        aria-pressed={isSelected}
+                        className={`version-entry-head ${isSelected ? "active" : ""}`}
+                        onClick={handleVersionRowClick}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            handleVersionRowClick();
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <div className="version-row-main">
+                          <strong>v{version.version}</strong>
+                          <span>{formatDateTime(version.createdAt)}</span>
+                        </div>
                         <div className="version-col-release">
                           {isLatest ? <span className="badge">Latest</span> : null}
                           <VerdictBadge verdict={version.status} />
                         </div>
-                        <div className="version-col-download">
+                        <div
+                          className="version-col-download"
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
                           {viewer ? (
                             <button
                               className="button secondary compact version-download-button"
@@ -1131,15 +1140,9 @@ export default function SkillDetailPage() {
                             </Link>
                           )}
                         </div>
-                        <button
-                          aria-expanded={isExpanded}
-                          aria-label={isExpanded ? "收起 Changelog" : "展开 Changelog"}
-                          className="version-expand-toggle"
-                          onClick={handleVersionRowClick}
-                          type="button"
-                        >
+                        <span aria-hidden="true" className="version-expand-icon">
                           {isExpanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
-                        </button>
+                        </span>
                       </div>
                       {isExpanded ? (
                         <div className="version-changelog">
