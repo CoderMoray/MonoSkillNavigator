@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChangeEvent, DragEvent, FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, ChevronDown, KeyRound, UploadCloud } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
+import { SkillCategoryLabel } from "../../../components/SkillCategoryIcon";
 import { SuccessToast } from "../../../components/SuccessToast";
 import {
   getCurrentUser,
@@ -750,7 +751,9 @@ function PublishSkillPageContent() {
                           {categories.length > 0 ? (
                             <span className="publish-category-selected">
                               {categories.map((item) => (
-                                <span className="badge" key={item}>{item}</span>
+                                <span className="badge" key={item}>
+                                  <SkillCategoryLabel category={item} iconSize={12} />
+                                </span>
                               ))}
                             </span>
                           ) : (
@@ -773,7 +776,7 @@ function PublishSkillPageContent() {
                                   role="option"
                                   type="button"
                                 >
-                                  <span>{option}</span>
+                                  <SkillCategoryLabel category={option} />
                                   {selected ? <Check size={15} /> : null}
                                 </button>
                               );

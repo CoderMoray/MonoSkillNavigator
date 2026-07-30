@@ -930,6 +930,9 @@ button {
 }
 
 .category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
@@ -938,6 +941,17 @@ button {
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
+}
+
+.skill-category-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.publish-category-option .skill-category-label {
+  flex: 1;
+  min-width: 0;
 }
 
 .category-chip.active {

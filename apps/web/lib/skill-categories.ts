@@ -10,6 +10,8 @@ export const SKILL_CATEGORY_OPTIONS = [
   "Other"
 ] as const;
 
+export type SkillCategory = (typeof SKILL_CATEGORY_OPTIONS)[number];
+
 export const MAX_SKILL_CATEGORY_FILTERS = 3;
 
 export function normalizeSkillCategoryFilters(values: string[]): string[] {

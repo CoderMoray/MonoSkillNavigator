@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Sparkles, Trophy, UploadCloud } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "../../components/AppShell";
+import { SkillCategoryLabel } from "../../components/SkillCategoryIcon";
 import { PillSelect } from "../../components/PillSelect";
 import { SkillCard } from "../../components/SkillCard";
 import { getLeaderboard, getSkills } from "../../lib/api";
@@ -140,7 +141,7 @@ export default function SkillsPage() {
                   onClick={() => toggleCategory(item)}
                   type="button"
                 >
-                  {item}
+                  <SkillCategoryLabel category={item} iconSize={13} />
                 </button>
               ))}
             </div>
