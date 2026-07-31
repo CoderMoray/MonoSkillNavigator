@@ -9,6 +9,24 @@ import { registerUser } from "../../lib/api";
 import { setAuthToken } from "../../lib/auth-token";
 import { creatorProfilePath } from "../../lib/creators";
 
+function setRegisterUsernameValidity(input: HTMLInputElement) {
+  if (input.validity.valueMissing) {
+    input.setCustomValidity("请输入用户名。");
+    return;
+  }
+  if (input.validity.tooShort) {
+    input.setCustomValidity(
+      `请将此用户名加长到 ${input.minLength} 个字符或更多（目前使用了 ${input.value.length} 个字符）。`
+    );
+    return;
+  }
+  if (input.validity.patternMismatch) {
+    input.setCustomValidity("用户名只能包含字母、数字、点、下划线或连字符。");
+    return;
+  }
+  input.setCustomValidity("");
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -56,6 +74,8 @@ export default function RegisterPage() {
                 autoComplete="username"
                 minLength={3}
                 onChange={(event) => setUsername(event.target.value)}
+                onInput={(event) => setRegisterUsernameValidity(event.currentTarget)}
+                onInvalid={(event) => setRegisterUsernameValidity(event.currentTarget)}
                 pattern="[a-zA-Z0-9_.-]+"
                 required
                 value={username}
