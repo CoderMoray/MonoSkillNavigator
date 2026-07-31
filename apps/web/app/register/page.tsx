@@ -27,6 +27,20 @@ function setRegisterUsernameValidity(input: HTMLInputElement) {
   input.setCustomValidity("");
 }
 
+function setRegisterPasswordValidity(input: HTMLInputElement, label: string) {
+  if (input.validity.valueMissing) {
+    input.setCustomValidity(`请输入${label}。`);
+    return;
+  }
+  if (input.validity.tooShort) {
+    input.setCustomValidity(
+      `请将此${label}加长到 ${input.minLength} 个字符或更多（目前使用了 ${input.value.length} 个字符）。`
+    );
+    return;
+  }
+  input.setCustomValidity("");
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -87,6 +101,8 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 minLength={8}
                 onChange={(event) => setPassword(event.target.value)}
+                onInput={(event) => setRegisterPasswordValidity(event.currentTarget, "密码")}
+                onInvalid={(event) => setRegisterPasswordValidity(event.currentTarget, "密码")}
                 required
                 type="password"
                 value={password}
@@ -98,6 +114,8 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 minLength={8}
                 onChange={(event) => setConfirmPassword(event.target.value)}
+                onInput={(event) => setRegisterPasswordValidity(event.currentTarget, "确认密码")}
+                onInvalid={(event) => setRegisterPasswordValidity(event.currentTarget, "确认密码")}
                 required
                 type="password"
                 value={confirmPassword}
