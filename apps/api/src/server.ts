@@ -367,40 +367,41 @@ export function buildServer() {
   });
 
   app.post<{ Params: SkillParams; Body: ContributorBody }>("/skills/:slug/contributors", async (request, reply) => {
-    try {
-      const user = await getAuthenticatedUser(request.headers.authorization, authStore);
-      if (!user) {
-        return reply.code(401).send({ error: "Unauthorized" });
-      }
+    const user = await getAuthenticatedUser(request.headers.authorization, authStore);
+    if (!user) {
+      return reply.code(401).send({ error: "Unauthorized" });
+    }
 
-      const skill = await store.getSkill(request.params.slug);
-      if (!skill) {
-        return reply.code(404).send({ error: "skill_not_found" });
-      }
-      if (!isSkillContributor(skill, user)) {
-        return reply.code(403).send({ error: "Only skill contributors can add contributors" });
-      }
-
-      const contributorName = request.body.name.trim();
-      if (!contributorName) {
-        return reply.code(400).send({ error: "contributor_username_required" });
-      }
-
-      const contributorUser = await authStore.getUserByUsername(contributorName);
-      if (!contributorUser) {
-        return reply.code(404).send({ error: "user_not_found" });
-      }
-
-      const contributor = await store.addContributor(request.params.slug, {
-        role: request.body.role,
-        name: contributorUser.username,
-        username: contributorUser.username,
-        userId: contributorUser.id
-      });
-      return reply.code(201).send({ contributor });
-    } catch {
+    const skill = await store.getSkill(request.params.slug);
+    if (!skill) {
       return reply.code(404).send({ error: "skill_not_found" });
     }
+    if (!isSkillContributor(skill, user)) {
+      return reply.code(403).send({ error: "Only skill contributors can add contributors" });
+    }
+
+    const contributorName = request.body.name.trim();
+    if (!contributorName) {
+      return reply.code(400).send({ error: "contributor_username_required" });
+    }
+
+    let contributorUser: Awaited<ReturnType<typeof authStore.getUserByUsername>>;
+    try {
+      contributorUser = await authStore.getUserByUsername(contributorName);
+    } catch {
+      return reply.code(404).send({ error: "user_not_found" });
+    }
+    if (!contributorUser) {
+      return reply.code(404).send({ error: "user_not_found" });
+    }
+
+    const contributor = await store.addContributor(request.params.slug, {
+      role: request.body.role,
+      name: contributorUser.username,
+      username: contributorUser.username,
+      userId: contributorUser.id
+    });
+    return reply.code(201).send({ contributor });
   });
 
   app.post<{ Params: SkillParams; Body: IssueBody }>("/skills/:slug/issues", async (request, reply) => {
