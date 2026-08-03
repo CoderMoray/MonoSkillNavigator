@@ -39,7 +39,6 @@ import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../component
 import { addSkillContributor, addSkillRating, bookmarkSkill, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, republishSkill, republishSkillVersion, saveBlobAsFile, unpublishSkill, unpublishSkillVersion, unbookmarkSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { creatorProfilePath } from "../../../lib/creators";
-import { isSkillContributor } from "../../../lib/skill-contributors";
 import { formatDateTime, formatNumber } from "../../../lib/format";
 import { buildHaluCatchReportPath, extractHaluCatchSummary } from "../../../lib/halucatch-report";
 import { localizeSkillSpectorFinding } from "@skill-platform/review-engine/skillspector-i18n";
@@ -328,7 +327,6 @@ export default function SkillDetailPage() {
             (contributor.userId === viewer.id || contributor.username === viewer.username)
         ))
   );
-  const canManageContributors = Boolean(viewer && isSkillContributor(skill, viewer));
   const categories = currentVersion.manifest.categories ?? [];
   const openIssues = skill.issues.filter((issue) => issue.status !== "closed");
   const reviewFindings = currentVersion.review?.findings ?? [];
@@ -975,7 +973,7 @@ export default function SkillDetailPage() {
                     <h3>贡献者</h3>
                     <span className="badge">{skill.contributors.length}</span>
                   </div>
-                  {canManageContributors ? (
+                  {isOwner ? (
                     <form className="contributor-form" onSubmit={handleAddContributor}>
                       <label className="field">
                         <span>用户名</span>

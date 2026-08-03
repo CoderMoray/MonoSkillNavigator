@@ -417,8 +417,8 @@ export function buildServer() {
     if (!skill) {
       return reply.code(404).send({ error: "skill_not_found" });
     }
-    if (!isSkillContributor(skill, user)) {
-      return reply.code(403).send({ error: "Only skill contributors can add contributors" });
+    if (!isSkillOwner(skill, user)) {
+      return reply.code(403).send({ error: "Only skill owners can add contributors" });
     }
 
     const contributorName = request.body.name.trim();
