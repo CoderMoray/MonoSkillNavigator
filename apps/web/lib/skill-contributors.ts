@@ -13,6 +13,10 @@ function matchesContributorUser(
 }
 
 export function isSkillContributor(skill: RegistrySkill, user: PublicUser): boolean {
+  if (user.role === "admin") {
+    return true;
+  }
+
   if (skill.ownerUserId && skill.ownerUserId === user.id) {
     return true;
   }
