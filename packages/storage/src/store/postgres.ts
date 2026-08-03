@@ -379,7 +379,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       .select()
       .from(schema.skillVersions)
       .where(eq(schema.skillVersions.skillSlug, slug))
-      .orderBy(schema.skillVersions.createdAt);
+      .orderBy(desc(schema.skillVersions.createdAt));
 
     const contributors = await this.db
       .select()

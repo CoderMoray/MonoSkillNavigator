@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { MarkdownContent } from "../../../components/MarkdownContent";
 import type { LucideIcon } from "lucide-react";
-import { isSkillEntryPath } from "@skill-platform/skill-spec/skill-format";
+import { compareSemver, isSkillEntryPath } from "@skill-platform/skill-spec/skill-format";
 import {
   ArrowLeft,
   BookOpen,
@@ -278,7 +278,16 @@ export default function SkillDetailPage() {
   }, [currentVersion, skill, viewer]);
 
   const versions = useMemo(
-    () => (skill ? Object.values(skill.versions).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : []),
+    () =>
+      skill
+        ? Object.values(skill.versions).sort((a, b) => {
+            const compared = compareSemver(b.version, a.version);
+            if (compared !== null && compared !== 0) {
+              return compared;
+            }
+            return b.createdAt.localeCompare(a.createdAt);
+          })
+        : [],
     [skill]
   );
 
