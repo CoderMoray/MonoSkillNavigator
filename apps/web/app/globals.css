@@ -2522,7 +2522,7 @@ button {
 
 .version-table-header {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(96px, 0.75fr) minmax(168px, 1fr) 36px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(96px, 0.75fr) minmax(220px, 1.35fr) 36px;
   gap: 12px;
   align-items: center;
   padding: 0 14px 4px;
@@ -2539,7 +2539,7 @@ button {
 
 .version-entry-head {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(96px, 0.75fr) minmax(168px, 1fr) 36px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(96px, 0.75fr) minmax(220px, 1.35fr) 36px;
   gap: 12px;
   align-items: center;
   border: 1px solid var(--border);
@@ -2570,9 +2570,29 @@ button {
 .version-col-download {
   display: flex;
   justify-content: flex-start;
+  min-width: 0;
+}
+
+.version-action-buttons {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
 }
 
 .version-download-button {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.version-unpublish-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.version-restore-button {
   width: 100%;
   justify-content: center;
   white-space: nowrap;

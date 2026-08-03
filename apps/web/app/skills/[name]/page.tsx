@@ -23,7 +23,6 @@ import {
   MessageSquare,
   Package,
   Plus,
-  RotateCcw,
   ShieldCheck,
   Star,
   Trash2,
@@ -1173,55 +1172,50 @@ export default function SkillDetailPage() {
                         </div>
                         <div className="version-col-release">
                           {isLatest ? <span className="badge">Latest</span> : null}
-                          {isVersionUnpublished ? (
-                            <span className="badge badge-unpublished">
-                              <EyeOff size={12} /> 已下架
-                            </span>
-                          ) : null}
                           <VerdictBadge verdict={version.status} />
-                          {isOwner ? (
-                            isVersionUnpublished ? (
-                              <button
-                                className="button secondary compact"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setManageError(null);
-                                  setVersionManageModal({ action: "republish", version: version.version });
-                                }}
-                                type="button"
-                              >
-                                <RotateCcw size={14} /> 恢复上架
-                              </button>
-                            ) : !isLatest ? (
-                              <button
-                                className="button secondary compact"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setManageError(null);
-                                  setVersionManageModal({ action: "unpublish", version: version.version });
-                                }}
-                                type="button"
-                              >
-                                <EyeOff size={14} /> 下架版本
-                              </button>
-                            ) : null
-                          ) : null}
                         </div>
                         <div
                           className="version-col-download"
                           onClick={(event) => event.stopPropagation()}
                           onKeyDown={(event) => event.stopPropagation()}
                         >
-                          {viewer ? (
-                            <button
-                              className="button secondary compact version-download-button"
-                              disabled={downloadingVersion === version.version}
-                              onClick={() => void handleDownload(version.version)}
-                              type="button"
-                            >
-                              <Download size={14} />
-                              {downloadingVersion === version.version ? "Downloading…" : "Download version"}
-                            </button>
+                          {isVersionUnpublished ? (
+                            isOwner ? (
+                              <button
+                                className="button secondary compact version-restore-button"
+                                onClick={() => {
+                                  setManageError(null);
+                                  setVersionManageModal({ action: "republish", version: version.version });
+                                }}
+                                type="button"
+                              >
+                                恢复上架
+                              </button>
+                            ) : null
+                          ) : viewer ? (
+                            <div className="version-action-buttons">
+                              <button
+                                className="button secondary compact version-download-button"
+                                disabled={downloadingVersion === version.version}
+                                onClick={() => void handleDownload(version.version)}
+                                type="button"
+                              >
+                                <Download size={14} />
+                                {downloadingVersion === version.version ? "Downloading…" : "Download version"}
+                              </button>
+                              {isOwner && !isLatest ? (
+                                <button
+                                  className="button secondary compact danger version-unpublish-button"
+                                  onClick={() => {
+                                    setManageError(null);
+                                    setVersionManageModal({ action: "unpublish", version: version.version });
+                                  }}
+                                  type="button"
+                                >
+                                  下架
+                                </button>
+                              ) : null}
+                            </div>
                           ) : (
                             <Link className="button secondary compact version-download-button" href="/login">
                               <Download size={14} />
