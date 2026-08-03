@@ -23,6 +23,7 @@ import {
   MessageSquare,
   Package,
   Plus,
+  RotateCcw,
   ShieldCheck,
   Star,
   Trash2,
@@ -36,7 +37,7 @@ import { HaluCatchRadar } from "../../../components/HaluCatchRadar";
 import { FindingConfidenceBadge } from "../../../components/FindingConfidenceBadge";
 import { SkillCategoryLabel } from "../../../components/SkillCategoryIcon";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
-import { addSkillContributor, addSkillRating, bookmarkSkill, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, republishSkill, saveBlobAsFile, unpublishSkill, unbookmarkSkill } from "../../../lib/api";
+import { addSkillContributor, addSkillRating, bookmarkSkill, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, republishSkill, republishSkillVersion, saveBlobAsFile, unpublishSkill, unpublishSkillVersion, unbookmarkSkill } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { creatorProfilePath } from "../../../lib/creators";
 import { formatDateTime, formatNumber } from "../../../lib/format";
@@ -105,6 +106,22 @@ function formatContributorError(message: string): string {
   return message;
 }
 
+function formatVersionManageError(message: string): string {
+  if (message === "cannot_unpublish_latest_version") {
+    return "最新版本不能下架，请先发布更新的版本后再下架旧版本。";
+  }
+  if (message === "version_already_unpublished") {
+    return "该版本已下架。";
+  }
+  if (message === "version_already_published") {
+    return "该版本已在上架状态。";
+  }
+  if (message === "version_unpublished") {
+    return "该版本已下架，无法下载。";
+  }
+  return message;
+}
+
 export default function SkillDetailPage() {
   const params = useParams<{ name: string }>();
   const router = useRouter();
@@ -143,6 +160,8 @@ export default function SkillDetailPage() {
   const [unpublishingSkill, setUnpublishingSkill] = useState(false);
   const [republishingSkill, setRepublishingSkill] = useState(false);
   const [deletingSkill, setDeletingSkill] = useState(false);
+  const [versionManageModal, setVersionManageModal] = useState<{ action: "unpublish" | "republish"; version: string } | null>(null);
+  const [managingVersion, setManagingVersion] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [platformAverageHaluCatch, setPlatformAverageHaluCatch] = useState<HaluCatchRadarScores | undefined>();
@@ -218,7 +237,7 @@ export default function SkillDetailPage() {
   }, [skillSlug]);
 
   useEffect(() => {
-    if (!issueModalOpen && !ratingModalOpen && !unpublishModalOpen && !republishModalOpen && !deleteModalOpen) {
+    if (!issueModalOpen && !ratingModalOpen && !unpublishModalOpen && !republishModalOpen && !deleteModalOpen && !versionManageModal) {
       return;
     }
 
@@ -229,6 +248,7 @@ export default function SkillDetailPage() {
         setUnpublishModalOpen(false);
         setRepublishModalOpen(false);
         setDeleteModalOpen(false);
+        setVersionManageModal(null);
         setIssueError(null);
         setRatingError(null);
         setManageError(null);
@@ -237,7 +257,7 @@ export default function SkillDetailPage() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [issueModalOpen, ratingModalOpen, unpublishModalOpen, republishModalOpen, deleteModalOpen]);
+  }, [issueModalOpen, ratingModalOpen, unpublishModalOpen, republishModalOpen, deleteModalOpen, versionManageModal]);
 
   const currentVersion = useMemo(() => {
     if (!skill) {
@@ -565,7 +585,7 @@ export default function SkillDetailPage() {
       setSkill(updated);
       setSuccessToast(`已下载 v${version}（${fileName}）`);
     } catch (err) {
-      setDownloadError(err instanceof Error ? err.message : "下载失败");
+      setDownloadError(formatVersionManageError(err instanceof Error ? err.message : "下载失败"));
     } finally {
       setDownloadingVersion(null);
     }
@@ -637,6 +657,35 @@ export default function SkillDetailPage() {
       setManageError(err instanceof Error ? err.message : "上架失败");
     } finally {
       setRepublishingSkill(false);
+    }
+  }
+
+  async function handleVersionManageConfirm() {
+    if (!skill || !versionManageModal) {
+      return;
+    }
+
+    setManageError(null);
+    const token = getAuthToken();
+    if (!token) {
+      setManageError("请先登录后再操作。");
+      return;
+    }
+
+    setManagingVersion(true);
+    const { action, version } = versionManageModal;
+    try {
+      const updated =
+        action === "unpublish"
+          ? await unpublishSkillVersion(token, skill.slug, version)
+          : await republishSkillVersion(token, skill.slug, version);
+      setSkill(updated);
+      setVersionManageModal(null);
+      setSuccessToast(action === "unpublish" ? `v${version} 已下架。` : `v${version} 已恢复上架。`);
+    } catch (err) {
+      setManageError(formatVersionManageError(err instanceof Error ? err.message : "操作失败"));
+    } finally {
+      setManagingVersion(false);
     }
   }
 
@@ -1078,6 +1127,7 @@ export default function SkillDetailPage() {
                 {versions.map((version) => {
                   const isExpanded = expandedVersionNames.has(version.version);
                   const isLatest = version.version === skill.latestVersion;
+                  const isVersionUnpublished = version.published === false;
 
                   function handleVersionRowClick() {
                     setSelectedVersionName(version.version);
@@ -1114,7 +1164,39 @@ export default function SkillDetailPage() {
                         </div>
                         <div className="version-col-release">
                           {isLatest ? <span className="badge">Latest</span> : null}
+                          {isVersionUnpublished ? (
+                            <span className="badge badge-unpublished">
+                              <EyeOff size={12} /> 已下架
+                            </span>
+                          ) : null}
                           <VerdictBadge verdict={version.status} />
+                          {isOwner ? (
+                            isVersionUnpublished ? (
+                              <button
+                                className="button secondary compact"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setManageError(null);
+                                  setVersionManageModal({ action: "republish", version: version.version });
+                                }}
+                                type="button"
+                              >
+                                <RotateCcw size={14} /> 恢复上架
+                              </button>
+                            ) : !isLatest ? (
+                              <button
+                                className="button secondary compact"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setManageError(null);
+                                  setVersionManageModal({ action: "unpublish", version: version.version });
+                                }}
+                                type="button"
+                              >
+                                <EyeOff size={14} /> 下架版本
+                              </button>
+                            ) : null
+                          ) : null}
                         </div>
                         <div
                           className="version-col-download"
@@ -1705,6 +1787,86 @@ export default function SkillDetailPage() {
                   </button>
                   <button className="button primary" disabled={republishingSkill} onClick={() => void handleRepublish()} type="button">
                     {republishingSkill ? "上架中…" : "确认上架"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {versionManageModal ? (
+          <div
+            className="modal-overlay"
+            onClick={() => {
+              setVersionManageModal(null);
+              setManageError(null);
+            }}
+            role="presentation"
+          >
+            <div
+              aria-labelledby="version-manage-modal-title"
+              aria-modal="true"
+              className="modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+            >
+              <div className="modal-head">
+                <div>
+                  <span className="eyebrow">
+                    {versionManageModal.action === "unpublish" ? "Unpublish version" : "Republish version"}
+                  </span>
+                  <h3 id="version-manage-modal-title">
+                    {versionManageModal.action === "unpublish" ? "下架版本" : "恢复版本上架"}
+                  </h3>
+                </div>
+                <button
+                  aria-label="关闭"
+                  className="modal-close"
+                  onClick={() => {
+                    setVersionManageModal(null);
+                    setManageError(null);
+                  }}
+                  type="button"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="modal-form">
+                <p className="description">
+                  {versionManageModal.action === "unpublish" ? (
+                    <>
+                      下架 <strong>v{versionManageModal.version}</strong> 后，其他用户将无法查看或下载该版本。
+                      最新版本 v{skill.latestVersion} 不受影响。
+                    </>
+                  ) : (
+                    <>
+                      将 <strong>v{versionManageModal.version}</strong> 恢复上架后，其他用户可再次查看并下载该版本。
+                    </>
+                  )}
+                </p>
+                {manageError ? <div className="error compact-error">{manageError}</div> : null}
+                <div className="modal-actions">
+                  <button
+                    className="button secondary"
+                    onClick={() => {
+                      setVersionManageModal(null);
+                      setManageError(null);
+                    }}
+                    type="button"
+                  >
+                    取消
+                  </button>
+                  <button
+                    className="button primary"
+                    disabled={managingVersion}
+                    onClick={() => void handleVersionManageConfirm()}
+                    type="button"
+                  >
+                    {managingVersion
+                      ? "处理中…"
+                      : versionManageModal.action === "unpublish"
+                        ? "确认下架"
+                        : "确认恢复"}
                   </button>
                 </div>
               </div>

@@ -79,6 +79,7 @@ export abstract class JsonRegistryStore implements RegistryStore {
       releaseTags,
       changelog: options.changelog,
       downloads: 0,
+      published: true,
       createdAt: now,
       updatedAt: now,
     };
@@ -296,6 +297,55 @@ export abstract class JsonRegistryStore implements RegistryStore {
 
     const now = new Date().toISOString();
     skill.published = true;
+    skill.updatedAt = now;
+    await this.save(data);
+    return skill;
+  }
+
+  async unpublishVersion(slug: string, version: string): Promise<RegistrySkill> {
+    const data = await this.load();
+    const skill = data.skills[slug];
+    if (!skill) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+    if (skill.latestVersion === version) {
+      throw new Error("cannot_unpublish_latest_version");
+    }
+
+    const registryVersion = skill.versions[version];
+    if (!registryVersion) {
+      throw new Error(`Version not found: ${slug}@${version}`);
+    }
+    if (registryVersion.published === false) {
+      throw new Error("version_already_unpublished");
+    }
+
+    const now = new Date().toISOString();
+    registryVersion.published = false;
+    registryVersion.updatedAt = now;
+    skill.updatedAt = now;
+    await this.save(data);
+    return skill;
+  }
+
+  async republishVersion(slug: string, version: string): Promise<RegistrySkill> {
+    const data = await this.load();
+    const skill = data.skills[slug];
+    if (!skill) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+
+    const registryVersion = skill.versions[version];
+    if (!registryVersion) {
+      throw new Error(`Version not found: ${slug}@${version}`);
+    }
+    if (registryVersion.published !== false) {
+      throw new Error("version_already_published");
+    }
+
+    const now = new Date().toISOString();
+    registryVersion.published = true;
+    registryVersion.updatedAt = now;
     skill.updatedAt = now;
     await this.save(data);
     return skill;

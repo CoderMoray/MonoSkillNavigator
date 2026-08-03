@@ -154,6 +154,7 @@ export interface RegistryVersion {
   releaseTags: string[];
   changelog?: string;
   downloads: number;
+  published?: boolean;
   createdAt: string;
   updatedAt: string;
 }

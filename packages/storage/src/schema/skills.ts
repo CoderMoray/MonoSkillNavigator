@@ -43,6 +43,7 @@ export const skillVersions = pgTable("skill_versions", {
   readme: text("readme").notNull(),
   snapshotCreatedAt: timestamp("snapshot_created_at", { withTimezone: true }).notNull(),
   status: text("status").notNull(),
+  published: boolean("published").notNull().default(true),
   downloads: integer("downloads").notNull().default(0),
   artifactProvider: text("artifact_provider"),
   artifactBucket: text("artifact_bucket"),
@@ -56,6 +57,7 @@ export const skillVersions = pgTable("skill_versions", {
   uniqueIndex("skill_versions_pkey").on(table.skillSlug, table.version),
   index("skill_versions_status_updated_at_idx").on(table.status, table.updatedAt.desc()),
   index("skill_versions_content_hash_idx").on(table.contentHash),
+  index("skill_versions_published_idx").on(table.skillSlug, table.published),
 ]);
 
 export const skillVersionTags = pgTable("skill_version_tags", {

@@ -71,6 +71,7 @@ export interface RegistryVersion {
   releaseTags: string[];
   changelog?: string;
   downloads: number;
+  published?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -187,6 +188,8 @@ export interface RegistryStore {
   downloadSnapshot(slug: string, version?: string): Promise<SkillSnapshot | undefined>;
   unpublishSkill(slug: string): Promise<RegistrySkill>;
   republishSkill(slug: string): Promise<RegistrySkill>;
+  unpublishVersion(slug: string, version: string): Promise<RegistrySkill>;
+  republishVersion(slug: string, version: string): Promise<RegistrySkill>;
   deleteSkill(slug: string): Promise<void>;
   restoreSkill(slug: string): Promise<RegistrySkill>;
   listRecycleBinForOwner(ownerUserId: string): Promise<RecycleBinSkill[]>;

@@ -30,7 +30,8 @@ import {
   type IssueStatus,
   type IssueType,
   type LeaderboardSort,
-  type PublicUser
+  type PublicUser,
+  type RegistrySkill
 } from "@skill-platform/storage";
 
 loadDotEnvIfPresent();
@@ -98,6 +99,46 @@ interface VersionParams {
 }
 
 type LeaderboardQuerySort = LeaderboardSort | "compliance" | "privacy";
+
+function filterSkillVersionsForViewer(skill: RegistrySkill, user: PublicUser | undefined): RegistrySkill {
+  if (user && isSkillOwner(skill, user)) {
+    return skill;
+  }
+
+  return {
+    ...skill,
+    versions: Object.fromEntries(
+      Object.entries(skill.versions).filter(([, version]) => version.published !== false)
+    )
+  };
+}
+
+function canAccessVersion(
+  skill: RegistrySkill | undefined,
+  version: { published?: boolean } | undefined,
+  user: PublicUser | undefined
+): boolean {
+  if (!skill || !version) {
+    return false;
+  }
+  if (version.published !== false) {
+    return true;
+  }
+  return Boolean(user && isSkillOwner(skill, user));
+}
+
+function versionManageErrorStatus(message: string): number {
+  if (message === "cannot_unpublish_latest_version") {
+    return 400;
+  }
+  if (message === "version_already_unpublished" || message === "version_already_published") {
+    return 409;
+  }
+  if (message.includes("Version not found") || message.includes("Skill not found")) {
+    return 404;
+  }
+  return 400;
+}
 
 export function buildServer() {
   const app = Fastify({
@@ -483,14 +524,20 @@ export function buildServer() {
       : undefined;
 
     return {
-      ...skill,
-      bookmarkedByViewer,
+      ...filterSkillVersionsForViewer(skill, user),
+      bookmarkedByViewer
     };
   });
 
   app.get<{ Params: VersionParams }>("/skills/:slug/versions/:version", async (request, reply) => {
+    const skill = await store.getSkill(request.params.slug);
     const registryVersion = await store.getVersion(request.params.slug, request.params.version);
     if (!registryVersion) {
+      return reply.code(404).send({ error: "version_not_found" });
+    }
+
+    const user = await getAuthenticatedUser(request.headers.authorization, authStore);
+    if (!canAccessVersion(skill, registryVersion, user)) {
       return reply.code(404).send({ error: "version_not_found" });
     }
 
@@ -514,6 +561,11 @@ export function buildServer() {
 
     if (skill.published === false && !isSkillOwner(skill, user)) {
       return reply.code(404).send({ error: "skill_unpublished" });
+    }
+
+    const registryVersion = await store.getVersion(request.params.slug, request.params.version);
+    if (!canAccessVersion(skill, registryVersion, user)) {
+      return reply.code(404).send({ error: "version_unpublished" });
     }
 
     const snapshot = await store.downloadSnapshot(request.params.slug, request.params.version);
@@ -572,6 +624,52 @@ export function buildServer() {
       return { skill: updated };
     } catch {
       return reply.code(404).send({ error: "skill_not_found" });
+    }
+  });
+
+  app.post<{ Params: VersionParams }>("/skills/:slug/versions/:version/unpublish", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
+    const skill = await store.getSkill(request.params.slug);
+    if (!skill) {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
+    if (!isSkillOwner(skill, user)) {
+      return reply.code(403).send({ error: "Forbidden" });
+    }
+
+    try {
+      const updated = await store.unpublishVersion(request.params.slug, request.params.version);
+      return { skill: filterSkillVersionsForViewer(updated, user) };
+    } catch (error) {
+      const message = errorMessage(error);
+      return reply.code(versionManageErrorStatus(message)).send({ error: message });
+    }
+  });
+
+  app.post<{ Params: VersionParams }>("/skills/:slug/versions/:version/republish", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
+    const skill = await store.getSkill(request.params.slug);
+    if (!skill) {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
+    if (!isSkillOwner(skill, user)) {
+      return reply.code(403).send({ error: "Forbidden" });
+    }
+
+    try {
+      const updated = await store.republishVersion(request.params.slug, request.params.version);
+      return { skill: filterSkillVersionsForViewer(updated, user) };
+    } catch (error) {
+      const message = errorMessage(error);
+      return reply.code(versionManageErrorStatus(message)).send({ error: message });
     }
   });
 

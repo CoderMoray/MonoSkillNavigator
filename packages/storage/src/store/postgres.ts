@@ -554,6 +554,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         evaluation: hydratedEvaluation,
         status: v.status as RegistryVersion["status"],
         releaseTags: v.releaseTags, changelog: v.changelog ?? undefined, downloads: Number(v.downloads),
+        published: v.published,
         createdAt: String(v.createdAt), updatedAt: String(v.updatedAt),
       };
     }
@@ -905,6 +906,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         categories: snapshot.manifest.categories ?? [], topics: snapshot.manifest.topics ?? [],
         releaseTags, changelog: options.changelog?.trim() || null,
         contentHash: snapshot.contentHash, readme: snapshot.readme ?? "",
+        published: true,
         snapshotCreatedAt: now, createdAt: now, updatedAt: now,
       });
 
@@ -1049,6 +1051,77 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     if (updated.length === 0) {
       throw new Error(`Skill not found: ${slug}`);
     }
+
+    const skill = await this.getSkill(slug);
+    if (!skill) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+    return skill;
+  }
+
+  async unpublishVersion(slug: string, version: string): Promise<RegistrySkill> {
+    await this.ensureSchema();
+    const [skillRow] = await this.db
+      .select({ latestVersion: schema.skills.latestVersion })
+      .from(schema.skills)
+      .where(eq(schema.skills.slug, slug))
+      .limit(1);
+
+    if (!skillRow) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+    if (skillRow.latestVersion === version) {
+      throw new Error("cannot_unpublish_latest_version");
+    }
+
+    const [versionRow] = await this.db
+      .select({ published: schema.skillVersions.published })
+      .from(schema.skillVersions)
+      .where(and(eq(schema.skillVersions.skillSlug, slug), eq(schema.skillVersions.version, version)))
+      .limit(1);
+
+    if (!versionRow) {
+      throw new Error(`Version not found: ${slug}@${version}`);
+    }
+    if (versionRow.published === false) {
+      throw new Error("version_already_unpublished");
+    }
+
+    const now = new Date();
+    await this.db
+      .update(schema.skillVersions)
+      .set({ published: false, updatedAt: now })
+      .where(and(eq(schema.skillVersions.skillSlug, slug), eq(schema.skillVersions.version, version)));
+    await this.db.update(schema.skills).set({ updatedAt: now }).where(eq(schema.skills.slug, slug));
+
+    const skill = await this.getSkill(slug);
+    if (!skill) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+    return skill;
+  }
+
+  async republishVersion(slug: string, version: string): Promise<RegistrySkill> {
+    await this.ensureSchema();
+    const [versionRow] = await this.db
+      .select({ published: schema.skillVersions.published })
+      .from(schema.skillVersions)
+      .where(and(eq(schema.skillVersions.skillSlug, slug), eq(schema.skillVersions.version, version)))
+      .limit(1);
+
+    if (!versionRow) {
+      throw new Error(`Version not found: ${slug}@${version}`);
+    }
+    if (versionRow.published !== false) {
+      throw new Error("version_already_published");
+    }
+
+    const now = new Date();
+    await this.db
+      .update(schema.skillVersions)
+      .set({ published: true, updatedAt: now })
+      .where(and(eq(schema.skillVersions.skillSlug, slug), eq(schema.skillVersions.version, version)));
+    await this.db.update(schema.skills).set({ updatedAt: now }).where(eq(schema.skills.slug, slug));
 
     const skill = await this.getSkill(slug);
     if (!skill) {
