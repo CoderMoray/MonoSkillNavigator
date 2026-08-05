@@ -37,6 +37,7 @@ export interface ReviewReport {
   scores: ReviewScores;
   findings: ReviewFinding[];
   skillSpector?: SkillSpectorScanSummary;
+  virusTotal?: VirusTotalScanSummary;
   createdAt: string;
 }
 
@@ -46,6 +47,17 @@ export interface SkillSpectorScanSummary {
   riskSeverity: string;
   recommendation: string;
   scanMode: "static-only";
+}
+
+export interface VirusTotalScanSummary {
+  provider: "virustotal";
+  sha256: string;
+  status: "completed" | "not_found";
+  malicious: number;
+  suspicious: number;
+  harmless: number;
+  undetected: number;
+  analysisUrl?: string;
 }
 
 export interface FunctionalEvaluationFinding {

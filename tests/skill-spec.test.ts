@@ -7,7 +7,12 @@ import {
   parseSkillFrontmatterHints,
   validatePublishMetadataInput
 } from "../packages/skill-spec/src/skill-format.js";
-import { parseSkillMarkdown, readSkillZipBuffer, validateSkillSnapshot } from "../packages/skill-spec/src/index.js";
+import {
+  parseSkillMarkdown,
+  readSkillZipBuffer,
+  skillSnapshotToZipBuffer,
+  validateSkillSnapshot
+} from "../packages/skill-spec/src/index.js";
 
 describe("Slug validation", () => {
   it("accepts unscoped npm-safe slugs", () => {
@@ -115,6 +120,19 @@ describe("Skill archive frontmatter", () => {
     const hints = await readSkillFrontmatterFromZip(file);
 
     expect(hints?.description).toContain("Reviews a short product idea");
+  });
+});
+
+describe("Skill archive serialization", () => {
+  it("creates deterministic ZIP archives for the same snapshot", async () => {
+    const snapshot = readSkillZipBuffer(readFileSync("examples/demo-skill.zip"));
+    const reordered = { ...snapshot, files: [...snapshot.files].reverse() };
+    const first = skillSnapshotToZipBuffer(snapshot);
+    const second = skillSnapshotToZipBuffer(reordered);
+    const AdmZip = (await import("adm-zip")).default;
+
+    expect(first.equals(second)).toBe(true);
+    expect(new AdmZip(first).getEntries().every((entry) => entry.header.time.getFullYear() === 1980)).toBe(true);
   });
 });
 

@@ -11,6 +11,11 @@ import {
   runSkillSpectorSecurityScan,
   type SkillSpectorScanSummary
 } from "./skillspector.js";
+import {
+  isVirusTotalEnabled,
+  runVirusTotalScan,
+  type VirusTotalScanSummary
+} from "./virustotal.js";
 import { collectSkillLicenseFindings, isSkillLicenseValidationEnabled } from "./license-compliance.js";
 
 export {
@@ -57,10 +62,17 @@ export interface ReviewReport {
   scores: ReviewScores;
   findings: ReviewFinding[];
   skillSpector?: SkillSpectorScanSummary;
+  virusTotal?: VirusTotalScanSummary;
   createdAt: string;
 }
 
 export type { SkillSpectorScanSummary } from "./skillspector.js";
+export {
+  isVirusTotalEnabled,
+  isVirusTotalUploadOnMissEnabled,
+  runVirusTotalScan,
+  type VirusTotalScanSummary
+} from "./virustotal.js";
 
 interface PatternRule {
   id: string;
@@ -173,6 +185,7 @@ export async function reviewSkillSnapshot(
 
   let skillSpector: SkillSpectorScanSummary | undefined;
   let skillSpectorAvailable = false;
+  let virusTotal: VirusTotalScanSummary | undefined;
 
   if (isSkillSpectorEnabled()) {
     try {
@@ -189,6 +202,24 @@ export async function reviewSkillSnapshot(
         message: `SkillSpector static security scan could not run: ${truncateError(error)}`,
         recommendation:
           "Install Python 3.12+ with SkillSpector dependencies, keep packages/SkillSpector-main available, or set SKILLSPECTOR_PYTHON. Falling back to built-in platform review rules."
+      });
+    }
+  }
+
+  if (isVirusTotalEnabled()) {
+    try {
+      const scan = await runVirusTotalScan(snapshot);
+      virusTotal = scan.summary;
+      findings.push(...scan.findings);
+    } catch (error) {
+      findings.push({
+        id: "virustotal-unavailable",
+        category: "security",
+        severity: "low",
+        title: "VirusTotal package scan unavailable",
+        message: `VirusTotal package scan could not run: ${truncateError(error)}`,
+        recommendation:
+          "Check VIRUSTOTAL_API_KEY, VirusTotal quota, and network access. The package was not blocked because no VirusTotal verdict was available."
       });
     }
   }
@@ -211,6 +242,7 @@ export async function reviewSkillSnapshot(
     scores,
     findings,
     skillSpector,
+    virusTotal,
     createdAt: new Date().toISOString()
   };
 }

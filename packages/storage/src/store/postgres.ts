@@ -25,6 +25,7 @@ import type {
 } from "../types";
 import { skillRecyclePurgeAt, skillRecycleRetentionMs } from "../recycle-bin";
 import { parseSkillSpectorReviewRow, skillSpectorReviewColumns } from "../skillspector-review";
+import { parseVirusTotalReviewRow, virusTotalReviewColumns } from "../virustotal-review";
 import { emptyRegistry, normalizeRegistryData, toSearchResult } from "../utils";
 import { JsonRegistryStore } from "./base";
 
@@ -514,6 +515,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       } as RegistryVersion["manifest"];
 
       const skillSpectorSummary = review ? parseSkillSpectorReviewRow(review) : undefined;
+      const virusTotalSummary = review ? parseVirusTotalReviewRow(review) : undefined;
 
       versionMap[v.version] = {
         version: v.version,
@@ -549,6 +551,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
               : {}),
           })),
           ...(skillSpectorSummary ? { skillSpector: skillSpectorSummary } : {}),
+          ...(virusTotalSummary ? { virusTotal: virusTotalSummary } : {}),
           createdAt: String(review.createdAt),
         } : {} as RegistryVersion["review"],
         evaluation: hydratedEvaluation,
@@ -743,6 +746,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     const createdAt = new Date();
 
     const skillSpectorCols = skillSpectorReviewColumns(review.skillSpector);
+    const virusTotalCols = virusTotalReviewColumns(review.virusTotal);
 
     await this.db.insert(schema.skillReviews).values({
       skillSlug: slug, version, reviewId: review.id, reportVersion: review.version ?? "1.0",
@@ -751,6 +755,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       securityScore: review.scores.securityScore,
       reliabilityScore: review.scores.reliabilityScore,
       ...skillSpectorCols,
+      ...virusTotalCols,
       createdAt,
     }).onConflictDoUpdate({
       target: [schema.skillReviews.skillSlug, schema.skillReviews.version],
@@ -761,6 +766,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         securityScore: review.scores.securityScore,
         reliabilityScore: review.scores.reliabilityScore,
         ...skillSpectorCols,
+        ...virusTotalCols,
       },
     });
 
@@ -930,6 +936,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         securityScore: review.scores.securityScore,
         reliabilityScore: review.scores.reliabilityScore,
         ...skillSpectorReviewColumns(review.skillSpector),
+        ...virusTotalReviewColumns(review.virusTotal),
         createdAt: now,
       });
 

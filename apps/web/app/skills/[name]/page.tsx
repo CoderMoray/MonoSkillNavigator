@@ -339,6 +339,10 @@ export default function SkillDetailPage() {
       finding.category === "leakage"
   );
   const skillSpectorScan = currentVersion.review?.skillSpector;
+  const virusTotalScan = currentVersion.review?.virusTotal;
+  const virusTotalDetections = virusTotalScan
+    ? virusTotalScan.malicious + virusTotalScan.suspicious
+    : 0;
   const hiddenPlatformFindingCount = reviewFindings.length - securityFindings.length;
   const isHaluCatchEvaluation = currentVersion.evaluation?.provider === "halucatch-adapter";
   const haluCatchReport = currentVersion.evaluation?.haluCatchReport;
@@ -1301,8 +1305,13 @@ export default function SkillDetailPage() {
                   <div>
                     <h3>安全审查</h3>
                     <p className="description">
-                      由 SkillSpector 对发布包做静态安全扫描；以下 finding 与包级安全分用于解释阻断或复核原因，不再汇总为单一安全分。
+                      由 SkillSpector 对发布包做静态安全扫描；配置 VirusTotal 后，还会按归档 hash 查询或扫描发布包。以下 finding 用于解释阻断或复核原因，不再汇总为单一安全分。
                       {skillSpectorScan ? ` ${formatSkillSpectorSummaryLine(skillSpectorScan)}` : null}
+                      {virusTotalScan
+                        ? virusTotalScan.status === "completed"
+                          ? ` VirusTotal 已完成：${virusTotalScan.malicious} 个恶意、${virusTotalScan.suspicious} 个可疑检出。`
+                          : " VirusTotal 未命中该归档的历史报告，且未上传新样本。"
+                        : null}
                       {hiddenPlatformFindingCount > 0
                         ? ` 另有 ${hiddenPlatformFindingCount} 条平台质量/合规提示（如 description、tags、tests）计入审查记录，但不在此安全区域展示。`
                         : null}
@@ -1331,6 +1340,43 @@ export default function SkillDetailPage() {
                       <span>模式</span>
                       <strong>{formatSkillSpectorScanMode(skillSpectorScan.scanMode)}</strong>
                     </div>
+                  </div>
+                ) : null}
+                {virusTotalScan ? (
+                  <div className="evaluation-summary">
+                    <div>
+                      <span>扫描器</span>
+                      <strong>VirusTotal</strong>
+                    </div>
+                    <div>
+                      <span>状态</span>
+                      <strong>{virusTotalScan.status === "completed" ? "已完成" : "未命中历史报告"}</strong>
+                    </div>
+                    <div>
+                      <span>检出结果</span>
+                      <strong>
+                        {virusTotalDetections
+                          ? `${virusTotalScan.malicious} 恶意 · ${virusTotalScan.suspicious} 可疑`
+                          : "未检出"}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>归档 SHA-256</span>
+                      <strong className="mono">{virusTotalScan.sha256.slice(0, 16)}...</strong>
+                    </div>
+                    {virusTotalScan.analysisUrl ? (
+                      <div>
+                        <span>分析报告</span>
+                        <a
+                          className="text-link"
+                          href={virusTotalScan.analysisUrl}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          查看 VirusTotal 报告 <ExternalLink size={13} />
+                        </a>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
                 {securityFindings.length === 0 ? (

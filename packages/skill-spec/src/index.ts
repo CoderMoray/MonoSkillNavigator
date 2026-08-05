@@ -44,6 +44,7 @@ export {
 } from "./skill-format.js";
 
 const frontmatterPattern = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
+const STABLE_ZIP_ENTRY_TIMESTAMP = Date.UTC(1980, 0, 1, 0, 0, 0);
 
 export const skillManifestSchema = z
   .object({
@@ -478,11 +479,12 @@ function readZipTextFiles(zip: AdmZip): SkillFile[] {
 
 function createZipFromSnapshot(snapshot: SkillSnapshot): AdmZip {
   const zip = new AdmZip();
-  for (const file of snapshot.files) {
+  for (const file of [...snapshot.files].sort((left, right) => left.path.localeCompare(right.path))) {
     if (file.path.includes("..") || path.isAbsolute(file.path)) {
       throw new Error(`Refusing to zip unsafe file path: ${file.path}`);
     }
-    zip.addFile(file.path, Buffer.from(file.content, "utf8"));
+    const entry = zip.addFile(file.path, Buffer.from(file.content, "utf8"));
+    entry.header.time = new Date(STABLE_ZIP_ENTRY_TIMESTAMP);
   }
   return zip;
 }
