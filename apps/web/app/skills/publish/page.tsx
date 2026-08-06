@@ -776,7 +776,7 @@ function PublishSkillPageContent() {
                     </div>
 
                     <label className="field">
-                      <span>Summary <em>必填</em></span>
+                      <span>Description <em>必填</em></span>
                       <textarea
                         maxLength={1024}
                         onChange={(event) => setSummary(event.target.value)}
@@ -785,7 +785,7 @@ function PublishSkillPageContent() {
                         rows={4}
                         value={summary}
                       />
-                      <small>Skill 摘要，说明能做什么及适用场景。</small>
+                      <small>Skill 描述，说明能做什么及适用场景。</small>
                     </label>
 
                     <div className="publish-form-grid">
@@ -939,7 +939,7 @@ function createPublishMetadata(input: {
 function validatePublishMetadata(metadata: PublishSkillMetadata): string | undefined {
   const sharedError = validatePublishMetadataInput(metadata);
   if (sharedError) {
-    return sharedError;
+    return sharedError.replace(/^Summary /, "Description ");
   }
   if (metadata.categories.length > MAX_CATEGORIES) {
     return `Category 最多选择 ${MAX_CATEGORIES} 个。`;
@@ -1078,7 +1078,7 @@ function applyFrontmatterToForm(
 
   if (frontmatter.description) {
     setters.setSummary(frontmatter.description);
-    filledFields.push("Summary");
+    filledFields.push("Description");
   }
   if (frontmatter.version) {
     setters.setVersion(frontmatter.version);
