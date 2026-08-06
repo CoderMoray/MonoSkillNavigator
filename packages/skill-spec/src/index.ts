@@ -90,6 +90,31 @@ export interface ParsedSkillMarkdown {
   rawFrontmatter: Record<string, unknown>;
 }
 
+export function splitSkillEntryMarkdown(markdown: string): {
+  rawFrontmatter: Record<string, unknown>;
+  body: string;
+} {
+  const match = frontmatterPattern.exec(markdown);
+  if (!match) {
+    return { rawFrontmatter: {}, body: markdown };
+  }
+
+  let rawFrontmatter: Record<string, unknown> = {};
+  try {
+    const loaded = yaml.load(match[1] ?? "");
+    if (loaded && typeof loaded === "object" && !Array.isArray(loaded)) {
+      rawFrontmatter = loaded as Record<string, unknown>;
+    }
+  } catch {
+    rawFrontmatter = {};
+  }
+
+  return {
+    rawFrontmatter,
+    body: match[2] ?? ""
+  };
+}
+
 export function parseSkillMarkdown(markdown: string): ParsedSkillMarkdown {
   const match = frontmatterPattern.exec(markdown);
   if (!match) {
@@ -140,9 +165,9 @@ export function applySkillPublishMetadata(
     throw new Error(`Skill package must include one of: ${SKILL_ENTRY_BASENAMES.join(", ")}`);
   }
 
-  const parsed = parseSkillMarkdown(skillEntry.content);
+  const { rawFrontmatter, body } = splitSkillEntryMarkdown(skillEntry.content);
   const frontmatter = {
-    ...parsed.rawFrontmatter,
+    ...rawFrontmatter,
     slug: metadata.slug,
     name: metadata.displayName,
     description: metadata.summary,
@@ -152,7 +177,7 @@ export function applySkillPublishMetadata(
     "release-tags": metadata.releaseTags
   };
   const manifest = skillManifestSchema.parse(frontmatter);
-  const content = `---\n${yaml.dump(frontmatter, { lineWidth: -1, noRefs: true })}---\n${parsed.body}`;
+  const content = `---\n${yaml.dump(frontmatter, { lineWidth: -1, noRefs: true })}---\n${body}`;
   const files = snapshot.files.map((file) =>
     file.path === skillEntry.path
       ? {
@@ -169,7 +194,7 @@ export function applySkillPublishMetadata(
       ...manifest,
       slug: getSkillSlug(manifest)
     },
-    readme: parsed.body,
+    readme: body,
     files,
     contentHash: hashSnapshotFiles(files),
     createdAt: snapshot.createdAt,
@@ -246,6 +271,27 @@ export function readSkillZipBuffer(buffer: Buffer): SkillSnapshot {
   return {
     manifest: parsed.manifest,
     readme: parsed.body,
+    files,
+    contentHash: hashSnapshotFiles(files),
+    createdAt: new Date().toISOString(),
+    entryPath: skillEntry.path
+  };
+}
+
+export function readSkillZipBufferLoose(buffer: Buffer): SkillSnapshot {
+  const zip = new AdmZip(buffer);
+  const files = readZipTextFiles(zip);
+  const skillEntry = findSkillEntryFile(files);
+  if (!skillEntry) {
+    throw new Error(
+      `Skill zip must include one of ${SKILL_ENTRY_BASENAMES.join(", ")} at the root, or inside a single top-level folder`
+    );
+  }
+
+  const { rawFrontmatter, body } = splitSkillEntryMarkdown(skillEntry.content);
+  return {
+    manifest: buildLooseManifest(rawFrontmatter),
+    readme: body,
     files,
     contentHash: hashSnapshotFiles(files),
     createdAt: new Date().toISOString(),
@@ -367,6 +413,22 @@ function normalizePublishMetadata(input: SkillPublishMetadata): SkillPublishMeta
     categories: uniqueStrings(metadata.categories),
     topics: uniqueStrings(metadata.topics),
     releaseTags: uniqueStrings(metadata.releaseTags)
+  };
+}
+
+function buildLooseManifest(rawFrontmatter: Record<string, unknown>): SkillManifest {
+  const name =
+    typeof rawFrontmatter.name === "string" && rawFrontmatter.name.trim()
+      ? rawFrontmatter.name.trim()
+      : "pending";
+  const description =
+    typeof rawFrontmatter.description === "string" && rawFrontmatter.description.trim()
+      ? rawFrontmatter.description.trim()
+      : "pending";
+
+  return {
+    name,
+    description
   };
 }
 

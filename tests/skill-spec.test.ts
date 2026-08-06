@@ -8,8 +8,10 @@ import {
   validatePublishMetadataInput
 } from "../packages/skill-spec/src/skill-format.js";
 import {
+  applySkillPublishMetadata,
   parseSkillMarkdown,
   readSkillZipBuffer,
+  readSkillZipBufferLoose,
   skillSnapshotToZipBuffer,
   validateSkillSnapshot
 } from "../packages/skill-spec/src/index.js";
@@ -159,6 +161,16 @@ describe("Skill archive serialization", () => {
 });
 
 describe("Web publish metadata", () => {
+  const publishMetadata = {
+    displayName: "Test Skill",
+    slug: "test-skill",
+    summary: "Filled from the publish form description field.",
+    categories: ["Developer Tools"],
+    topics: ["testing"],
+    version: "1.0.0",
+    releaseTags: ["latest"]
+  };
+
   it("uses shared publish metadata validation", () => {
     const error = validatePublishMetadataInput({
       displayName: "Demo",
@@ -171,5 +183,79 @@ describe("Web publish metadata", () => {
     });
 
     expect(error).toContain("SemVer");
+  });
+
+  it("fills missing frontmatter when applying publish metadata", () => {
+    const snapshot = applySkillPublishMetadata(
+      {
+        manifest: { name: "pending", description: "pending" },
+        readme: "# Body only",
+        files: [
+          {
+            path: "SKILL.md",
+            content: "# Body only\n\nNo frontmatter here.",
+            size: 30,
+            sha256: "abc"
+          }
+        ],
+        contentHash: "hash",
+        createdAt: new Date().toISOString(),
+        entryPath: "SKILL.md"
+      },
+      publishMetadata
+    );
+
+    expect(snapshot.manifest.name).toBe("Test Skill");
+    expect(snapshot.manifest.description).toBe(publishMetadata.summary);
+    expect(snapshot.manifest.version).toBe("1.0.0");
+    expect(snapshot.files[0]?.content).toContain("description: Filled from the publish form description field.");
+    expect(snapshot.files[0]?.content).toContain("# Body only");
+  });
+
+  it("fills missing required fields over partial frontmatter", () => {
+    const snapshot = applySkillPublishMetadata(
+      {
+        manifest: { name: "partial-skill", description: "pending" },
+        readme: "# Partial",
+        files: [
+          {
+            path: "SKILL.md",
+            content: `---
+name: partial-skill
+---
+# Partial
+`,
+            size: 40,
+            sha256: "abc"
+          }
+        ],
+        contentHash: "hash",
+        createdAt: new Date().toISOString(),
+        entryPath: "SKILL.md"
+      },
+      publishMetadata
+    );
+
+    expect(snapshot.manifest.description).toBe(publishMetadata.summary);
+    expect(snapshot.manifest.slug).toBe("test-skill");
+    expect(validateSkillSnapshot(snapshot).some((issue) => issue.code === "invalid-frontmatter")).toBe(false);
+  });
+
+  it("reads zip packages without frontmatter when using loose reader", async () => {
+    const AdmZip = (await import("adm-zip")).default;
+    const zip = new AdmZip();
+    zip.addFile(
+      "my-skill/SKILL.md",
+      Buffer.from(`# Legacy body
+
+No YAML frontmatter.`)
+    );
+
+    const loose = readSkillZipBufferLoose(zip.toBuffer());
+    const snapshot = applySkillPublishMetadata(loose, publishMetadata);
+
+    expect(snapshot.manifest.name).toBe("Test Skill");
+    expect(snapshot.manifest.description).toBe(publishMetadata.summary);
+    expect(snapshot.files[0]?.content.startsWith("---\n")).toBe(true);
   });
 });

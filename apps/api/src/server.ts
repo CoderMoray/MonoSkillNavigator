@@ -9,6 +9,7 @@ import {
   getSkillSlug,
   parseSkillFrontmatterHints,
   readSkillZipBuffer,
+  readSkillZipBufferLoose,
   readSkillZipFrontmatterHints,
   skillSnapshotToZipBuffer,
   type SkillPublishMetadata,
@@ -315,7 +316,7 @@ export function buildServer() {
 
     try {
       const changelog = normalizeChangelog(request.body.changelog);
-      const uploaded = readSkillFromBody(request.body);
+      const uploaded = readSkillFromBody(request.body, { looseEntry: Boolean(request.body.metadata) });
       const snapshot = request.body.metadata
         ? applySkillPublishMetadata(uploaded.snapshot, request.body.metadata)
         : uploaded.snapshot;
@@ -859,10 +860,14 @@ function extractPublishPreview(snapshot: SkillSnapshot) {
   };
 }
 
-function readSkillFromBody(body: PublishBody | ReviewBody): { snapshot: SkillSnapshot; version?: string } {
+function readSkillFromBody(
+  body: PublishBody | ReviewBody,
+  options?: { looseEntry?: boolean }
+): { snapshot: SkillSnapshot; version?: string } {
   if (body.archiveBase64) {
+    const buffer = Buffer.from(stripDataUrlPrefix(body.archiveBase64), "base64");
     return {
-      snapshot: readSkillZipBuffer(Buffer.from(stripDataUrlPrefix(body.archiveBase64), "base64")),
+      snapshot: options?.looseEntry ? readSkillZipBufferLoose(buffer) : readSkillZipBuffer(buffer),
       version: body.version
     };
   }
