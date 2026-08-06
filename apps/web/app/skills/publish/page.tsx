@@ -1014,12 +1014,15 @@ async function loadFrontmatterFromArchive(file: File): Promise<PublishSkillFront
       const preview = await previewSkillArchive(token, archiveBase64);
       return hasFrontmatterFields(preview.frontmatter) ? preview.frontmatter : null;
     } catch {
-      // Fall back to browser parsing when API is unavailable.
+      // Fall back to browser parsing when preview is unavailable or rejects the archive.
     }
   }
 
-  const local = await readSkillFrontmatterFromZip(file);
-  return local;
+  try {
+    return await readSkillFrontmatterFromZip(file);
+  } catch {
+    return null;
+  }
 }
 
 function hasFrontmatterFields(frontmatter: PublishSkillFrontmatter): boolean {

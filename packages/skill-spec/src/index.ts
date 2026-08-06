@@ -14,8 +14,10 @@ import {
   skillPublishMetadataSchema,
   skillSlugSchema,
   SKILL_ENTRY_BASENAMES,
+  parseSkillFrontmatterHints,
   type SkillPublishMetadata,
-  type SkillValidationIssue
+  type SkillValidationIssue,
+  type SkillFrontmatterHints
 } from "./skill-format.js";
 
 export {
@@ -248,6 +250,25 @@ export function readSkillZipBuffer(buffer: Buffer): SkillSnapshot {
     contentHash: hashSnapshotFiles(files),
     createdAt: new Date().toISOString(),
     entryPath: skillEntry.path
+  };
+}
+
+export function readSkillZipFrontmatterHints(buffer: Buffer): {
+  entryPath: string;
+  frontmatter: SkillFrontmatterHints | null;
+} {
+  const zip = new AdmZip(buffer);
+  const files = readZipTextFiles(zip);
+  const skillEntry = findSkillEntryFile(files);
+  if (!skillEntry) {
+    throw new Error(
+      `Skill zip must include one of ${SKILL_ENTRY_BASENAMES.join(", ")} at the root, or inside a single top-level folder`
+    );
+  }
+
+  return {
+    entryPath: skillEntry.path,
+    frontmatter: parseSkillFrontmatterHints(skillEntry.content)
   };
 }
 

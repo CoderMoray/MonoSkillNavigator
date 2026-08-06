@@ -9,6 +9,7 @@ import {
   getSkillSlug,
   parseSkillFrontmatterHints,
   readSkillZipBuffer,
+  readSkillZipFrontmatterHints,
   skillSnapshotToZipBuffer,
   type SkillPublishMetadata,
   type SkillSnapshot
@@ -290,6 +291,15 @@ export function buildServer() {
     }
 
     try {
+      if (request.body.archiveBase64) {
+        const buffer = Buffer.from(stripDataUrlPrefix(request.body.archiveBase64), "base64");
+        const preview = readSkillZipFrontmatterHints(buffer);
+        return {
+          entryPath: preview.entryPath,
+          frontmatter: preview.frontmatter ?? {}
+        };
+      }
+
       const uploaded = readSkillFromBody(request.body);
       return extractPublishPreview(uploaded.snapshot);
     } catch (error) {
