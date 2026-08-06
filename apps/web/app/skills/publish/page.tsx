@@ -401,6 +401,16 @@ function PublishSkillPageContent() {
 
     try {
       const frontmatter = await loadFrontmatterFromArchive(fileToUpload);
+      if (!isNewVersion) {
+        resetPublishFormFields({
+          setDisplayName,
+          setSlug,
+          setSummary,
+          setVersion,
+          setCategories,
+          setTopics
+        });
+      }
       const filledFields = applyFrontmatterToForm(frontmatter, isNewVersion, {
         setDisplayName,
         setSlug,
@@ -1002,7 +1012,7 @@ async function loadFrontmatterFromArchive(file: File): Promise<PublishSkillFront
     try {
       const archiveBase64 = await readFileAsBase64(file);
       const preview = await previewSkillArchive(token, archiveBase64);
-      return preview.frontmatter;
+      return hasFrontmatterFields(preview.frontmatter) ? preview.frontmatter : null;
     } catch {
       // Fall back to browser parsing when API is unavailable.
     }
@@ -1012,6 +1022,17 @@ async function loadFrontmatterFromArchive(file: File): Promise<PublishSkillFront
   return local;
 }
 
+function hasFrontmatterFields(frontmatter: PublishSkillFrontmatter): boolean {
+  return Boolean(
+    frontmatter.name?.trim() ||
+      frontmatter.description?.trim() ||
+      frontmatter.slug?.trim() ||
+      frontmatter.version?.trim() ||
+      frontmatter.categories?.length ||
+      frontmatter.topics?.length
+  );
+}
+
 interface FrontmatterSetters {
   setDisplayName: (value: string) => void;
   setSlug: (value: string) => void;
@@ -1019,6 +1040,15 @@ interface FrontmatterSetters {
   setVersion: (value: string) => void;
   setCategories: (value: string[]) => void;
   setTopics: (value: string) => void;
+}
+
+function resetPublishFormFields(setters: FrontmatterSetters): void {
+  setters.setDisplayName("");
+  setters.setSlug("");
+  setters.setSummary("");
+  setters.setVersion("1.0.0");
+  setters.setCategories([]);
+  setters.setTopics("");
 }
 
 function applyFrontmatterToForm(

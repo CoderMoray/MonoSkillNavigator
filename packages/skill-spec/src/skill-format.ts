@@ -183,7 +183,7 @@ export function parseSkillFrontmatterHints(markdown: string): SkillFrontmatterHi
       .map((item) => item.trim());
   }
 
-  return hints;
+  return Object.keys(hints).length > 0 ? hints : null;
 }
 
 function parseSimpleFrontmatter(yamlText: string): Record<string, string | string[]> {

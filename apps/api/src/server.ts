@@ -7,7 +7,7 @@ import {
   applySkillPublishMetadata,
   findSkillEntryFile,
   getSkillSlug,
-  parseSkillMarkdown,
+  parseSkillFrontmatterHints,
   readSkillZipBuffer,
   skillSnapshotToZipBuffer,
   type SkillPublishMetadata,
@@ -838,24 +838,10 @@ function extractPublishPreview(snapshot: SkillSnapshot) {
     throw new Error("Skill package must include SKILL.md, skill.md, or skills.md");
   }
 
-  const parsed = parseSkillMarkdown(entry.content);
-  let slug: string | undefined;
-  try {
-    slug = getSkillSlug(parsed.manifest);
-  } catch {
-    slug = typeof parsed.manifest.slug === "string" ? parsed.manifest.slug : undefined;
-  }
-
+  const frontmatter = parseSkillFrontmatterHints(entry.content);
   return {
     entryPath: entry.path,
-    frontmatter: {
-      name: parsed.manifest.name,
-      description: parsed.manifest.description,
-      slug,
-      version: parsed.manifest.version,
-      categories: parsed.manifest.categories,
-      topics: parsed.manifest.topics
-    }
+    frontmatter: frontmatter ?? {}
   };
 }
 

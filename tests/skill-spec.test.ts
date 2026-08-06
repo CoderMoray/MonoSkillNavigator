@@ -111,6 +111,28 @@ version: 1.0.0
 
     expect(hints?.description).toBe("Reviews a short product idea and returns structured feedback.");
   });
+
+  it("returns null when frontmatter has no usable fields", () => {
+    const hints = parseSkillFrontmatterHints(`---
+# comment only
+---
+# Body
+`);
+
+    expect(hints).toBeNull();
+  });
+
+  it("does not derive slug from name", () => {
+    const hints = parseSkillFrontmatterHints(`---
+name: demo-skill
+description: A demo skill for testing.
+---
+# Body
+`);
+
+    expect(hints?.name).toBe("demo-skill");
+    expect(hints?.slug).toBeUndefined();
+  });
 });
 
 describe("Skill archive frontmatter", () => {
