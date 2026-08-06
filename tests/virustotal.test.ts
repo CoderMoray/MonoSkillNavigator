@@ -159,4 +159,18 @@ describe("VirusTotal package review adapter", () => {
       })
     );
   });
+
+  test("records a failed scan summary instead of a security finding", async () => {
+    configureVirusTotal();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("fetch failed")));
+
+    const report = await reviewSkillSnapshot(snapshot, undefined, evaluation());
+
+    expect(report.virusTotal).toMatchObject({
+      provider: "virustotal",
+      status: "failed",
+      error: "fetch failed"
+    });
+    expect(report.findings.some((finding) => finding.id === "virustotal-unavailable")).toBe(false);
+  });
 });

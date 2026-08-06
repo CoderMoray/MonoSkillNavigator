@@ -52,12 +52,13 @@ export interface SkillSpectorScanSummary {
 export interface VirusTotalScanSummary {
   provider: "virustotal";
   sha256: string;
-  status: "completed" | "not_found";
+  status: "completed" | "not_found" | "failed";
   malicious: number;
   suspicious: number;
   harmless: number;
   undetected: number;
   analysisUrl?: string;
+  error?: string;
 }
 
 export interface FunctionalEvaluationFinding {

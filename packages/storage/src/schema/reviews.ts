@@ -24,6 +24,7 @@ export const skillReviews = pgTable("skill_reviews", {
   virustotalHarmless: integer("virustotal_harmless"),
   virustotalUndetected: integer("virustotal_undetected"),
   virustotalAnalysisUrl: text("virustotal_analysis_url"),
+  virustotalError: text("virustotal_error"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
   uniqueIndex("skill_reviews_pkey").on(table.skillSlug, table.version),

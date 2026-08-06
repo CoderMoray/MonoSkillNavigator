@@ -2,9 +2,11 @@ import {
   findSkillEntryFile,
   getSkillSlug,
   normalizeTools,
+  skillSnapshotToZipBuffer,
   type SkillSnapshot,
   validateSkillSnapshot
 } from "@skill-platform/skill-spec";
+import { createHash } from "node:crypto";
 import { evaluateSkillSnapshot, type FunctionalEvaluationReport } from "@skill-platform/evaluator";
 import {
   isSkillSpectorEnabled,
@@ -212,15 +214,7 @@ export async function reviewSkillSnapshot(
       virusTotal = scan.summary;
       findings.push(...scan.findings);
     } catch (error) {
-      findings.push({
-        id: "virustotal-unavailable",
-        category: "security",
-        severity: "low",
-        title: "VirusTotal package scan unavailable",
-        message: `VirusTotal package scan could not run: ${truncateError(error)}`,
-        recommendation:
-          "Check VIRUSTOTAL_API_KEY, VirusTotal quota, and network access. The package was not blocked because no VirusTotal verdict was available."
-      });
+      virusTotal = createFailedVirusTotalSummary(snapshot, error);
     }
   }
 
@@ -424,6 +418,26 @@ function excerpt(content: string, index: number): string {
   const start = Math.max(0, index - 80);
   const end = Math.min(content.length, index + 160);
   return content.slice(start, end).replace(/\s+/g, " ").trim();
+}
+
+function createFailedVirusTotalSummary(snapshot: SkillSnapshot, error: unknown): VirusTotalScanSummary {
+  let sha256 = "";
+  try {
+    sha256 = createHash("sha256").update(skillSnapshotToZipBuffer(snapshot)).digest("hex");
+  } catch {
+    sha256 = snapshot.contentHash;
+  }
+
+  return {
+    provider: "virustotal",
+    sha256,
+    status: "failed",
+    malicious: 0,
+    suspicious: 0,
+    harmless: 0,
+    undetected: 0,
+    error: truncateError(error)
+  };
 }
 
 function truncateError(error: unknown): string {

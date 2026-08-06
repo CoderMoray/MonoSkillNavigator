@@ -9,7 +9,7 @@ const MAX_UPLOAD_LIMIT_BYTES = 650 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 90_000;
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
 
-export type VirusTotalScanStatus = "completed" | "not_found";
+export type VirusTotalScanStatus = "completed" | "not_found" | "failed";
 
 export interface VirusTotalScanSummary {
   provider: "virustotal";
@@ -20,6 +20,7 @@ export interface VirusTotalScanSummary {
   harmless: number;
   undetected: number;
   analysisUrl?: string;
+  error?: string;
 }
 
 interface VirusTotalStats {

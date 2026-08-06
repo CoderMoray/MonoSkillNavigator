@@ -121,6 +121,14 @@ function formatVersionManageError(message: string): string {
   return message;
 }
 
+function extractVirusTotalLegacyError(message: string | undefined): string | undefined {
+  if (!message) {
+    return undefined;
+  }
+  const prefix = "VirusTotal package scan could not run: ";
+  return message.startsWith(prefix) ? message.slice(prefix.length) : message;
+}
+
 export default function SkillDetailPage() {
   const params = useParams<{ name: string }>();
   const router = useRouter();
@@ -330,16 +338,23 @@ export default function SkillDetailPage() {
   const categories = currentVersion.manifest.categories ?? [];
   const openIssues = skill.issues.filter((issue) => issue.status !== "closed");
   const reviewFindings = currentVersion.review?.findings ?? [];
+  const virusTotalLegacyUnavailableFinding = reviewFindings.find((finding) => finding.id === "virustotal-unavailable");
   const securityFindings = reviewFindings.filter(
     (finding) =>
-      finding.id === "skillspector-unavailable" ||
-      finding.id.startsWith("skillspector-") ||
-      finding.category === "security" ||
-      finding.category === "privacy" ||
-      finding.category === "leakage"
+      finding.id !== "virustotal-unavailable" &&
+      (finding.id === "skillspector-unavailable" ||
+        finding.id.startsWith("skillspector-") ||
+        finding.category === "security" ||
+        finding.category === "privacy" ||
+        finding.category === "leakage")
   );
   const skillSpectorScan = currentVersion.review?.skillSpector;
   const virusTotalScan = currentVersion.review?.virusTotal;
+  const virusTotalScanFailed =
+    virusTotalScan?.status === "failed" || Boolean(virusTotalLegacyUnavailableFinding);
+  const virusTotalScanError =
+    virusTotalScan?.error ?? extractVirusTotalLegacyError(virusTotalLegacyUnavailableFinding?.message);
+  const showVirusTotalSection = Boolean(virusTotalScan || virusTotalLegacyUnavailableFinding);
   const virusTotalDetections = virusTotalScan
     ? virusTotalScan.malicious + virusTotalScan.suspicious
     : 0;
@@ -1307,10 +1322,12 @@ export default function SkillDetailPage() {
                     <p className="description">
                       由 SkillSpector 对发布包做静态安全扫描；配置 VirusTotal 后，还会按归档 hash 查询或扫描发布包。以下 finding 用于解释阻断或复核原因，不再汇总为单一安全分。
                       {skillSpectorScan ? ` ${formatSkillSpectorSummaryLine(skillSpectorScan)}` : null}
-                      {virusTotalScan
-                        ? virusTotalScan.status === "completed"
-                          ? ` VirusTotal 已完成：${virusTotalScan.malicious} 个恶意、${virusTotalScan.suspicious} 个可疑检出。`
-                          : " VirusTotal 未命中该归档的历史报告，且未上传新样本。"
+                      {showVirusTotalSection
+                        ? virusTotalScanFailed
+                          ? " VirusTotal 扫描未成功完成，以下错误信息来自扫描器。"
+                          : virusTotalScan?.status === "completed"
+                            ? ` VirusTotal 已完成：${virusTotalScan.malicious} 个恶意、${virusTotalScan.suspicious} 个可疑检出。`
+                            : " VirusTotal 未命中该归档的历史报告，且未上传新样本。"
                         : null}
                       {hiddenPlatformFindingCount > 0
                         ? ` 另有 ${hiddenPlatformFindingCount} 条平台质量/合规提示（如 description、tags、tests）计入审查记录，但不在此安全区域展示。`
@@ -1342,41 +1359,60 @@ export default function SkillDetailPage() {
                     </div>
                   </div>
                 ) : null}
-                {virusTotalScan ? (
+                {showVirusTotalSection ? (
                   <div className="evaluation-summary">
                     <div>
                       <span>扫描器</span>
                       <strong>VirusTotal</strong>
                     </div>
-                    <div>
-                      <span>状态</span>
-                      <strong>{virusTotalScan.status === "completed" ? "已完成" : "未命中历史报告"}</strong>
-                    </div>
-                    <div>
-                      <span>检出结果</span>
-                      <strong>
-                        {virusTotalDetections
-                          ? `${virusTotalScan.malicious} 恶意 · ${virusTotalScan.suspicious} 可疑`
-                          : "未检出"}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>归档 SHA-256</span>
-                      <strong className="mono">{virusTotalScan.sha256.slice(0, 16)}...</strong>
-                    </div>
-                    {virusTotalScan.analysisUrl ? (
-                      <div>
-                        <span>分析报告</span>
-                        <a
-                          className="text-link"
-                          href={virusTotalScan.analysisUrl}
-                          rel="noreferrer"
-                          target="_blank"
-                        >
-                          查看 VirusTotal 报告 <ExternalLink size={13} />
-                        </a>
-                      </div>
-                    ) : null}
+                    {virusTotalScanFailed ? (
+                      <>
+                        <div>
+                          <span>状态</span>
+                          <strong>扫描失败</strong>
+                        </div>
+                        {virusTotalScanError ? (
+                          <div style={{ gridColumn: "1 / -1" }}>
+                            <span>错误信息</span>
+                            <strong>{virusTotalScanError}</strong>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <span>状态</span>
+                          <strong>{virusTotalScan?.status === "completed" ? "已完成" : "未命中历史报告"}</strong>
+                        </div>
+                        <div>
+                          <span>检出结果</span>
+                          <strong>
+                            {virusTotalDetections
+                              ? `${virusTotalScan!.malicious} 恶意 · ${virusTotalScan!.suspicious} 可疑`
+                              : "未检出"}
+                          </strong>
+                        </div>
+                        {virusTotalScan?.sha256 ? (
+                          <div>
+                            <span>归档 SHA-256</span>
+                            <strong className="mono">{virusTotalScan.sha256.slice(0, 16)}...</strong>
+                          </div>
+                        ) : null}
+                        {virusTotalScan?.analysisUrl ? (
+                          <div>
+                            <span>分析报告</span>
+                            <a
+                              className="text-link"
+                              href={virusTotalScan.analysisUrl}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              查看 VirusTotal 报告 <ExternalLink size={13} />
+                            </a>
+                          </div>
+                        ) : null}
+                      </>
+                    )}
                   </div>
                 ) : null}
                 {securityFindings.length === 0 ? (
