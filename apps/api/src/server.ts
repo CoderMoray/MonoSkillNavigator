@@ -2,7 +2,7 @@ import cors from "@fastify/cors";
 import Fastify, { type FastifyReply } from "fastify";
 import { pathToFileURL } from "node:url";
 import { evaluateSkillSnapshot } from "@skill-platform/evaluator";
-import { reviewSkillSnapshot } from "@skill-platform/review-engine";
+import { reviewAndEvaluateSkillSnapshot } from "@skill-platform/review-engine";
 import {
   applySkillPublishMetadata,
   findSkillEntryFile,
@@ -329,8 +329,7 @@ export function buildServer() {
         return reply.code(403).send({ error: "Only skill contributors can publish new versions" });
       }
 
-      const evaluation = await evaluateSkillSnapshot(snapshot);
-      const review = await reviewSkillSnapshot(snapshot, version, evaluation);
+      const { review, evaluation } = await reviewAndEvaluateSkillSnapshot(snapshot, version);
       const registryVersion = await store.publishSnapshot(snapshot, review, evaluation, {
         owner: {
           userId: user.id,
@@ -361,11 +360,8 @@ export function buildServer() {
 
   app.post<{ Body: ReviewBody }>("/reviews/run", async (request) => {
     const { snapshot, version } = readSkillFromBody(request.body);
-    const evaluation = await evaluateSkillSnapshot(snapshot);
-    return {
-      review: await reviewSkillSnapshot(snapshot, version, evaluation),
-      evaluation
-    };
+    const { review, evaluation } = await reviewAndEvaluateSkillSnapshot(snapshot, version);
+    return { review, evaluation };
   });
 
   app.post<{ Body: ReviewBody }>("/evaluations/run", async (request) => {
@@ -384,21 +380,7 @@ export function buildServer() {
       return reply.code(403).send({ error: "Forbidden" });
     }
 
-    const evaluationCache = new Map<string, ReturnType<typeof evaluateSkillSnapshot>>();
-    const getEvaluation = (snapshot: SkillSnapshot) => {
-      const cached = evaluationCache.get(snapshot.contentHash);
-      if (cached) {
-        return cached;
-      }
-
-      const evaluation = evaluateSkillSnapshot(snapshot);
-      evaluationCache.set(snapshot.contentHash, evaluation);
-      return evaluation;
-    };
-    const reviewed = await store.reviewAll(
-      async (snapshot, version) => reviewSkillSnapshot(snapshot, version, await getEvaluation(snapshot)),
-      (snapshot) => getEvaluation(snapshot)
-    );
+    const reviewed = await store.reviewAll((snapshot, version) => reviewAndEvaluateSkillSnapshot(snapshot, version));
     return {
       reviewed: reviewed.length,
       items: reviewed.map((item) => ({

@@ -1019,7 +1019,12 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     return (await this.getSkill(slug))?.versions[version]!;
   }
 
-  async reviewAll(reviewFn: any, evaluationFn?: any): Promise<RegistryVersion[]> {
+  async reviewAll(
+    pipelineFn: (
+      snapshot: SkillSnapshot,
+      version: string
+    ) => Promise<{ review: ReviewReport; evaluation: FunctionalEvaluationReport }>
+  ): Promise<RegistryVersion[]> {
     await this.ensureSchema();
     const versions = await this.db
       .select({ slug: schema.skillVersions.skillSlug, version: schema.skillVersions.version })
@@ -1031,13 +1036,9 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       const rv = skill?.versions[version];
       if (!skill || skill.deletedAt || !rv) continue;
 
-      const review = await reviewFn(rv.snapshot, version);
+      const { review, evaluation } = await pipelineFn(rv.snapshot, version);
       await this.upsertReview(slug, version, review);
-
-      if (evaluationFn) {
-        const evaluation = await evaluationFn(rv.snapshot);
-        await this.upsertEvaluation(slug, version, evaluation);
-      }
+      await this.upsertEvaluation(slug, version, evaluation);
 
       results.push((await this.getSkill(slug))!.versions[version]!);
     }

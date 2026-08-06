@@ -496,8 +496,10 @@ export abstract class JsonRegistryStore implements RegistryStore {
   }
 
   async reviewAll(
-    reviewFn: (snapshot: SkillSnapshot, version: string) => ReviewReport | Promise<ReviewReport>,
-    evaluationFn?: (snapshot: SkillSnapshot) => FunctionalEvaluationReport | Promise<FunctionalEvaluationReport>
+    pipelineFn: (
+      snapshot: SkillSnapshot,
+      version: string
+    ) => Promise<{ review: ReviewReport; evaluation: FunctionalEvaluationReport }>
   ): Promise<RegistryVersion[]> {
     const data = await this.load();
     const reviewed: RegistryVersion[] = [];
@@ -510,8 +512,9 @@ export abstract class JsonRegistryStore implements RegistryStore {
           ? await this.artifactStore.getSnapshot(rv.artifact)
           : rv.snapshot;
         rv.snapshot = snapshot;
-        rv.review = await reviewFn(snapshot, rv.version);
-        rv.evaluation = evaluationFn ? await evaluationFn(snapshot) : rv.evaluation;
+        const { review, evaluation } = await pipelineFn(snapshot, rv.version);
+        rv.review = review;
+        rv.evaluation = evaluation;
         rv.status = rv.review.verdict;
         rv.updatedAt = new Date().toISOString();
         reviewed.push(rv);

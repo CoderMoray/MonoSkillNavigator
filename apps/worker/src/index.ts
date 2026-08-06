@@ -1,10 +1,9 @@
-import { evaluateSkillSnapshot, type FunctionalEvaluationReport } from "@skill-platform/evaluator";
 import {
-  reviewSkillSnapshot,
+  reviewAndEvaluateSkillSnapshot,
   type ReviewFinding,
   type ReviewReport
 } from "@skill-platform/review-engine";
-import type { SkillSnapshot } from "@skill-platform/skill-spec";
+import type { FunctionalEvaluationReport } from "@skill-platform/evaluator";
 import { createRegistryStoreFromEnv, loadDotEnvIfPresent } from "@skill-platform/storage";
 
 loadDotEnvIfPresent();
@@ -12,22 +11,8 @@ loadDotEnvIfPresent();
 console.log("Registry worker: batch re-review of all skill versions (persists reviews and evaluations to the registry).");
 
 const store = createRegistryStoreFromEnv();
-const evaluationCache = new Map<string, ReturnType<typeof evaluateSkillSnapshot>>();
-const getEvaluation = (snapshot: SkillSnapshot) => {
-  const cached = evaluationCache.get(snapshot.contentHash);
-  if (cached) {
-    return cached;
-  }
 
-  const evaluation = evaluateSkillSnapshot(snapshot);
-  evaluationCache.set(snapshot.contentHash, evaluation);
-  return evaluation;
-};
-
-const reviewed = await store.reviewAll(
-  async (snapshot, version) => reviewSkillSnapshot(snapshot, version, await getEvaluation(snapshot)),
-  (snapshot) => getEvaluation(snapshot)
-);
+const reviewed = await store.reviewAll((snapshot, version) => reviewAndEvaluateSkillSnapshot(snapshot, version));
 
 console.log(`Done. Re-reviewed ${reviewed.length} version(s).\n`);
 for (const item of reviewed) {

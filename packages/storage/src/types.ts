@@ -218,7 +218,11 @@ export interface RegistryStore {
   isSkillBookmarked(userId: string, slug: string): Promise<boolean>;
   purgeExpiredRecycleBinSkills(): Promise<number>;
   reviewAll(
-    reviewFn: (snapshot: SkillSnapshot, version: string) => ReviewReport | Promise<ReviewReport>,
-    evaluationFn?: (snapshot: SkillSnapshot) => FunctionalEvaluationReport | Promise<FunctionalEvaluationReport>
+    pipelineFn: (
+      snapshot: SkillSnapshot,
+      version: string
+    ) =>
+      | { review: ReviewReport; evaluation: FunctionalEvaluationReport }
+      | Promise<{ review: ReviewReport; evaluation: FunctionalEvaluationReport }>
   ): Promise<RegistryVersion[]>;
 }

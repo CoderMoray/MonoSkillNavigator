@@ -162,11 +162,11 @@ const contentRules: PatternRule[] = [
   }
 ];
 
-export async function reviewSkillSnapshot(
+export async function reviewAndEvaluateSkillSnapshot(
   snapshot: SkillSnapshot,
   versionOverride?: string,
   evaluationOverride?: FunctionalEvaluationReport
-): Promise<ReviewReport> {
+): Promise<{ review: ReviewReport; evaluation: FunctionalEvaluationReport }> {
   const findings: ReviewFinding[] = [];
   const version = versionOverride ?? snapshot.manifest.version ?? "0.1.0";
 
@@ -181,9 +181,6 @@ export async function reviewSkillSnapshot(
       recommendation: "Update the package to follow docs/rules/skill-spec.md."
     });
   }
-
-  const evaluation = evaluationOverride ?? (await evaluateSkillSnapshot(snapshot));
-  const haluCatchAvailable = evaluation.provider === "halucatch-adapter";
 
   let skillSpector: SkillSpectorScanSummary | undefined;
   let skillSpectorAvailable = false;
@@ -218,6 +215,9 @@ export async function reviewSkillSnapshot(
     }
   }
 
+  const evaluation = evaluationOverride ?? (await evaluateSkillSnapshot(snapshot));
+  const haluCatchAvailable = evaluation.provider === "halucatch-adapter";
+
   const shouldRunPlatformRules = !haluCatchAvailable || !skillSpectorAvailable;
   if (shouldRunPlatformRules) {
     runPlatformRulesReview(snapshot, findings, { includeContentRules: !skillSpectorAvailable });
@@ -226,7 +226,7 @@ export async function reviewSkillSnapshot(
   const scores = calculateScores(findings, evaluation, skillSpector);
   const verdict = calculateVerdict(findings);
 
-  return {
+  const review: ReviewReport = {
     id: `review_${snapshot.contentHash.slice(0, 16)}_${Date.now()}`,
     skillSlug: getSkillSlug(snapshot.manifest),
     skillName: snapshot.manifest.name,
@@ -239,6 +239,17 @@ export async function reviewSkillSnapshot(
     virusTotal,
     createdAt: new Date().toISOString()
   };
+
+  return { review, evaluation };
+}
+
+export async function reviewSkillSnapshot(
+  snapshot: SkillSnapshot,
+  versionOverride?: string,
+  evaluationOverride?: FunctionalEvaluationReport
+): Promise<ReviewReport> {
+  const { review } = await reviewAndEvaluateSkillSnapshot(snapshot, versionOverride, evaluationOverride);
+  return review;
 }
 
 function runPlatformRulesReview(
@@ -393,8 +404,7 @@ function calculateScores(
   _evaluation: FunctionalEvaluationReport,
   _skillSpector?: SkillSpectorScanSummary
 ): ReviewScores {
-  // Placeholder DB scores; quality via HaluCatch, security via SkillSpector when available.
-  // Platform manifest/quality/content rules run only when HaluCatch or SkillSpector is unavailable.
+  // Format validation, SkillSpector, and VirusTotal run before HaluCatch; platform rules follow evaluation.
   return {
     qualityScore: 100,
     securityScore: 100,

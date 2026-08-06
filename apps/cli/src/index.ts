@@ -3,7 +3,7 @@ import path from "node:path";
 import { writeFile } from "node:fs/promises";
 import { Command } from "commander";
 import { evaluateSkillSnapshot, type FunctionalEvaluationReport } from "@skill-platform/evaluator";
-import { reviewSkillSnapshot, type ReviewReport } from "@skill-platform/review-engine";
+import { reviewAndEvaluateSkillSnapshot, type ReviewReport } from "@skill-platform/review-engine";
 import {
   getSkillSlug,
   readSkillPackage,
@@ -40,8 +40,7 @@ program
   .option("--json", "Print raw JSON report")
   .action(async (input: string, options: { version?: string; json?: boolean }) => {
     const snapshot = await readSkillPackage(resolveUserPath(input));
-    const evaluation = await evaluateSkillSnapshot(snapshot);
-    const report = await reviewSkillSnapshot(snapshot, options.version, evaluation);
+    const { review: report } = await reviewAndEvaluateSkillSnapshot(snapshot, options.version);
 
     if (options.json) {
       printJson(report);
