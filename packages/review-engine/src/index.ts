@@ -186,34 +186,15 @@ export async function reviewAndEvaluateSkillSnapshot(
   let skillSpectorAvailable = false;
   let virusTotal: VirusTotalScanSummary | undefined;
 
-  if (isSkillSpectorEnabled()) {
-    try {
-      const scan = await runSkillSpectorSecurityScan(snapshot);
-      skillSpector = scan.summary;
-      skillSpectorAvailable = true;
-      findings.push(...scan.findings);
-    } catch (error) {
-      findings.push({
-        id: "skillspector-unavailable",
-        category: "security",
-        severity: "low",
-        title: "SkillSpector security scan unavailable",
-        message: `SkillSpector static security scan could not run: ${truncateError(error)}`,
-        recommendation:
-          "Install Python 3.12+ with SkillSpector dependencies, keep packages/SkillSpector-main available, or set SKILLSPECTOR_PYTHON. Falling back to built-in platform review rules."
-      });
-    }
-  }
+  const [skillSpectorResult, virusTotalResult] = await Promise.all([
+    runSkillSpectorReviewStep(snapshot),
+    runVirusTotalReviewStep(snapshot)
+  ]);
 
-  if (isVirusTotalEnabled()) {
-    try {
-      const scan = await runVirusTotalScan(snapshot);
-      virusTotal = scan.summary;
-      findings.push(...scan.findings);
-    } catch (error) {
-      virusTotal = createFailedVirusTotalSummary(snapshot, error);
-    }
-  }
+  skillSpector = skillSpectorResult.skillSpector;
+  skillSpectorAvailable = skillSpectorResult.skillSpectorAvailable;
+  virusTotal = virusTotalResult.virusTotal;
+  findings.push(...skillSpectorResult.findings, ...virusTotalResult.findings);
 
   const evaluation = evaluationOverride ?? (await evaluateSkillSnapshot(snapshot));
   const haluCatchAvailable = evaluation.provider === "halucatch-adapter";
@@ -428,6 +409,62 @@ function excerpt(content: string, index: number): string {
   const start = Math.max(0, index - 80);
   const end = Math.min(content.length, index + 160);
   return content.slice(start, end).replace(/\s+/g, " ").trim();
+}
+
+async function runSkillSpectorReviewStep(snapshot: SkillSnapshot): Promise<{
+  skillSpector?: SkillSpectorScanSummary;
+  skillSpectorAvailable: boolean;
+  findings: ReviewFinding[];
+}> {
+  if (!isSkillSpectorEnabled()) {
+    return { skillSpectorAvailable: false, findings: [] };
+  }
+
+  try {
+    const scan = await runSkillSpectorSecurityScan(snapshot);
+    return {
+      skillSpector: scan.summary,
+      skillSpectorAvailable: true,
+      findings: scan.findings
+    };
+  } catch (error) {
+    return {
+      skillSpectorAvailable: false,
+      findings: [
+        {
+          id: "skillspector-unavailable",
+          category: "security",
+          severity: "low",
+          title: "SkillSpector security scan unavailable",
+          message: `SkillSpector static security scan could not run: ${truncateError(error)}`,
+          recommendation:
+            "Install Python 3.12+ with SkillSpector dependencies, keep packages/SkillSpector-main available, or set SKILLSPECTOR_PYTHON. Falling back to built-in platform review rules."
+        }
+      ]
+    };
+  }
+}
+
+async function runVirusTotalReviewStep(snapshot: SkillSnapshot): Promise<{
+  virusTotal?: VirusTotalScanSummary;
+  findings: ReviewFinding[];
+}> {
+  if (!isVirusTotalEnabled()) {
+    return { findings: [] };
+  }
+
+  try {
+    const scan = await runVirusTotalScan(snapshot);
+    return {
+      virusTotal: scan.summary,
+      findings: scan.findings
+    };
+  } catch (error) {
+    return {
+      virusTotal: createFailedVirusTotalSummary(snapshot, error),
+      findings: []
+    };
+  }
 }
 
 function createFailedVirusTotalSummary(snapshot: SkillSnapshot, error: unknown): VirusTotalScanSummary {
