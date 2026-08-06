@@ -757,6 +757,28 @@ export function buildServer() {
     }
   });
 
+  app.delete<{ Params: SkillParams }>("/skills/:slug/purge", async (request, reply) => {
+    const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
+    if (!user) {
+      return;
+    }
+
+    const skill = await store.getSkill(request.params.slug);
+    if (!skill?.deletedAt) {
+      return reply.code(404).send({ error: "skill_not_in_recycle_bin" });
+    }
+    if (!isSkillOwner(skill, user)) {
+      return reply.code(403).send({ error: "Forbidden" });
+    }
+
+    try {
+      await store.purgeRecycleBinSkill(request.params.slug);
+      return { ok: true, purged: true, slug: request.params.slug };
+    } catch {
+      return reply.code(404).send({ error: "skill_not_in_recycle_bin" });
+    }
+  });
+
   app.get("/users/me/recycle-bin", async (request, reply) => {
     const user = await requireAuthenticatedUser(request.headers.authorization, authStore, reply);
     if (!user) {

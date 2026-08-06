@@ -407,6 +407,18 @@ export abstract class JsonRegistryStore implements RegistryStore {
     return skill;
   }
 
+  async purgeRecycleBinSkill(slug: string): Promise<void> {
+    const data = await this.load();
+    const skill = data.skills[slug];
+    if (!skill) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+    if (!skill.deletedAt) {
+      throw new Error(`Skill not in recycle bin: ${slug}`);
+    }
+    await this.permanentlyDeleteSkill(slug);
+  }
+
   async listRecycleBinForOwner(ownerUserId: string): Promise<RecycleBinSkill[]> {
     const { skillRecyclePurgeAt } = await import("../recycle-bin");
     const data = await this.load();

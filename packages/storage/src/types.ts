@@ -210,6 +210,7 @@ export interface RegistryStore {
   republishVersion(slug: string, version: string): Promise<RegistrySkill>;
   deleteSkill(slug: string): Promise<void>;
   restoreSkill(slug: string): Promise<RegistrySkill>;
+  purgeRecycleBinSkill(slug: string): Promise<void>;
   listRecycleBinForOwner(ownerUserId: string): Promise<RecycleBinSkill[]>;
   bookmarkSkill(userId: string, slug: string): Promise<void>;
   unbookmarkSkill(userId: string, slug: string): Promise<void>;

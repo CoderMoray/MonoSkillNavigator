@@ -8,7 +8,7 @@ import { SkillCard } from "./SkillCard";
 import { ErrorToast } from "./ErrorToast";
 import { SuccessToast } from "./SuccessToast";
 import { clearAuthToken, getAuthToken } from "../lib/auth-token";
-import { getBookmarkedSkills, getRecycleBin, logoutUser, restoreSkill, type RecycleBinSkill } from "../lib/api";
+import { getBookmarkedSkills, getRecycleBin, logoutUser, purgeRecycleBinSkill, restoreSkill, type RecycleBinSkill } from "../lib/api";
 import { normalizeHandle, type CreatorSummary } from "../lib/creators";
 import { formatDateTime, formatNumber } from "../lib/format";
 import type { PublicUser, SkillSearchResult } from "../lib/types";
@@ -36,6 +36,7 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [restoringSlug, setRestoringSlug] = useState<string | null>(null);
+  const [purgingSlug, setPurgingSlug] = useState<string | null>(null);
   const [bookmarkItems, setBookmarkItems] = useState<SkillSearchResult[]>([]);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [bookmarkError, setBookmarkError] = useState<string | null>(null);
@@ -156,6 +157,34 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
       setErrorToast(err instanceof Error ? err.message : "恢复失败");
     } finally {
       setRestoringSlug(null);
+    }
+  }
+
+  async function handlePurge(slug: string, name: string) {
+    const token = getAuthToken();
+    if (!token) {
+      setErrorToast("请先登录后再删除 Skill。");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `确定立即永久删除 Skill「${name}」（${slug}）吗？此操作不可恢复，相关版本与 artifact 将被清除。`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setErrorToast(null);
+    setPurgingSlug(slug);
+    try {
+      await purgeRecycleBinSkill(token, slug);
+      setRecycleItems((current) => current.filter((item) => item.slug !== slug));
+      setSuccessToast(`已永久删除 Skill「${name}」。`);
+      router.refresh();
+    } catch (err) {
+      setErrorToast(err instanceof Error ? err.message : "永久删除失败");
+    } finally {
+      setPurgingSlug(null);
     }
   }
 
@@ -289,7 +318,7 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
           {activeTab === "recycle" && isOwner ? (
             <>
               <p className="description" style={{ marginBottom: 12 }}>
-                删除的 Skill 会在回收站保留 {RECYCLE_RETENTION_DAYS} 天，之后永久删除。期间可恢复。
+                删除的 Skill 会在回收站保留 {RECYCLE_RETENTION_DAYS} 天，之后永久删除。期间可恢复，也可立即永久删除。
               </p>
               {recycleLoading ? (
                 <div className="skeleton" />
@@ -304,14 +333,24 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
                           <strong>{item.name}</strong>
                           <p className="description mono">{item.slug} · v{item.latestVersion}</p>
                         </div>
-                        <button
-                          className="button secondary compact"
-                          disabled={restoringSlug === item.slug}
-                          onClick={() => void handleRestore(item.slug)}
-                          type="button"
-                        >
-                          <RotateCcw size={14} /> {restoringSlug === item.slug ? "恢复中…" : "恢复"}
-                        </button>
+                        <div className="card-head-actions">
+                          <button
+                            className="button secondary compact"
+                            disabled={restoringSlug === item.slug || purgingSlug === item.slug}
+                            onClick={() => void handleRestore(item.slug)}
+                            type="button"
+                          >
+                            <RotateCcw size={14} /> {restoringSlug === item.slug ? "恢复中…" : "恢复"}
+                          </button>
+                          <button
+                            className="button secondary compact danger"
+                            disabled={restoringSlug === item.slug || purgingSlug === item.slug}
+                            onClick={() => void handlePurge(item.slug, item.name)}
+                            type="button"
+                          >
+                            <Trash2 size={14} /> {purgingSlug === item.slug ? "删除中…" : "立即删除"}
+                          </button>
+                        </div>
                       </div>
                       <p className="description">
                         <Trash2 size={13} style={{ verticalAlign: "-2px" }} /> 删除于 {formatDateTime(item.deletedAt)}

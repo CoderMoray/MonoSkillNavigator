@@ -1223,6 +1223,24 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     return skill;
   }
 
+  async purgeRecycleBinSkill(slug: string): Promise<void> {
+    await this.ensureSchema();
+    const [existing] = await this.db
+      .select({ deletedAt: schema.skills.deletedAt })
+      .from(schema.skills)
+      .where(eq(schema.skills.slug, slug))
+      .limit(1);
+
+    if (!existing) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+    if (!existing.deletedAt) {
+      throw new Error(`Skill not in recycle bin: ${slug}`);
+    }
+
+    await this.permanentlyDeleteSkill(slug);
+  }
+
   async bookmarkSkill(userId: string, slug: string): Promise<void> {
     await this.ensureSchema();
 

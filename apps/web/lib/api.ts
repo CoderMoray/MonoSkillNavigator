@@ -355,6 +355,19 @@ export async function restoreSkill(token: string, slug: string): Promise<Registr
   return data.skill;
 }
 
+export async function purgeRecycleBinSkill(
+  token: string,
+  slug: string
+): Promise<{ ok: true; purged: true; slug: string }> {
+  return request<{ ok: true; purged: true; slug: string }>(
+    new URL(`/skills/${encodeURIComponent(slug)}/purge`, API_BASE_URL),
+    {
+      method: "DELETE",
+      token
+    }
+  );
+}
+
 export interface RecycleBinSkill {
   slug: string;
   name: string;
