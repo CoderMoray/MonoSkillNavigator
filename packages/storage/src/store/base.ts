@@ -18,7 +18,9 @@ import type {
   RegistryStore,
   SkillSearchResult,
   RecycleBinSkill,
+  SkillSlugAvailability,
 } from "../types";
+import { skillRecyclePurgeAt } from "../recycle-bin";
 import {
   createId,
   createOwnerContributor,
@@ -236,6 +238,30 @@ export abstract class JsonRegistryStore implements RegistryStore {
 
   async getSkill(slug: string): Promise<RegistrySkill | undefined> {
     return (await this.load()).skills[slug];
+  }
+
+  async getSkillSlugAvailability(slug: string): Promise<SkillSlugAvailability> {
+    const skill = (await this.load()).skills[slug];
+    if (!skill) {
+      return { status: "available" };
+    }
+    if (skill.deletedAt) {
+      const deletedAt = new Date(skill.deletedAt);
+      return {
+        status: "recycle_bin",
+        slug: skill.slug,
+        name: skill.name,
+        deletedAt: skill.deletedAt,
+        purgeAt: skillRecyclePurgeAt(deletedAt).toISOString(),
+      };
+    }
+    return {
+      status: "active",
+      slug: skill.slug,
+      name: skill.name,
+      latestVersion: skill.latestVersion,
+      published: skill.published !== false,
+    };
   }
 
   async getVersion(slug: string, version = "latest"): Promise<RegistryVersion | undefined> {

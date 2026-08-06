@@ -63,6 +63,34 @@ export async function getSkill(slug: string, token?: string): Promise<RegistrySk
   return request<RegistrySkill>(new URL(`/skills/${encodeURIComponent(slug)}`, API_BASE_URL), { token });
 }
 
+export type SkillSlugAvailabilityResponse =
+  | { status: "available" }
+  | {
+      status: "recycle_bin";
+      slug: string;
+      name: string;
+      deletedAt: string;
+      purgeAt: string;
+    }
+  | {
+      status: "active";
+      slug: string;
+      name: string;
+      latestVersion: string;
+      published: boolean;
+      viewerCanPublish?: boolean;
+    };
+
+export async function checkSkillSlugAvailability(
+  slug: string,
+  token?: string
+): Promise<SkillSlugAvailabilityResponse> {
+  return request<SkillSlugAvailabilityResponse>(
+    new URL(`/skills/${encodeURIComponent(slug)}/availability`, API_BASE_URL),
+    { token }
+  );
+}
+
 export interface SkillDownloadResult {
   blob: Blob;
   fileName: string;

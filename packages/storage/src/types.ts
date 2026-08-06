@@ -167,6 +167,23 @@ export interface RecycleBinSkill {
   purgeAt: string;
 }
 
+export type SkillSlugAvailability =
+  | { status: "available" }
+  | {
+      status: "recycle_bin";
+      slug: string;
+      name: string;
+      deletedAt: string;
+      purgeAt: string;
+    }
+  | {
+      status: "active";
+      slug: string;
+      name: string;
+      latestVersion: string;
+      published: boolean;
+    };
+
 export interface RegistryStore {
   publishSnapshot(
     snapshot: SkillSnapshot,
@@ -183,6 +200,7 @@ export interface RegistryStore {
   search(query?: string, categories?: string[]): Promise<SkillSearchResult[]>;
   listUnpublishedSkillsForOwner(ownerUserId: string): Promise<SkillSearchResult[]>;
   getSkill(slug: string): Promise<RegistrySkill | undefined>;
+  getSkillSlugAvailability(slug: string): Promise<SkillSlugAvailability>;
   getVersion(slug: string, version?: string): Promise<RegistryVersion | undefined>;
   leaderboard(sort?: LeaderboardSort, limit?: number, categories?: string[]): Promise<SkillSearchResult[]>;
   downloadSnapshot(slug: string, version?: string): Promise<SkillSnapshot | undefined>;

@@ -22,6 +22,7 @@ import type {
   RegistryContributor, RegistryData, RegistryIssue, RegistryRating,
   RegistrySkill, RegistryVersion, SkillSearchResult, LeaderboardSort,
   RecycleBinSkill,
+  SkillSlugAvailability,
 } from "../types";
 import { skillRecyclePurgeAt, skillRecycleRetentionMs } from "../recycle-bin";
 import { parseSkillSpectorReviewRow, skillSpectorReviewColumns } from "../skillspector-review";
@@ -364,6 +365,44 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       updatedAt: String(r.updatedAt),
       published: false,
     }));
+  }
+
+  async getSkillSlugAvailability(slug: string): Promise<SkillSlugAvailability> {
+    await this.ensureSchema();
+    const [row] = await this.db
+      .select({
+        slug: schema.skills.slug,
+        name: schema.skills.name,
+        latestVersion: schema.skills.latestVersion,
+        published: schema.skills.published,
+        deletedAt: schema.skills.deletedAt,
+      })
+      .from(schema.skills)
+      .where(eq(schema.skills.slug, slug))
+      .limit(1);
+
+    if (!row) {
+      return { status: "available" };
+    }
+
+    if (row.deletedAt) {
+      const deletedAt = new Date(row.deletedAt);
+      return {
+        status: "recycle_bin",
+        slug: row.slug,
+        name: row.name,
+        deletedAt: String(row.deletedAt),
+        purgeAt: skillRecyclePurgeAt(deletedAt).toISOString(),
+      };
+    }
+
+    return {
+      status: "active",
+      slug: row.slug,
+      name: row.name,
+      latestVersion: row.latestVersion,
+      published: row.published !== false,
+    };
   }
 
   async getSkill(slug: string): Promise<RegistrySkill | undefined> {

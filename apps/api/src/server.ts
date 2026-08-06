@@ -312,6 +312,9 @@ export function buildServer() {
       const version = request.body.metadata?.version ?? uploaded.version;
       const slug = getSkillSlug(snapshot.manifest);
       const existingSkill = await store.getSkill(slug);
+      if (existingSkill?.deletedAt) {
+        return reply.code(409).send({ error: "skill_in_recycle_bin" });
+      }
       if (existingSkill && !isSkillContributor(existingSkill, user)) {
         return reply.code(403).send({ error: "Only skill contributors can publish new versions" });
       }
@@ -340,7 +343,9 @@ export function buildServer() {
       });
     } catch (error) {
       const message = errorMessage(error);
-      return reply.code(message.includes("already exists") ? 409 : 400).send({ error: message });
+      return reply.code(
+        message.includes("already exists") || message === "skill_in_recycle_bin" ? 409 : 400
+      ).send({ error: message });
     }
   });
 
@@ -499,6 +504,24 @@ export function buildServer() {
         message === "rating_already_submitted" ? 409 : message.includes("score") ? 400 : 404;
       return reply.code(status).send({ error: message });
     }
+  });
+
+  app.get<{ Params: SkillParams }>("/skills/:slug/availability", async (request) => {
+    const availability = await store.getSkillSlugAvailability(request.params.slug);
+    if (availability.status !== "active") {
+      return availability;
+    }
+
+    const user = await getAuthenticatedUser(request.headers.authorization, authStore);
+    if (!user) {
+      return availability;
+    }
+
+    const skill = await store.getSkill(request.params.slug);
+    return {
+      ...availability,
+      viewerCanPublish: skill ? isSkillContributor(skill, user) : false,
+    };
   });
 
   app.get<{ Params: SkillParams }>("/skills/:slug", async (request, reply) => {

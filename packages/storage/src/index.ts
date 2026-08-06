@@ -38,6 +38,7 @@ export type {
   MinioArtifactStoreOptions,
   RegistryStore,
   RecycleBinSkill,
+  SkillSlugAvailability,
 } from "./types";
 
 export {

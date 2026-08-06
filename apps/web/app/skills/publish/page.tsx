@@ -8,16 +8,19 @@ import { AppShell } from "../../../components/AppShell";
 import { SkillCategoryLabel } from "../../../components/SkillCategoryIcon";
 import { SuccessToast } from "../../../components/SuccessToast";
 import {
+  checkSkillSlugAvailability,
   getCurrentUser,
   getSkill,
   previewSkillArchive,
   publishSkillArchive,
   type PublishSkillFrontmatter,
-  type PublishSkillMetadata
+  type PublishSkillMetadata,
+  type SkillSlugAvailabilityResponse
 } from "../../../lib/api";
 import { savePublishNotice } from "../../../lib/publish-notice";
 import { getAuthToken } from "../../../lib/auth-token";
 import { creatorProfilePath } from "../../../lib/creators";
+import { formatDateTime } from "../../../lib/format";
 import { readSkillFrontmatterFromZip } from "../../../lib/parse-skill-archive";
 import {
   buildSkillZipFileFromBrowserFiles,
@@ -78,7 +81,8 @@ function PublishSkillPageContent() {
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [parsingArchive, setParsingArchive] = useState(false);
   const [existingSkillBySlug, setExistingSkillBySlug] = useState<RegistrySkill | null>(null);
-  const [loadingExistingSlug, setLoadingExistingSlug] = useState(false);
+  const [slugAvailability, setSlugAvailability] = useState<SkillSlugAvailabilityResponse | null>(null);
+  const [loadingSlugAvailability, setLoadingSlugAvailability] = useState(false);
   const [slugPermissionError, setSlugPermissionError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -159,36 +163,56 @@ function PublishSkillPageContent() {
 
   useEffect(() => {
     if (isNewVersion) {
+      setSlugAvailability(null);
       setExistingSkillBySlug(null);
-      setLoadingExistingSlug(false);
+      setLoadingSlugAvailability(false);
       return;
     }
 
     const normalizedSlug = slug.trim();
     if (!normalizedSlug || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(normalizedSlug)) {
+      setSlugAvailability(null);
       setExistingSkillBySlug(null);
-      setLoadingExistingSlug(false);
+      setLoadingSlugAvailability(false);
       return;
     }
 
     let cancelled = false;
     const token = getAuthToken();
-    setLoadingExistingSlug(true);
+    setLoadingSlugAvailability(true);
     const timeout = window.setTimeout(() => {
-      void getSkill(normalizedSlug, token ?? undefined)
-        .then((skill) => {
-          if (!cancelled) {
-            setExistingSkillBySlug(skill);
+      void checkSkillSlugAvailability(normalizedSlug, token ?? undefined)
+        .then(async (availability) => {
+          if (cancelled) {
+            return;
           }
+          setSlugAvailability(availability);
+
+          if (availability.status === "active" && availability.viewerCanPublish) {
+            try {
+              const skill = await getSkill(normalizedSlug, token ?? undefined);
+              if (!cancelled) {
+                setExistingSkillBySlug(skill);
+              }
+            } catch {
+              if (!cancelled) {
+                setExistingSkillBySlug(null);
+              }
+            }
+            return;
+          }
+
+          setExistingSkillBySlug(null);
         })
         .catch(() => {
           if (!cancelled) {
+            setSlugAvailability(null);
             setExistingSkillBySlug(null);
           }
         })
         .finally(() => {
           if (!cancelled) {
-            setLoadingExistingSlug(false);
+            setLoadingSlugAvailability(false);
           }
         });
     }, 280);
@@ -196,9 +220,9 @@ function PublishSkillPageContent() {
     return () => {
       cancelled = true;
       window.clearTimeout(timeout);
-      setLoadingExistingSlug(false);
+      setLoadingSlugAvailability(false);
     };
-  }, [isNewVersion, slug]);
+  }, [isNewVersion, slug, user?.id]);
 
   useEffect(() => {
     if (isNewVersion) {
@@ -221,26 +245,35 @@ function PublishSkillPageContent() {
       return;
     }
 
-    if (loadingExistingSlug) {
+    if (loadingSlugAvailability) {
       return;
     }
 
-    if (!existingSkillBySlug) {
+    if (slugAvailability?.status === "recycle_bin") {
+      setSlugPermissionError(
+        `该 Slug 已被 Skill「${slugAvailability.name}」占用且位于回收站中，请先恢复或等待 ${formatDateTime(slugAvailability.purgeAt)} 过期后再发布。`
+      );
+      return;
+    }
+
+    if (!slugAvailability || slugAvailability.status === "available") {
       setSlugPermissionError(null);
       return;
     }
 
-    if (!user) {
-      setSlugPermissionError("该 Slug 已被使用，请先登录以确认是否有权发布新版本。");
-      return;
-    }
+    if (slugAvailability.status === "active") {
+      if (!user) {
+        setSlugPermissionError("该 Slug 已被使用，请先登录以确认是否有权发布新版本。");
+        return;
+      }
 
-    setSlugPermissionError(
-      isSkillContributor(existingSkillBySlug, user)
-        ? null
-        : "你没有权限向该 Skill 发布新版本，请联系 contributor。"
-    );
-  }, [existingSkillBySlug, isNewVersion, loadingExistingSlug, loadingUser, slug, sourceSkill, user]);
+      setSlugPermissionError(
+        slugAvailability.viewerCanPublish
+          ? null
+          : "你没有权限向该 Skill 发布新版本，请联系 contributor。"
+      );
+    }
+  }, [isNewVersion, loadingSlugAvailability, loadingUser, slug, slugAvailability, sourceSkill, user]);
 
   useEffect(() => {
     if (!categoryMenuOpen) {
@@ -271,21 +304,28 @@ function PublishSkillPageContent() {
     user &&
       (isNewVersion
         ? sourceSkill && isSkillContributor(sourceSkill, user)
-        : !existingSkillBySlug || isSkillContributor(existingSkillBySlug, user))
+        : !slugAvailability ||
+          slugAvailability.status === "available" ||
+          (slugAvailability.status === "active" && slugAvailability.viewerCanPublish))
   );
 
   const slugStatusMessage = useMemo(() => {
     if (slugPermissionError) {
       return slugPermissionError;
     }
-    if (!isNewVersion && loadingExistingSlug) {
+    if (!isNewVersion && loadingSlugAvailability) {
       return "正在检查 Slug 是否可用…";
     }
-    if (!isNewVersion && existingSkillBySlug && user && isSkillContributor(existingSkillBySlug, user)) {
-      return `该 Slug 已存在，将为此 Skill 发布新版本（当前最新 v${existingSkillBySlug.latestVersion}）。`;
+    if (
+      !isNewVersion &&
+      slugAvailability?.status === "active" &&
+      user &&
+      slugAvailability.viewerCanPublish
+    ) {
+      return `该 Slug 已存在，将为此 Skill 发布新版本（当前最新 v${slugAvailability.latestVersion}）。`;
     }
     return null;
-  }, [existingSkillBySlug, isNewVersion, loadingExistingSlug, slugPermissionError, user]);
+  }, [isNewVersion, loadingSlugAvailability, slugAvailability, slugPermissionError, user]);
 
   const fileLabel = useMemo(() => {
     if (parsingArchive) {
@@ -308,7 +348,7 @@ function PublishSkillPageContent() {
     if (slugPermissionError) {
       return slugPermissionError;
     }
-    if ((isNewVersion && sourceSkill) || existingSkillBySlug) {
+    if ((isNewVersion && sourceSkill) || (slugAvailability?.status === "active" && slugAvailability.viewerCanPublish)) {
       if (!user) {
         return "请先登录后再发布。";
       }
@@ -512,7 +552,7 @@ function PublishSkillPageContent() {
       return;
     }
 
-    if ((isNewVersion && sourceSkill) || existingSkillBySlug) {
+    if ((isNewVersion && sourceSkill) || (slugAvailability?.status === "active" && slugAvailability.viewerCanPublish)) {
       if (!canPublishToSkill) {
         setError("你没有权限向该 Skill 发布新版本。");
         return;
@@ -925,6 +965,9 @@ function formatPublishError(message: string): string {
   }
   if (/Only skill contributors can publish new versions/i.test(message)) {
     return "你没有权限向该 Skill 发布新版本。";
+  }
+  if (message === "skill_in_recycle_bin") {
+    return "该 Slug 对应的 Skill 位于回收站中，请先恢复或等待过期后再发布。";
   }
   return message;
 }
