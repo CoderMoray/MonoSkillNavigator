@@ -2857,10 +2857,6 @@ button {
   }
 }
 
-.detail-list {
-  margin-top: 18px;
-}
-
 .evaluation-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3160,6 +3156,14 @@ button {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.list.detail-list {
+  margin-top: 24px;
+}
+
+.evaluation-summary + .detail-empty {
+  margin-top: 24px;
 }
 
 .list-item {
