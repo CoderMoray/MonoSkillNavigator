@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import {
+  parseEngineResults,
   reviewSkillSnapshot,
   runVirusTotalScan
 } from "@skill-platform/review-engine";
@@ -66,8 +67,42 @@ afterEach(() => {
   }
 });
 
+describe("VirusTotal engine result parsing", () => {
+  test("extracts malicious and suspicious engine detections only", () => {
+    const results = parseEngineResults({
+      Kaspersky: {
+        category: "malicious",
+        result: "Trojan.Generic",
+        method: "blacklist",
+        engine_update: "20260101"
+      },
+      Avast: {
+        category: "harmless",
+        result: "Clean"
+      },
+      Elastic: {
+        category: "suspicious",
+        result: "Suspicious archive"
+      }
+    });
+
+    expect(results).toEqual([
+      expect.objectContaining({
+        engine: "Kaspersky",
+        category: "malicious",
+        result: "Trojan.Generic"
+      }),
+      expect.objectContaining({
+        engine: "Elastic",
+        category: "suspicious",
+        result: "Suspicious archive"
+      })
+    ]);
+  });
+});
+
 describe("VirusTotal package review adapter", () => {
-  test("adds a malicious finding from an existing VirusTotal report", async () => {
+  test("adds per-engine findings from an existing VirusTotal report", async () => {
     configureVirusTotal();
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({
@@ -78,6 +113,26 @@ describe("VirusTotal package review adapter", () => {
               suspicious: 1,
               harmless: 5,
               undetected: 61
+            },
+            last_analysis_results: {
+              Kaspersky: {
+                category: "malicious",
+                result: "Trojan.Generic",
+                method: "blacklist"
+              },
+              "Microsoft Defender": {
+                category: "malicious",
+                result: "Trojan:Script/Wacatac",
+                method: "blacklist"
+              },
+              Elastic: {
+                category: "suspicious",
+                result: "Suspicious archive"
+              },
+              Avast: {
+                category: "harmless",
+                result: "Clean"
+              }
             }
           }
         }
@@ -95,12 +150,27 @@ describe("VirusTotal package review adapter", () => {
       malicious: 2,
       suspicious: 1
     });
+    expect(report.virusTotal?.engineResults).toHaveLength(3);
     expect(report.findings).toContainEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^virustotal-malicious-/),
+        id: expect.stringMatching(/^virustotal-malicious-.*-kaspersky$/),
+        severity: "high",
+        title: "VirusTotal (Kaspersky): Trojan.Generic"
+      })
+    );
+    expect(report.findings).toContainEqual(
+      expect.objectContaining({
+        id: expect.stringMatching(/^virustotal-malicious-.*-microsoft-defender$/),
         severity: "high"
       })
     );
+    expect(report.findings).toContainEqual(
+      expect.objectContaining({
+        id: expect.stringMatching(/^virustotal-suspicious-.*-elastic$/),
+        severity: "medium"
+      })
+    );
+    expect(report.findings.filter((finding) => finding.id.startsWith("virustotal-"))).toHaveLength(3);
   });
 
   test("does not upload an unknown archive unless explicitly enabled", async () => {
@@ -136,6 +206,13 @@ describe("VirusTotal package review adapter", () => {
                 suspicious: 1,
                 harmless: 4,
                 undetected: 60
+              },
+              results: {
+                "Cynet Security": {
+                  category: "suspicious",
+                  result: "Suspicious.Zip",
+                  method: "blacklist"
+                }
               }
             }
           }
@@ -154,8 +231,38 @@ describe("VirusTotal package review adapter", () => {
     });
     expect(scan.findings).toContainEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^virustotal-suspicious-/),
-        severity: "medium"
+        id: expect.stringMatching(/^virustotal-suspicious-.*-cynet-security$/),
+        severity: "medium",
+        title: "VirusTotal (Cynet Security): Suspicious.Zip"
+      })
+    );
+  });
+
+  test("falls back to aggregate findings when engine details are missing", async () => {
+    configureVirusTotal();
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        data: {
+          attributes: {
+            last_analysis_stats: {
+              malicious: 1,
+              suspicious: 0,
+              harmless: 0,
+              undetected: 0
+            }
+          }
+        }
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const scan = await runVirusTotalScan(snapshot);
+
+    expect(scan.findings).toContainEqual(
+      expect.objectContaining({
+        id: expect.stringMatching(/^virustotal-malicious-/),
+        severity: "high",
+        title: "VirusTotal detected malicious content"
       })
     );
   });

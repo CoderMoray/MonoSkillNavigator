@@ -11,6 +11,14 @@ const DEFAULT_POLL_INTERVAL_MS = 30_000;
 
 export type VirusTotalScanStatus = "completed" | "not_found" | "failed";
 
+export interface VirusTotalEngineResult {
+  engine: string;
+  category: string;
+  result: string;
+  method?: string;
+  engineUpdate?: string;
+}
+
 export interface VirusTotalScanSummary {
   provider: "virustotal";
   sha256: string;
@@ -21,6 +29,7 @@ export interface VirusTotalScanSummary {
   undetected: number;
   analysisUrl?: string;
   error?: string;
+  engineResults?: VirusTotalEngineResult[];
 }
 
 interface VirusTotalStats {
@@ -28,6 +37,11 @@ interface VirusTotalStats {
   suspicious: number;
   harmless: number;
   undetected: number;
+}
+
+interface VirusTotalReport {
+  stats: VirusTotalStats;
+  engineResults: VirusTotalEngineResult[];
 }
 
 export function isVirusTotalEnabled(): boolean {
@@ -54,9 +68,9 @@ export async function runVirusTotalScan(
   }
 
   const sha256 = createHash("sha256").update(archive).digest("hex");
-  const existingStats = await lookupFileStats(sha256, apiKey);
-  if (existingStats) {
-    return completeScan(sha256, existingStats);
+  const existingReport = await lookupFileReport(sha256, apiKey);
+  if (existingReport) {
+    return completeScan(sha256, existingReport);
   }
 
   if (!isVirusTotalUploadOnMissEnabled()) {
@@ -75,26 +89,27 @@ export async function runVirusTotalScan(
   }
 
   const analysisId = await uploadArchive(archive, apiKey);
-  const stats = await waitForAnalysis(analysisId, apiKey);
-  return completeScan(sha256, stats);
+  const report = await waitForAnalysis(analysisId, apiKey);
+  return completeScan(sha256, report);
 }
 
 function completeScan(
   sha256: string,
-  stats: VirusTotalStats
+  report: VirusTotalReport
 ): { summary: VirusTotalScanSummary; findings: ReviewFinding[] } {
   const summary: VirusTotalScanSummary = {
     provider: "virustotal",
     sha256,
     status: "completed",
-    ...stats,
-    analysisUrl: `${VIRUSTOTAL_GUI_BASE_URL}/${sha256}`
+    ...report.stats,
+    analysisUrl: `${VIRUSTOTAL_GUI_BASE_URL}/${sha256}`,
+    engineResults: report.engineResults
   };
 
-  return { summary, findings: createFindings(summary) };
+  return { summary, findings: createFindings(summary, report.engineResults) };
 }
 
-async function lookupFileStats(sha256: string, apiKey: string): Promise<VirusTotalStats | undefined> {
+async function lookupFileReport(sha256: string, apiKey: string): Promise<VirusTotalReport | undefined> {
   const response = await virusTotalFetch(`${VIRUSTOTAL_API_BASE_URL}/files/${sha256}`, apiKey);
   if (response.status === 404) {
     return undefined;
@@ -102,7 +117,11 @@ async function lookupFileStats(sha256: string, apiKey: string): Promise<VirusTot
 
   const payload = await readJsonResponse(response, "VirusTotal file lookup");
   const stats = getNestedValue(payload, ["data", "attributes", "last_analysis_stats"]);
-  return parseStats(stats, "VirusTotal file lookup");
+  const engineResults = getNestedValue(payload, ["data", "attributes", "last_analysis_results"]);
+  return {
+    stats: parseStats(stats, "VirusTotal file lookup"),
+    engineResults: parseEngineResults(engineResults)
+  };
 }
 
 async function uploadArchive(archive: Buffer, apiKey: string): Promise<string> {
@@ -136,7 +155,7 @@ async function getLargeFileUploadUrl(apiKey: string): Promise<string> {
   return uploadUrl;
 }
 
-async function waitForAnalysis(analysisId: string, apiKey: string): Promise<VirusTotalStats> {
+async function waitForAnalysis(analysisId: string, apiKey: string): Promise<VirusTotalReport> {
   const timeoutMs = readPositiveInteger(process.env.VIRUSTOTAL_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
   const pollIntervalMs = readPositiveInteger(
     process.env.VIRUSTOTAL_POLL_INTERVAL_MS,
@@ -154,7 +173,11 @@ async function waitForAnalysis(analysisId: string, apiKey: string): Promise<Viru
 
     if (status === "completed") {
       const stats = getNestedValue(payload, ["data", "attributes", "stats"]);
-      return parseStats(stats, "VirusTotal analysis");
+      const engineResults = getNestedValue(payload, ["data", "attributes", "results"]);
+      return {
+        stats: parseStats(stats, "VirusTotal analysis"),
+        engineResults: parseEngineResults(engineResults)
+      };
     }
 
     if (status === "failed") {
@@ -210,11 +233,76 @@ function parseStats(value: unknown, source: string): VirusTotalStats {
   };
 }
 
-function createFindings(summary: VirusTotalScanSummary): ReviewFinding[] {
+export function parseEngineResults(value: unknown): VirusTotalEngineResult[] {
+  if (!isRecord(value)) {
+    return [];
+  }
+
+  const results: VirusTotalEngineResult[] = [];
+  for (const [engine, entry] of Object.entries(value)) {
+    if (!isRecord(entry)) {
+      continue;
+    }
+
+    const category = typeof entry.category === "string" ? entry.category.trim().toLowerCase() : "undetected";
+    if (category !== "malicious" && category !== "suspicious") {
+      continue;
+    }
+
+    const result = typeof entry.result === "string" ? entry.result.trim() : "";
+    results.push({
+      engine,
+      category,
+      result: result || category,
+      method: typeof entry.method === "string" ? entry.method : undefined,
+      engineUpdate: typeof entry.engine_update === "string" ? entry.engine_update : undefined
+    });
+  }
+
+  return results.sort((left, right) => {
+    const categoryRank = (category: string) => (category === "malicious" ? 0 : 1);
+    const rankDiff = categoryRank(left.category) - categoryRank(right.category);
+    if (rankDiff !== 0) {
+      return rankDiff;
+    }
+    return left.engine.localeCompare(right.engine);
+  });
+}
+
+function createFindings(summary: VirusTotalScanSummary, engineResults: VirusTotalEngineResult[]): ReviewFinding[] {
   if (summary.status !== "completed") {
     return [];
   }
 
+  const flagged = engineResults.filter(
+    (engine) => engine.category === "malicious" || engine.category === "suspicious"
+  );
+  if (flagged.length > 0) {
+    return flagged.map((engine) => createEngineFinding(summary, engine));
+  }
+
+  return createAggregateFindings(summary);
+}
+
+function createEngineFinding(summary: VirusTotalScanSummary, engine: VirusTotalEngineResult): ReviewFinding {
+  const severity = engine.category === "malicious" ? "high" : "medium";
+  const engineKey = slugifyEngineName(engine.engine);
+
+  return {
+    id: `virustotal-${engine.category}-${summary.sha256.slice(0, 16)}-${engineKey}`,
+    category: "security",
+    severity,
+    title: `VirusTotal (${engine.engine}): ${engine.result}`,
+    message: `${engine.engine} classified this package as ${engine.category}.`,
+    evidence: buildEngineEvidence(summary, engine),
+    recommendation:
+      engine.category === "malicious"
+        ? "Do not publish this package until the flagged content is removed or the VirusTotal detection is reviewed and cleared."
+        : "Review the package and VirusTotal report before publishing; remove suspicious behavior or document a verified false positive."
+  };
+}
+
+function createAggregateFindings(summary: VirusTotalScanSummary): ReviewFinding[] {
   const engines = summary.malicious + summary.suspicious + summary.harmless + summary.undetected;
   const evidence = [
     `SHA-256: ${summary.sha256}`,
@@ -253,6 +341,27 @@ function createFindings(summary: VirusTotalScanSummary): ReviewFinding[] {
   }
 
   return [];
+}
+
+function buildEngineEvidence(summary: VirusTotalScanSummary, engine: VirusTotalEngineResult): string {
+  return [
+    `SHA-256: ${summary.sha256}`,
+    `Engine: ${engine.engine}`,
+    `Category: ${engine.category}`,
+    `Result: ${engine.result}`,
+    ...(engine.method ? [`Method: ${engine.method}`] : []),
+    ...(engine.engineUpdate ? [`Engine update: ${engine.engineUpdate}`] : []),
+    ...(summary.analysisUrl ? [`Report: ${summary.analysisUrl}`] : [])
+  ].join("\n");
+}
+
+function slugifyEngineName(engine: string): string {
+  const slug = engine
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "engine";
 }
 
 function getNestedValue(value: unknown, path: string[]): unknown {

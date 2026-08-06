@@ -72,7 +72,9 @@ export type { SkillSpectorScanSummary } from "./skillspector.js";
 export {
   isVirusTotalEnabled,
   isVirusTotalUploadOnMissEnabled,
+  parseEngineResults,
   runVirusTotalScan,
+  type VirusTotalEngineResult,
   type VirusTotalScanSummary
 } from "./virustotal.js";
 

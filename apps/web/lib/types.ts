@@ -49,6 +49,14 @@ export interface SkillSpectorScanSummary {
   scanMode: "static-only";
 }
 
+export interface VirusTotalEngineResult {
+  engine: string;
+  category: string;
+  result: string;
+  method?: string;
+  engineUpdate?: string;
+}
+
 export interface VirusTotalScanSummary {
   provider: "virustotal";
   sha256: string;
@@ -59,6 +67,7 @@ export interface VirusTotalScanSummary {
   undetected: number;
   analysisUrl?: string;
   error?: string;
+  engineResults?: VirusTotalEngineResult[];
 }
 
 export interface FunctionalEvaluationFinding {

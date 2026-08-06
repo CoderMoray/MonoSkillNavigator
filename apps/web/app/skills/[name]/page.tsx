@@ -344,6 +344,7 @@ export default function SkillDetailPage() {
       finding.id !== "virustotal-unavailable" &&
       (finding.id === "skillspector-unavailable" ||
         finding.id.startsWith("skillspector-") ||
+        finding.id.startsWith("virustotal-") ||
         finding.category === "security" ||
         finding.category === "privacy" ||
         finding.category === "leakage")
