@@ -50,6 +50,7 @@ import {
   toSkillSpectorSafetyScore
 } from "../../../lib/skillspector-summary";
 import { averageHaluCatchRadarScores, type HaluCatchRadarScores } from "../../../lib/halucatch-scores";
+import { formatVirusTotalThreatVerdict } from "../../../lib/virustotal-summary";
 import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill } from "../../../lib/types";
 
 type DetailPanel =
@@ -1393,6 +1394,12 @@ export default function SkillDetailPage() {
                               : "未检出"}
                           </strong>
                         </div>
+                        {formatVirusTotalThreatVerdict(virusTotalScan?.threatVerdict) ? (
+                          <div>
+                            <span>威胁裁决</span>
+                            <strong>{formatVirusTotalThreatVerdict(virusTotalScan!.threatVerdict)}</strong>
+                          </div>
+                        ) : null}
                         {virusTotalScan?.sha256 ? (
                           <div>
                             <span>归档 SHA-256</span>

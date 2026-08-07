@@ -1,4 +1,4 @@
-import type { VirusTotalScanSummary } from "@skill-platform/review-engine";
+import { parseThreatVerdict, type VirusTotalScanSummary } from "@skill-platform/review-engine";
 
 export interface VirusTotalReviewColumns {
   virustotalProvider: string | null;
@@ -10,6 +10,7 @@ export interface VirusTotalReviewColumns {
   virustotalUndetected: number | null;
   virustotalAnalysisUrl: string | null;
   virustotalError: string | null;
+  virustotalThreatVerdict: string | null;
 }
 
 export function virusTotalReviewColumns(
@@ -25,7 +26,8 @@ export function virusTotalReviewColumns(
       virustotalHarmless: null,
       virustotalUndetected: null,
       virustotalAnalysisUrl: null,
-      virustotalError: null
+      virustotalError: null,
+      virustotalThreatVerdict: null
     };
   }
 
@@ -38,7 +40,8 @@ export function virusTotalReviewColumns(
     virustotalHarmless: summary.harmless,
     virustotalUndetected: summary.undetected,
     virustotalAnalysisUrl: summary.analysisUrl ?? null,
-    virustotalError: summary.error ?? null
+    virustotalError: summary.error ?? null,
+    virustotalThreatVerdict: summary.threatVerdict ?? null
   };
 }
 
@@ -52,6 +55,7 @@ export function parseVirusTotalReviewRow(row: {
   virustotalUndetected?: number | null;
   virustotalAnalysisUrl?: string | null;
   virustotalError?: string | null;
+  virustotalThreatVerdict?: string | null;
 }): VirusTotalScanSummary | undefined {
   if (!row.virustotalStatus) {
     return undefined;
@@ -67,6 +71,8 @@ export function parseVirusTotalReviewRow(row: {
         ? "failed"
         : "completed";
 
+  const threatVerdict = parseThreatVerdict(row.virustotalThreatVerdict);
+
   return {
     provider: (row.virustotalProvider as VirusTotalScanSummary["provider"]) ?? "virustotal",
     sha256: row.virustotalSha256 ?? "",
@@ -76,6 +82,7 @@ export function parseVirusTotalReviewRow(row: {
     harmless: Number(row.virustotalHarmless ?? 0),
     undetected: Number(row.virustotalUndetected ?? 0),
     ...(row.virustotalAnalysisUrl ? { analysisUrl: row.virustotalAnalysisUrl } : {}),
-    ...(row.virustotalError ? { error: row.virustotalError } : {})
+    ...(row.virustotalError ? { error: row.virustotalError } : {}),
+    ...(threatVerdict ? { threatVerdict } : {})
   };
 }

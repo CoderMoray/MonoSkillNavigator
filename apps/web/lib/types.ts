@@ -57,6 +57,12 @@ export interface VirusTotalEngineResult {
   engineUpdate?: string;
 }
 
+export type VirusTotalThreatVerdict =
+  | "VERDICT_UNKNOWN"
+  | "VERDICT_UNDETECTED"
+  | "VERDICT_SUSPICIOUS"
+  | "VERDICT_MALICIOUS";
+
 export interface VirusTotalScanSummary {
   provider: "virustotal";
   sha256: string;
@@ -67,6 +73,7 @@ export interface VirusTotalScanSummary {
   undetected: number;
   analysisUrl?: string;
   error?: string;
+  threatVerdict?: VirusTotalThreatVerdict;
   engineResults?: VirusTotalEngineResult[];
 }
 

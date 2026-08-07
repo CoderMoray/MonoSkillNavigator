@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import {
   parseEngineResults,
+  parseThreatVerdict,
   reviewSkillSnapshot,
   runVirusTotalScan
 } from "@skill-platform/review-engine";
@@ -99,6 +100,12 @@ describe("VirusTotal engine result parsing", () => {
       })
     ]);
   });
+
+  test("parses supported threat verdict values", () => {
+    expect(parseThreatVerdict("VERDICT_MALICIOUS")).toBe("VERDICT_MALICIOUS");
+    expect(parseThreatVerdict("verdict_suspicious")).toBe("VERDICT_SUSPICIOUS");
+    expect(parseThreatVerdict("unsupported")).toBeUndefined();
+  });
 });
 
 describe("VirusTotal package review adapter", () => {
@@ -133,7 +140,8 @@ describe("VirusTotal package review adapter", () => {
                 category: "harmless",
                 result: "Clean"
               }
-            }
+            },
+            threat_verdict: "VERDICT_MALICIOUS"
           }
         }
       })
@@ -148,7 +156,8 @@ describe("VirusTotal package review adapter", () => {
       provider: "virustotal",
       status: "completed",
       malicious: 2,
-      suspicious: 1
+      suspicious: 1,
+      threatVerdict: "VERDICT_MALICIOUS"
     });
     expect(report.virusTotal?.engineResults).toHaveLength(3);
     expect(report.findings).toContainEqual(
@@ -200,20 +209,29 @@ describe("VirusTotal package review adapter", () => {
         jsonResponse({
           data: {
             attributes: {
-              status: "completed",
-              stats: {
+              status: "completed"
+            }
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: {
+            attributes: {
+              last_analysis_stats: {
                 malicious: 0,
                 suspicious: 1,
                 harmless: 4,
                 undetected: 60
               },
-              results: {
+              last_analysis_results: {
                 "Cynet Security": {
                   category: "suspicious",
                   result: "Suspicious.Zip",
                   method: "blacklist"
                 }
-              }
+              },
+              threat_verdict: "VERDICT_SUSPICIOUS"
             }
           }
         })
@@ -222,12 +240,14 @@ describe("VirusTotal package review adapter", () => {
 
     const scan = await runVirusTotalScan(snapshot);
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "POST" });
+    expect(String(fetchMock.mock.calls[3]?.[0])).toMatch(/\/files\/[a-f0-9]{64}$/);
     expect(scan.summary).toMatchObject({
       status: "completed",
       malicious: 0,
-      suspicious: 1
+      suspicious: 1,
+      threatVerdict: "VERDICT_SUSPICIOUS"
     });
     expect(scan.findings).toContainEqual(
       expect.objectContaining({

@@ -73,9 +73,11 @@ export {
   isVirusTotalEnabled,
   isVirusTotalUploadOnMissEnabled,
   parseEngineResults,
+  parseThreatVerdict,
   runVirusTotalScan,
   type VirusTotalEngineResult,
-  type VirusTotalScanSummary
+  type VirusTotalScanSummary,
+  type VirusTotalThreatVerdict
 } from "./virustotal.js";
 
 interface PatternRule {
