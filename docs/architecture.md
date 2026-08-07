@@ -1,66 +1,279 @@
-# Skill 管理平台架构设计
+# 架构设计
 
-## 一期目标
+本文档描述 Skill 管理平台的当前架构，与 `AGENTS.md` 和代码实现保持一致。
 
-Phase 0/1 的目标是交付一个可运行的可信 Skill 注册表雏形：用户可以通过 CLI 或 API 发布 Skill、触发审查、查询评分、下载安装版本。可视化、MCP、CI/CD 和多源同步在后续阶段迭代。
+## 1. 总体目标
 
-## 模块划分
+平台用于发布、审查、评估、分发和管理 Agent Skill。核心原则：
 
-```mermaid
-flowchart TD
-  cli["CLI"] --> api["API 服务"]
-  api --> store["FileRegistryStore"]
-  api --> review["Review Engine"]
-  worker["Worker"] --> store
-  worker --> review
-  review --> spec["Skill Spec"]
-  store --> artifacts["Skill Snapshot"]
+- **静态审查优先**：不执行 Skill 内脚本；安全与可靠性依赖静态分析与第三方扫描。
+- **slug 为唯一标识**：`slug` 不可变，用于数据库主键、API/CLI 参数、URL 和 MinIO 对象路径；`name` 仅作展示。
+- **API 为唯一数据入口**：Web、CLI、Worker 均通过 HTTP API 访问数据，不直连 PostgreSQL 或 MinIO。
+
+## 2. Monorepo 结构
+
+```text
+apps/
+  api/       Fastify HTTP API（端口 3000）
+  cli/       Commander CLI
+  worker/    批量重审/评估 Worker
+  web/       Next.js Web UI（端口 3001）
+packages/
+  skill-spec/     SKILL.md 解析、校验、快照与 ZIP
+  review-engine/  静态风险审查与评分
+  evaluator/      tests/*.json 功能性评估 + HaluCatch 适配
+  storage/        PostgreSQL 注册表 + MinIO artifact
+docs/
+  rules/          Skill 规范与审查规则
+examples/
+  demo-skill/     本地验证用 Skill
 ```
 
-## Monorepo 结构
+所有包使用 ESM、严格 TypeScript；共享包通过 `@skill-platform/*` 路径别名导入。
 
-- `apps/api`：HTTP API，提供健康检查、发布、搜索、详情、下载、审查查询。
-- `apps/cli`：命令行入口，支持 `review`、`publish`、`search`、`info`、`install`。
-- `apps/worker`：审查 Worker，可对待审版本重新执行审查。
-- `packages/skill-spec`：Skill 包读取、frontmatter 解析、schema 校验、快照与 hash。
-- `packages/review-engine`：质量、安全与可靠性三维评分；质量汇总平台合规和质量规则，安全采用 SkillSpector 静态扫描，可靠性采用 HaluCatch；不生成综合分。
-- `packages/storage`：注册表存储抽象。一期使用本地 JSON 文件，后续替换为 PostgreSQL + 对象存储。
-- `docs/rules`：平台规范与审查规则。
+## 3. 系统架构图
 
-## 数据流
+```mermaid
+flowchart TB
+  subgraph clients [Clients]
+    Web[Web UI]
+    CLI[CLI]
+    Worker[Worker]
+  end
 
-1. CLI 读取本地 Skill 目录，生成不可变快照。
-2. CLI 调用 API `POST /skills/publish` 上传快照。
-3. API 使用审查引擎生成审查报告，并写入注册表。
-4. 用户通过 `search`、`info` 查询元数据与评分。
-5. 用户通过 `install` 下载快照，CLI 校验内容并写入目标目录。
+  subgraph api [API Layer]
+    Fastify[Fastify Server]
+  end
 
-## 存储策略
+  subgraph core [Core Packages]
+    SkillSpec[skill-spec]
+    ReviewEngine[review-engine]
+    Evaluator[evaluator]
+    Storage[storage]
+  end
 
-一期采用 `.data/registry.json` 保存注册表状态，便于快速开发和本地验证。数据结构保持接近未来服务端模型：
+  subgraph external [External Services]
+    PG[(PostgreSQL)]
+    MinIO[(MinIO)]
+    SkillSpector[SkillSpector Python]
+    VirusTotal[VirusTotal API]
+    HaluCatch[HaluCatch Python]
+  end
 
-- `skills`：Skill 聚合根，按不可变 `slug` 唯一；`name` 仅用于展示。
-- `versions`：不可变版本，包含 manifest、hash、snapshot、review report、发布状态。
-- `reviews`：每次审查的报告和 findings。
+  Web --> Fastify
+  CLI --> Fastify
+  Worker --> Fastify
 
-生产化时建议替换为：
+  Fastify --> SkillSpec
+  Fastify --> ReviewEngine
+  Fastify --> Storage
 
-- PostgreSQL：元数据、用户、组织、版本、评分、issue、审查报告。
-- S3 兼容对象存储：Skill artifact、快照、审查日志。
-- Redis/BullMQ：异步审查队列。
-- OpenSearch/Meilisearch：搜索与榜单。
+  ReviewEngine --> SkillSpec
+  ReviewEngine --> Evaluator
+  ReviewEngine --> SkillSpector
+  ReviewEngine --> VirusTotal
+  Evaluator --> HaluCatch
 
-## 发布状态
+  Storage --> PG
+  Storage --> MinIO
+```
 
-- `draft`：已接收但尚未审查。
-- `reviewing`：Worker 正在审查。
-- `published`：审查通过，可安装。
-- `needs-review`：存在中风险，需要人工复核。
-- `rejected`：存在高危或严重问题，阻断发布。
 
-## 安全边界
 
-API 进程不执行 Skill 内脚本。当前 HaluCatch 可靠性评估仅将快照写入临时目录，并运行
-平台自带的 Python 静态扫描器；它不执行 Skill 中的程序、不访问网络，并受进程超时
-限制。需要实际执行 Agent 或 Skill 代码的后续功能评估必须进入隔离 Worker 或沙箱，
-限制网络、文件系统、环境变量和命令执行权限。
+
+
+## 4. 数据流
+
+
+
+### 4.1 发布流程
+
+```text
+用户上传 ZIP / 文件夹
+  → skill-spec 读取（Web 发布时可 loose 解析 SKILL.md frontmatter）
+  → 合并表单 metadata（name、description、slug 等）到 manifest
+  → 生成 SkillSnapshot（contentHash、文件树）
+  → review-engine 审查 + 评估
+  → storage 写入 PostgreSQL（Skill、Version、Review、Evaluation）
+  → 可选：artifact ZIP 存入 MinIO
+  → 返回 verdict 与评分
+```
+
+Web 发布路径会在审查前补全缺失或不完整的 frontmatter，避免因 `description` 等字段缺失而直接拒绝发布。
+
+### 4.2 审查流水线
+
+审查顺序（`reviewAndEvaluateSkillSnapshot`）：
+
+```text
+1. 格式校验（validateSkillSnapshot）→ compliance findings
+2. 并行执行：
+   ├── SkillSpector 静态安全扫描（Python，可选）
+   └── VirusTotal 静态 AV 扫描（可选，见 §5.3）
+3. HaluCatch 五维可靠性评估（Python，可选；否则回退 tests/*.json）
+4. 平台内置规则（仅当 HaluCatch 或 SkillSpector 不可用时作为补充）
+5. 汇总 findings → verdict + 三维度评分
+```
+
+**Verdict 规则**：存在 `critical`/`high` → `rejected`；存在 `medium` → `needs-review`；否则 → `published`。
+
+**评分维度**：`qualityScore`、`securityScore`、`reliabilityScore` 三个独立维度，不计算综合分。
+
+### 4.3 读取与分发
+
+```text
+GET /skills、/skills/:slug → PostgreSQL 查询
+GET /skills/:slug/download → MinIO 或本地 artifact 返回 ZIP
+Worker POST /reviews/rerun → 对注册表 Skill 重跑审查
+```
+
+
+
+## 5. 核心模块
+
+
+
+### 5.1 skill-spec
+
+
+| 职责          | 说明                                                        |
+| ----------- | --------------------------------------------------------- |
+| 解析 SKILL.md | frontmatter + Markdown 正文                                 |
+| 校验          | 目录结构、必填字段、slug 格式                                         |
+| 快照          | `SkillSnapshot`：manifest、文件树、contentHash                  |
+| ZIP         | 读/写 Skill 包；`readSkillZipBufferLoose` 支持发布时宽松 frontmatter |
+| metadata 合并 | `applySkillPublishMetadata` 将表单字段写入 manifest              |
+
+
+
+
+### 5.2 review-engine
+
+
+| 组件           | 说明                                                                       |
+| ------------ | ------------------------------------------------------------------------ |
+| 平台规则         | 合规、泄露、隐私、混淆代码等静态模式                                                       |
+| SkillSpector | 调用 Python SkillSpector，解析 per-finding 结果与 summary                        |
+| VirusTotal   | SHA256 查 hash；可选 upload-on-miss；per-engine malicious/suspicious findings |
+| 评分/裁决        | `calculateScores`、`calculateVerdict`                                     |
+
+
+SkillSpector 与 VirusTotal **并行**执行（`Promise.all`），互不阻塞。
+
+### 5.3 VirusTotal 集成（当前范围）
+
+
+| 项目                                              | 状态                             |
+| ----------------------------------------------- | ------------------------------ |
+| `GET /files/{sha256}` hash lookup               | ✅                              |
+| upload-on-miss + poll + re-fetch                | ✅（`VIRUSTOTAL_UPLOAD_ON_MISS`） |
+| `last_analysis_stats` / `last_analysis_results` | ✅                              |
+| per-engine malicious/suspicious findings        | ✅                              |
+| `threat_verdict` 解析与展示                          | ✅                              |
+| sandbox_verdicts / behaviours / GTI             | ❌ 未接入                          |
+
+
+配置：`VIRUSTOTAL_API_KEY`（必需）、`VIRUSTOTAL_UPLOAD_ON_MISS`（默认 false）、超时与轮询间隔见 `.env.example`。
+
+扫描对象：发布包整体 ZIP 的 SHA256（非单文件扫描）。
+
+### 5.4 evaluator
+
+- **HaluCatch**（优先）：五维静态可靠性（地基、代码风险、规则、护栏、复杂度）。
+- **回退**：`tests/*.json` 任务集功能性检查。
+- 报告持久化至 `skill_review.halucatch_report` JSON 列。
+
+
+
+### 5.5 storage
+
+
+| 存储         | 用途                                   |
+| ---------- | ------------------------------------ |
+| PostgreSQL | Skill 注册表、用户、审查、评分、书签、回收站            |
+| MinIO      | artifact ZIP（`MINIO_ENABLED=true` 时） |
+
+
+- ORM：Drizzle（`packages/storage/src/schema/*.ts`）
+- 迁移：`packages/storage/drizzle/*.sql`，API 首次启动自动执行
+- 主要表：`skills`、`skill_versions`、`skill_reviews`、`users`、`skill_bookmarks`、`skill_recycle_bin` 等
+
+Review 扩展列（近期）：
+
+- SkillSpector summary + findings
+- VirusTotal：status、stats、sha256、link、error、threat_verdict
+- HaluCatch report JSON
+- finding confidence
+
+
+
+## 6. API 与 Web
+
+
+
+### 6.1 API（Fastify）
+
+主要路由组：
+
+
+| 路由                                          | 功能              |
+| ------------------------------------------- | --------------- |
+| `/auth/*`                                   | 注册、登录、登出、当前用户   |
+| `/skills`                                   | 列表、搜索、发布        |
+| `/skills/:slug`                             | 详情、更新、删除（移入回收站） |
+| `/skills/:slug/download`                    | 下载 ZIP          |
+| `/skills/:slug/unpublish`                   | Skill 级下架       |
+| `/skills/:slug/versions/:version/unpublish` | 版本级下架           |
+| `/skills/:slug/purge`                       | 永久删除（回收站内）      |
+| `/skills/:slug/bookmark`                    | 书签              |
+| `/users/me/recycle-bin`                     | 回收站列表           |
+| `/reviews/rerun`                            | Worker 重审       |
+
+
+
+
+### 6.2 Web（Next.js）
+
+- 首页搜索、Skill 详情（审查 findings、SkillSpector/VirusTotal 摘要、HaluCatch 雷达图）
+- 发布页（Description 字段、ZIP 上传、metadata 自动补全）
+- 创作者主页、榜单、审查列表
+- 站内文档（skill-format、security-scan、halucatch-review 等）
+- 通过 `NEXT_PUBLIC_API_URL` 访问 API，不直连数据库
+
+
+
+## 7. 安全边界
+
+
+| 层级       | 措施                                                |
+| -------- | ------------------------------------------------- |
+| 输入       | ZIP/文件夹静态读取，不执行 Skill 脚本                          |
+| 审查       | 平台规则 + SkillSpector + VirusTotal + HaluCatch，全为静态 |
+| 第三方      | VT/SkillSpector/HaluCatch 为外部依赖；API key 仅存服务端     |
+| 认证       | Session/cookie；发布、删除、书签等需登录                       |
+| 回收站      | 软删除 + 定时 purge（默认 30 天）                           |
+| Artifact | MinIO 预签名或 API 代理下载                               |
+
+
+
+
+## 8. 配置要点
+
+
+| 变量               | 说明                  |
+| ---------------- | ------------------- |
+| `DATABASE_URL`   | PostgreSQL 连接（必需）   |
+| `MINIO_*`        | 对象存储（可选）            |
+| `SKILLSPECTOR_*` | SkillSpector 路径与开关  |
+| `VIRUSTOTAL_*`   | VirusTotal API      |
+| `HALUCATCH_*`    | HaluCatch Python 路径 |
+
+
+
+
+## 9. 验证
+
+```bash
+npm run typecheck   # TypeScript 零报错
+npm run test        # API 烟雾测试 + 单元测试（skill-spec、VT、HaluCatch 等）
+```
