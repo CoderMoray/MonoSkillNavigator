@@ -1,5 +1,5 @@
 import cors from "@fastify/cors";
-import Fastify, { type FastifyReply } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import { pathToFileURL } from "node:url";
 import { evaluateSkillSnapshot } from "@skill-platform/evaluator";
 import { reviewAndEvaluateSkillSnapshot } from "@skill-platform/review-engine";
@@ -33,7 +33,8 @@ import {
   type IssueType,
   type LeaderboardSort,
   type PublicUser,
-  type RegistrySkill
+  type RegistrySkill,
+  type RegistryStore
 } from "@skill-platform/storage";
 
 loadDotEnvIfPresent();
@@ -812,7 +813,18 @@ export function buildServer() {
     return { ok: true, bookmarked: false };
   });
 
-  return app;
+  const dispose = async (): Promise<void> => {
+    clearInterval(recycleBinPurgeTimer);
+    await closeRegistryStore(store);
+  };
+
+  return { app, dispose };
+}
+
+async function closeRegistryStore(store: RegistryStore): Promise<void> {
+  if ("close" in store && typeof store.close === "function") {
+    await store.close();
+  }
 }
 
 function readBearerToken(authorization: string | undefined): string | undefined {
@@ -935,20 +947,64 @@ function printStartupError(phase: string, error: unknown): void {
   console.error("");
 }
 
+async function listenWithRetry(app: FastifyInstance, port: number, host: string): Promise<void> {
+  const maxAttempts = 5;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await app.listen({ port, host });
+      return;
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code === "EADDRINUSE" && attempt < maxAttempts) {
+        app.log.warn({ port, host, attempt, maxAttempts }, "Port in use during startup; retrying listen");
+        await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 async function startServer(): Promise<void> {
   const port = Number(process.env.PORT ?? 3000);
   const host = process.env.HOST ?? "127.0.0.1";
 
-  let app: ReturnType<typeof buildServer>;
+  let server: ReturnType<typeof buildServer>;
   try {
-    app = buildServer();
+    server = buildServer();
   } catch (error) {
     printStartupError("server setup", error);
     process.exit(1);
   }
 
+  let shuttingDown = false;
+  const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) {
+      return;
+    }
+    shuttingDown = true;
+    server.app.log.info({ signal }, "Shutting down skill platform API");
+
+    try {
+      await server.app.close();
+      await server.dispose();
+    } catch (error) {
+      server.app.log.error({ err: error }, "Error during shutdown");
+    }
+
+    process.exit(0);
+  };
+
+  process.once("SIGTERM", () => {
+    void shutdown("SIGTERM");
+  });
+  process.once("SIGINT", () => {
+    void shutdown("SIGINT");
+  });
+
   try {
-    await app.listen({ port, host });
+    await listenWithRetry(server.app, port, host);
   } catch (error) {
     printStartupError("listen", error);
     process.exit(1);

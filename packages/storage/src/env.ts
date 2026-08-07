@@ -14,9 +14,32 @@ export function createRegistryStoreFromEnv(env: NodeJS.ProcessEnv = process.env)
 }
 
 export function loadDotEnvIfPresent(filePath = ".env"): void {
-  const absolutePath = path.resolve(process.env.INIT_CWD ?? process.cwd(), filePath);
-  if (existsSync(absolutePath)) {
+  const seen = new Set<string>();
+
+  const tryLoad = (baseDir: string): boolean => {
+    const absolutePath = path.resolve(baseDir, filePath);
+    if (seen.has(absolutePath) || !existsSync(absolutePath)) {
+      return false;
+    }
+    seen.add(absolutePath);
     loadEnvFile(absolutePath);
+    return true;
+  };
+
+  if (process.env.INIT_CWD && tryLoad(process.env.INIT_CWD)) {
+    return;
+  }
+
+  let dir = process.cwd();
+  for (let depth = 0; depth < 6; depth += 1) {
+    if (tryLoad(dir)) {
+      return;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      break;
+    }
+    dir = parent;
   }
 }
 
