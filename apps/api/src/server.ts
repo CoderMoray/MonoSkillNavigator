@@ -912,10 +912,52 @@ function normalizeLeaderboardSort(sort: LeaderboardQuerySort | undefined): Leade
   return sort ?? "downloads";
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+function printStartupError(phase: string, error: unknown): void {
+  const err = error as NodeJS.ErrnoException;
+  const message = err instanceof Error ? err.message : String(error);
+
+  console.error("");
+  console.error(`[skill-platform-api] Startup failed during: ${phase}`);
+  console.error(`  message: ${message}`);
+  if (err.code) {
+    console.error(`  code: ${err.code}`);
+  }
+
+  if (err.code === "EADDRINUSE") {
+    const port = Number(process.env.PORT ?? 3000);
+    console.error(`  hint: Port ${port} is already in use. Stop other API dev processes or set PORT in .env.`);
+    console.error(`  hint: Windows check — netstat -ano | findstr :${port}`);
+  }
+
+  if (error instanceof Error && error.stack) {
+    console.error(error.stack);
+  }
+  console.error("");
+}
+
+async function startServer(): Promise<void> {
   const port = Number(process.env.PORT ?? 3000);
   const host = process.env.HOST ?? "127.0.0.1";
-  const app = buildServer();
 
-  await app.listen({ port, host });
+  let app: ReturnType<typeof buildServer>;
+  try {
+    app = buildServer();
+  } catch (error) {
+    printStartupError("server setup", error);
+    process.exit(1);
+  }
+
+  try {
+    await app.listen({ port, host });
+  } catch (error) {
+    printStartupError("listen", error);
+    process.exit(1);
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  startServer().catch((error) => {
+    printStartupError("startup", error);
+    process.exit(1);
+  });
 }
