@@ -2,7 +2,7 @@ import type { ReviewReport, ReviewVerdict } from "@skill-platform/review-engine"
 import type { FunctionalEvaluationReport } from "@skill-platform/evaluator";
 import type { SkillManifest, SkillSnapshot } from "@skill-platform/skill-spec";
 
-export type ContributorRole = "owner" | "maintainer" | "reviewer" | "contributor";
+export type ContributorRole = "owner" | "contributor";
 export type IssueType = "bug" | "security" | "compatibility" | "feature" | "docs";
 export type IssueStatus = "open" | "triaged" | "closed";
 export type IssueSeverity = "low" | "medium" | "high" | "critical";

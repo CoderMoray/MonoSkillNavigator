@@ -17,6 +17,7 @@ import {
 } from "@skill-platform/skill-spec";
 import {
   aggregateCreators,
+  assertContributorRole,
   createAuthStoreFromEnv,
   createEmptyCreatorSummary,
   createRegistryStoreFromEnv,
@@ -435,8 +436,15 @@ export function buildServer() {
       return reply.code(404).send({ error: "user_not_found" });
     }
 
+    let role: ContributorRole;
+    try {
+      role = assertContributorRole(request.body.role);
+    } catch {
+      return reply.code(400).send({ error: "invalid_contributor_role" });
+    }
+
     const contributor = await store.addContributor(request.params.slug, {
-      role: request.body.role,
+      role,
       name: contributorUser.username,
       username: contributorUser.username,
       userId: contributorUser.id

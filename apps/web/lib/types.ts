@@ -147,7 +147,7 @@ export interface RegistryContributor {
   userId?: string;
   username?: string;
   name: string;
-  role: "owner" | "maintainer" | "reviewer" | "contributor";
+  role: "owner" | "contributor";
   addedAt: string;
 }
 

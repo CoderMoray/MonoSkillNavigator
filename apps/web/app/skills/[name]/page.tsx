@@ -1013,8 +1013,6 @@ export default function SkillDetailPage() {
                           value={contributorRole}
                         >
                           <option value="contributor">contributor</option>
-                          <option value="reviewer">reviewer</option>
-                          <option value="maintainer">maintainer</option>
                           <option value="owner">owner</option>
                         </select>
                       </label>

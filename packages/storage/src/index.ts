@@ -1,3 +1,9 @@
+export {
+  assertContributorRole,
+  CONTRIBUTOR_ROLES,
+  isContributorRole,
+  normalizeContributorRole,
+} from "./contributors";
 export * from "./auth";
 
 export {

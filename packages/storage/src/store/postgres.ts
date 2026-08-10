@@ -27,7 +27,7 @@ import type {
 import { skillRecyclePurgeAt, skillRecycleRetentionMs } from "../recycle-bin";
 import { parseSkillSpectorReviewRow, skillSpectorReviewColumns } from "../skillspector-review";
 import { parseVirusTotalReviewRow, virusTotalReviewColumns } from "../virustotal-review";
-import { emptyRegistry, normalizeRegistryData, toSearchResult } from "../utils";
+import { normalizeContributorRole, assertContributorRole } from "../contributors";
 import { JsonRegistryStore } from "./base";
 
 type DB = NodePgDatabase<typeof schema>;
@@ -47,6 +47,24 @@ function toFunctionalEvaluationFinding(row: EvaluationFindingRow): FunctionalEva
     severity: row.severity as FunctionalEvaluationFinding["severity"],
     message: row.message,
     recommendation: row.recommendation,
+  };
+}
+
+function mapContributorRow(row: {
+  id: string;
+  userId: string | null;
+  username: string | null;
+  name: string;
+  role: string;
+  addedAt: Date | string;
+}): RegistryContributor {
+  return {
+    id: row.id,
+    userId: row.userId ?? undefined,
+    username: row.username ?? undefined,
+    name: row.name,
+    role: normalizeContributorRole(row.role),
+    addedAt: String(row.addedAt),
   };
 }
 
@@ -225,14 +243,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     const contributorsMap = new Map<string, SkillSearchResult["contributors"]>();
     for (const c of allContributors) {
       const list = contributorsMap.get(c.skillSlug) ?? [];
-      list.push({
-        id: c.id,
-        userId: c.userId ?? undefined,
-        username: c.username ?? undefined,
-        name: c.name,
-        role: c.role as SkillSearchResult["contributors"][number]["role"],
-        addedAt: String(c.addedAt),
-      });
+      list.push(mapContributorRow(c));
       contributorsMap.set(c.skillSlug, list);
     }
 
@@ -334,14 +345,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     const contributorsMap = new Map<string, SkillSearchResult["contributors"]>();
     for (const c of allContributors) {
       const list = contributorsMap.get(c.skillSlug) ?? [];
-      list.push({
-        id: c.id,
-        userId: c.userId ?? undefined,
-        username: c.username ?? undefined,
-        name: c.name,
-        role: c.role as SkillSearchResult["contributors"][number]["role"],
-        addedAt: String(c.addedAt),
-      });
+      list.push(mapContributorRow(c));
       contributorsMap.set(c.skillSlug, list);
     }
 
@@ -605,10 +609,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       slug: row.slug, name: row.name, description: row.description,
       ownerUserId: row.ownerUserId ?? undefined, latestVersion: row.latestVersion,
       versions: versionMap,
-      contributors: contributors.map((c) => ({
-        id: c.id, userId: c.userId ?? undefined, username: c.username ?? undefined,
-        name: c.name, role: c.role as any, addedAt: String(c.addedAt),
-      })),
+      contributors: contributors.map((c) => mapContributorRow(c)),
       issues: issues.map((i) => ({
         id: i.id, type: i.type as any, status: i.status as any,
         severity: i.severity as any, title: i.title, body: i.body ?? undefined,
@@ -710,6 +711,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
 
   async addContributor(slug: string, contributor: { userId?: string; username?: string; name: string; role: string }): Promise<RegistryContributor> {
     await this.ensureSchema();
+    const role = assertContributorRole(contributor.role);
     const addedAt = new Date();
     const id = `contributor_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -720,21 +722,25 @@ export class PostgresRegistryStore extends JsonRegistryStore {
 
     if (existing) {
       await this.db.update(schema.skillContributors)
-        .set({ role: contributor.role as any })
+        .set({ role })
         .where(eq(schema.skillContributors.id, existing.id));
-      return {
-        id: existing.id, userId: existing.userId ?? undefined, username: existing.username ?? undefined,
-        name: existing.name, role: contributor.role as any, addedAt: String(existing.addedAt),
-      };
+      return mapContributorRow({ ...existing, role });
     }
 
     await this.db.insert(schema.skillContributors).values({
       id, skillSlug: slug, userId: contributor.userId ?? null,
       username: contributor.username ?? null, name: contributor.name,
-      role: contributor.role as any, addedAt,
+      role, addedAt,
     });
 
-    return { id, userId: contributor.userId, username: contributor.username, name: contributor.name, role: contributor.role as any, addedAt: addedAt.toISOString() };
+    return {
+      id,
+      userId: contributor.userId,
+      username: contributor.username,
+      name: contributor.name,
+      role,
+      addedAt: addedAt.toISOString(),
+    };
   }
 
   async downloadSnapshot(slug: string, version = "latest"): Promise<any | undefined> {
@@ -1358,14 +1364,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     const contributorsMap = new Map<string, SkillSearchResult["contributors"]>();
     for (const c of allContributors) {
       const list = contributorsMap.get(c.skillSlug) ?? [];
-      list.push({
-        id: c.id,
-        userId: c.userId ?? undefined,
-        username: c.username ?? undefined,
-        name: c.name,
-        role: c.role as SkillSearchResult["contributors"][number]["role"],
-        addedAt: String(c.addedAt),
-      });
+      list.push(mapContributorRow(c));
       contributorsMap.set(c.skillSlug, list);
     }
 

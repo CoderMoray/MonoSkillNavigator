@@ -126,7 +126,7 @@
 
 ### 3.1.1 Contributor 与邮件（当前迭代）
 
-- [ ] Contributor 模型精简：**仅保留 owner 与 contributor**（移除其他角色）
+- [x] Contributor 模型精简：**仅保留 owner 与 contributor**（移除其他角色）
 - [ ] 邀请 contributor 发送邮件；**被邀请人接受后**才生效
 - [ ] 填写 contributor 时：**用户名实时检索下拉**，可点选正确账号
 - [ ] **阿里云邮箱**接入：本地/测试环境验证发信

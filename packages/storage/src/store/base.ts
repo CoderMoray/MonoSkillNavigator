@@ -21,6 +21,7 @@ import type {
   SkillSlugAvailability,
 } from "../types";
 import { skillRecyclePurgeAt } from "../recycle-bin";
+import { assertContributorRole } from "../contributors";
 import {
   createId,
   createOwnerContributor,
@@ -148,15 +149,16 @@ export abstract class JsonRegistryStore implements RegistryStore {
     const data = await this.load();
     const skill = data.skills[slug];
     if (!skill) throw new Error(`Skill not found: ${slug}`);
+    const role = assertContributorRole(contributor.role);
     const existing = skill.contributors.find((item) => item.name.toLowerCase() === contributor.name.toLowerCase());
     const now = new Date().toISOString();
     if (existing) {
-      existing.role = contributor.role;
+      existing.role = role;
       skill.updatedAt = now;
       await this.save(data);
       return existing;
     }
-    const created: RegistryContributor = { id: createId("contributor"), ...contributor, addedAt: now };
+    const created: RegistryContributor = { id: createId("contributor"), ...contributor, role, addedAt: now };
     skill.contributors.push(created);
     skill.updatedAt = now;
     await this.save(data);
