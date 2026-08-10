@@ -1217,8 +1217,12 @@ export default function SkillDetailPage() {
                           <span>{formatDateTime(version.createdAt)}</span>
                         </div>
                         <div className="version-col-release">
-                          {isLatest ? <span className="badge">Latest</span> : null}
-                          <VerdictBadge verdict={version.status} />
+                          <span className="version-release-latest">
+                            {isLatest ? <span className="badge">Latest</span> : null}
+                          </span>
+                          <span className="version-release-status">
+                            <VerdictBadge verdict={version.status} />
+                          </span>
                         </div>
                         <div
                           className="version-col-download"
