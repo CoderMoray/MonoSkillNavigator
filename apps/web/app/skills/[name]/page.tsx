@@ -38,6 +38,7 @@ import { FindingConfidenceBadge } from "../../../components/FindingConfidenceBad
 import { SkillCategoryLabel } from "../../../components/SkillCategoryIcon";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
 import { findSkillContributorByHandle, isSkillContributor, isSkillOwner } from "../../../lib/skill-contributors";
+import { buildSkillInstallPrompt } from "../../../lib/skill-install-prompt";
 import {
   addSkillContributor,
   addSkillRating,
@@ -661,6 +662,25 @@ export default function SkillDetailPage() {
     }
   }
 
+  async function handleCopyInstallPrompt() {
+    const pageUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/skills/${encodeURIComponent(skill.slug)}`
+        : `/skills/${encodeURIComponent(skill.slug)}`;
+    const prompt = buildSkillInstallPrompt({
+      skill,
+      version: currentVersion.version,
+      pageUrl
+    });
+
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setSuccessToast("已复制安装 prompt");
+    } catch {
+      setErrorToast("复制失败，请手动复制");
+    }
+  }
+
   async function handleToggleBookmark() {
     const token = getAuthToken();
     if (!token) {
@@ -855,6 +875,9 @@ export default function SkillDetailPage() {
                   <Download size={16} /> 登录后下载
                 </Link>
               )}
+              <button className="button secondary" onClick={() => void handleCopyInstallPrompt()} type="button">
+                <Copy size={16} /> 复制 prompt
+              </button>
             </div>
             {downloadError ? <div className="error">{downloadError}</div> : null}
             {manageError ? <div className="error">{manageError}</div> : null}
