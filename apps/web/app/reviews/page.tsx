@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownUp, Download, FileSpreadsheet, ShieldCheck } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
+import { ConfirmToast } from "../../components/ConfirmToast";
 import { PillSelect } from "../../components/PillSelect";
 import {
   buildAuditRows,
@@ -34,6 +35,7 @@ export default function ReviewsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<"csv" | "xlsx" | null>(null);
+  const [exportConfirm, setExportConfirm] = useState<"csv" | "xlsx" | null>(null);
   const [sortField, setSortField] = useState<AuditSortField>("publish_date");
   const [sortDirection, setSortDirection] = useState<AuditSortDirection>("desc");
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(() => new Set());
@@ -177,40 +179,54 @@ export default function ReviewsPage() {
     }
   }
 
-  async function handleExportCsv() {
-    if (exportRowCount === 0) {
-      return;
-    }
-    setExporting("csv");
+  async function executeExport(format: "csv" | "xlsx") {
+    setExporting(format);
     setError(null);
     try {
       const rows = await resolveExportRows();
-      downloadAuditCsv(rows);
+      if (format === "csv") {
+        downloadAuditCsv(rows);
+      } else {
+        await downloadAuditXlsx(rows);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "导出 CSV 失败");
+      setError(err instanceof Error ? err.message : format === "csv" ? "导出 CSV 失败" : "导出 Excel 失败");
     } finally {
       setExporting(null);
     }
   }
 
-  async function handleExportXlsx() {
-    if (exportRowCount === 0) {
+  function requestExport(format: "csv" | "xlsx") {
+    if (exportRowCount === 0 || exporting !== null) {
       return;
     }
-    setExporting("xlsx");
-    setError(null);
-    try {
-      const rows = await resolveExportRows();
-      await downloadAuditXlsx(rows);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "导出 Excel 失败");
-    } finally {
-      setExporting(null);
+    setExportConfirm(format);
+  }
+
+  async function handleConfirmExport() {
+    if (!exportConfirm || exporting !== null) {
+      return;
     }
+    const format = exportConfirm;
+    await executeExport(format);
+    setExportConfirm(null);
   }
 
   return (
     <AppShell title="审查中心">
+      {exportConfirm ? (
+        <ConfirmToast
+          confirming={exporting !== null}
+          message={`当前已选中 ${exportRowCount} 条记录，确定导出为 ${exportConfirm === "csv" ? "CSV" : "Excel"} 吗？`}
+          onCancel={() => {
+            if (exporting === null) {
+              setExportConfirm(null);
+            }
+          }}
+          onConfirm={() => void handleConfirmExport()}
+          title="确认导出"
+        />
+      ) : null}
       <div className="page-stack">
         <section className="hero">
           <div className="hero-card">
@@ -264,8 +280,8 @@ export default function ReviewsPage() {
               <div className="audit-export-actions">
                 <button
                   className="button secondary compact"
-                  disabled={loading || exportRowCount === 0 || exporting !== null}
-                  onClick={() => void handleExportCsv()}
+                  disabled={loading || exportRowCount === 0 || exporting !== null || exportConfirm !== null}
+                  onClick={() => requestExport("csv")}
                   type="button"
                 >
                   <Download size={15} />
@@ -273,8 +289,8 @@ export default function ReviewsPage() {
                 </button>
                 <button
                   className="button secondary compact"
-                  disabled={loading || exportRowCount === 0 || exporting !== null}
-                  onClick={() => void handleExportXlsx()}
+                  disabled={loading || exportRowCount === 0 || exporting !== null || exportConfirm !== null}
+                  onClick={() => requestExport("xlsx")}
                   type="button"
                 >
                   <FileSpreadsheet size={15} />
