@@ -15,11 +15,16 @@
 - `medium`：缺少版本、描述不清、外部 URL 未解释、测试不足、脚本风险需人工复核。
 - `low`：文档风格、标签缺失、示例不足、非阻断性改进建议。
 
-发布判定：
+发布判定（SkillSpector / VirusTotal 阻断，其余 finding 复核）：
 
-- 存在 `critical` 或 `high`：`rejected`。
-- 存在 `medium`：`needs-review`。
-- 只有 `low` 或无问题：`published`。
+- **SkillSpector**
+  - `high` / `critical` finding：`rejected`。
+  - `medium` 且置信度 ≥ 90%：`rejected`。
+  - 其余 SkillSpector finding：允许上传，标记 `needs-review`（需复核）。
+- **VirusTotal**
+  - `high` / `critical` finding（如 malicious 检出）：`rejected`。
+  - 其余 VirusTotal finding（如 suspicious）：允许上传，标记 `needs-review`。
+- **平台规则与其他 finding**（格式、质量、降级静态规则等）：不自动拒绝；存在任意 finding 时标记 `needs-review`，全部通过则为 `published`。
 
 ## 质量审查（合规 + 质量）
 

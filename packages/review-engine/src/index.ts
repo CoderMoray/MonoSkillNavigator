@@ -209,7 +209,7 @@ export async function reviewAndEvaluateSkillSnapshot(
   }
 
   const scores = calculateScores(findings, evaluation, skillSpector);
-  const verdict = calculateVerdict(findings);
+  const verdict = calculateReviewVerdict(findings);
 
   const review: ReviewReport = {
     id: `review_${snapshot.contentHash.slice(0, 16)}_${Date.now()}`,
@@ -397,12 +397,52 @@ function calculateScores(
   };
 }
 
-function calculateVerdict(findings: ReviewFinding[]): ReviewVerdict {
-  if (findings.some((finding) => finding.severity === "critical" || finding.severity === "high")) {
+const SKILLSPECTOR_FINDING_PREFIX = "skillspector-";
+const VIRUSTOTAL_FINDING_PREFIX = "virustotal-";
+const SKILLSPECTOR_UNAVAILABLE_FINDING_ID = "skillspector-unavailable";
+const MEDIUM_CONFIDENCE_REJECT_PERCENT = 90;
+
+export function isSkillSpectorReviewFinding(finding: ReviewFinding): boolean {
+  return (
+    finding.id.startsWith(SKILLSPECTOR_FINDING_PREFIX) &&
+    finding.id !== SKILLSPECTOR_UNAVAILABLE_FINDING_ID
+  );
+}
+
+export function isVirusTotalReviewFinding(finding: ReviewFinding): boolean {
+  return finding.id.startsWith(VIRUSTOTAL_FINDING_PREFIX);
+}
+
+export function shouldRejectSkillSpectorFinding(finding: ReviewFinding): boolean {
+  if (!isSkillSpectorReviewFinding(finding)) {
+    return false;
+  }
+
+  if (finding.severity === "critical" || finding.severity === "high") {
+    return true;
+  }
+
+  if (finding.severity === "medium" && finding.confidence !== undefined) {
+    const confidencePercent = finding.confidence <= 1 ? finding.confidence * 100 : finding.confidence;
+    return confidencePercent >= MEDIUM_CONFIDENCE_REJECT_PERCENT;
+  }
+
+  return false;
+}
+
+export function shouldRejectVirusTotalFinding(finding: ReviewFinding): boolean {
+  return isVirusTotalReviewFinding(finding) && (finding.severity === "critical" || finding.severity === "high");
+}
+
+export function calculateReviewVerdict(findings: ReviewFinding[]): ReviewVerdict {
+  if (
+    findings.some(shouldRejectSkillSpectorFinding) ||
+    findings.some(shouldRejectVirusTotalFinding)
+  ) {
     return "rejected";
   }
 
-  if (findings.some((finding) => finding.severity === "medium")) {
+  if (findings.length > 0) {
     return "needs-review";
   }
 
