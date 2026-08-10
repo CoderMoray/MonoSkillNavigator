@@ -418,7 +418,7 @@ export function buildServer() {
       return reply.code(404).send({ error: "skill_not_found" });
     }
     if (!isSkillOwner(skill, user)) {
-      return reply.code(403).send({ error: "Only skill owners can add contributors" });
+      return reply.code(403).send({ error: "only_owner_can_add_contributors" });
     }
 
     const contributorName = request.body.name.trim();

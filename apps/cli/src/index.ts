@@ -285,7 +285,7 @@ program
 
 program
   .command("contributor")
-  .description("Add or update a skill contributor")
+  .description("Add a skill contributor (skill owner token required)")
   .argument("<slug>", "Skill slug")
   .requiredOption("--person <person>", "Contributor display name")
   .option("--registry <url>", "Registry API URL", defaultRegistry)

@@ -12,6 +12,17 @@ function matchesContributorUser(
   );
 }
 
+export function isSkillOwner(skill: RegistrySkill, user: PublicUser): boolean {
+  if (skill.ownerUserId && skill.ownerUserId === user.id) {
+    return true;
+  }
+
+  return skill.contributors.some(
+    (contributor) =>
+      contributor.role === "owner" && matchesContributorUser(contributor, user.id, user.username)
+  );
+}
+
 export function isSkillContributor(skill: RegistrySkill, user: PublicUser): boolean {
   if (user.role === "admin") {
     return true;

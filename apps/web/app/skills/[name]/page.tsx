@@ -36,7 +36,24 @@ import { HaluCatchRadar } from "../../../components/HaluCatchRadar";
 import { FindingConfidenceBadge } from "../../../components/FindingConfidenceBadge";
 import { SkillCategoryLabel } from "../../../components/SkillCategoryIcon";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
-import { addSkillContributor, addSkillRating, bookmarkSkill, createSkillIssue, deleteSkill, downloadSkillVersion, getCurrentUser, getSkill, getSkills, republishSkill, republishSkillVersion, saveBlobAsFile, unpublishSkill, unpublishSkillVersion, unbookmarkSkill } from "../../../lib/api";
+import { isSkillContributor, isSkillOwner } from "../../../lib/skill-contributors";
+import {
+  addSkillContributor,
+  addSkillRating,
+  bookmarkSkill,
+  createSkillIssue,
+  deleteSkill,
+  downloadSkillVersion,
+  getCurrentUser,
+  getSkill,
+  getSkills,
+  republishSkill,
+  republishSkillVersion,
+  saveBlobAsFile,
+  unpublishSkill,
+  unpublishSkillVersion,
+  unbookmarkSkill
+} from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { creatorProfilePath } from "../../../lib/creators";
 import { formatDateTime, formatNumber } from "../../../lib/format";
@@ -108,6 +125,9 @@ function formatContributorError(message: string): string {
   }
   if (message === "cannot_modify_owner_contributor") {
     return "不能修改 Skill 所有者的 contributor 记录。";
+  }
+  if (message === "only_owner_can_add_contributors") {
+    return "仅 Skill Owner 可添加 contributor。";
   }
   return message;
 }
@@ -332,15 +352,8 @@ export default function SkillDetailPage() {
     ? stripFrontmatter(skillMdFile.content).trim()
     : (snapshot?.readme?.trim() ?? "");
   const selectedFile = files.find((file) => file.path === selectedFilePath) ?? files[0];
-  const isOwner = Boolean(
-    viewer &&
-      (skill.ownerUserId === viewer.id ||
-        skill.contributors.some(
-          (contributor) =>
-            contributor.role === "owner" &&
-            (contributor.userId === viewer.id || contributor.username === viewer.username)
-        ))
-  );
+  const isOwner = Boolean(viewer && skill && isSkillOwner(skill, viewer));
+  const isContributor = Boolean(viewer && skill && isSkillContributor(skill, viewer));
   const categories = currentVersion.manifest.categories ?? [];
   const openIssues = skill.issues.filter((issue) => issue.status !== "closed");
   const reviewFindings = currentVersion.review?.findings ?? [];
@@ -469,6 +482,10 @@ export default function SkillDetailPage() {
     }
     if (!skill) {
       setContributorError("Skill 数据尚未加载完成。");
+      return;
+    }
+    if (!viewer || !isSkillOwner(skill, viewer)) {
+      setContributorError("仅 Skill Owner 可添加 contributor。");
       return;
     }
 
@@ -1015,6 +1032,10 @@ export default function SkillDetailPage() {
                         {addingContributor ? "添加中..." : "添加 contributor"}
                       </button>
                     </form>
+                  ) : isContributor && viewer ? (
+                    <p className="description" style={{ marginBottom: 12 }}>
+                      仅 Skill Owner 可添加 contributor。
+                    </p>
                   ) : null}
                   {skill.contributors.length === 0 ? (
                     <div className="empty detail-empty">暂无贡献者信息。</div>
