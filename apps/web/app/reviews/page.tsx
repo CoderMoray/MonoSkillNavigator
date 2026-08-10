@@ -52,12 +52,7 @@ export default function ReviewsPage() {
     summaries.length > 0 && summaries.every((item) => selectedSlugs.has(item.slug));
   const someSummariesSelected = summaries.some((item) => selectedSlugs.has(item.slug));
 
-  const exportRowCount = useMemo(() => {
-    if (!hasExplicitSelection) {
-      return auditRows.length;
-    }
-    return selectedSlugs.size;
-  }, [auditRows.length, hasExplicitSelection, selectedSlugs.size]);
+  const exportRowCount = selectedSlugs.size;
 
   useEffect(() => {
     const input = selectAllRef.current;
@@ -89,7 +84,7 @@ export default function ReviewsPage() {
 
   async function resolveExportRows(): Promise<AuditRow[]> {
     if (!hasExplicitSelection) {
-      return auditRows;
+      return [];
     }
 
     const selected = [...selectedSlugs];
@@ -244,7 +239,7 @@ export default function ReviewsPage() {
               <div>
                 <h2>审查列表</h2>
                 <p>
-                  与下方表格列一致，可排序。全选会勾选全部 Skill（含尚未加载的行）；有勾选时导出全部已勾选记录（未加载的会在导出前自动拉取详情）。
+                  与下方表格列一致，可排序。请先勾选要导出的记录；全选会勾选全部 Skill（含尚未加载的行），导出时会自动拉取未加载记录的详情。
                 </p>
               </div>
             </div>
