@@ -724,10 +724,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       if (normalizeContributorRole(existing.role) === "owner") {
         throw new Error("cannot_modify_owner_contributor");
       }
-      await this.db.update(schema.skillContributors)
-        .set({ role })
-        .where(eq(schema.skillContributors.id, existing.id));
-      return mapContributorRow({ ...existing, role });
+      throw new Error("contributor_already_exists");
     }
 
     await this.db.insert(schema.skillContributors).values({

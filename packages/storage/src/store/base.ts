@@ -156,10 +156,7 @@ export abstract class JsonRegistryStore implements RegistryStore {
       if (existing.role === "owner") {
         throw new Error("cannot_modify_owner_contributor");
       }
-      existing.role = role;
-      skill.updatedAt = now;
-      await this.save(data);
-      return existing;
+      throw new Error("contributor_already_exists");
     }
     const created: RegistryContributor = { id: createId("contributor"), ...contributor, role, addedAt: now };
     skill.contributors.push(created);

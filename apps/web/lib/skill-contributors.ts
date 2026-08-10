@@ -34,3 +34,15 @@ export function isSkillContributor(skill: RegistrySkill, user: PublicUser): bool
 
   return skill.contributors.some((contributor) => matchesContributorUser(contributor, user.id, user.username));
 }
+
+export function findSkillContributorByHandle(
+  skill: RegistrySkill,
+  handle: string
+): RegistryContributor | undefined {
+  const normalized = handle.trim().toLowerCase();
+  return skill.contributors.find(
+    (contributor) =>
+      contributor.name.trim().toLowerCase() === normalized ||
+      (contributor.username !== undefined && contributor.username.trim().toLowerCase() === normalized)
+  );
+}

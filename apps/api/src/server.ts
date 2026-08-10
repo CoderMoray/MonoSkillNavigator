@@ -455,6 +455,9 @@ export function buildServer() {
       if (message === "cannot_modify_owner_contributor") {
         return reply.code(400).send({ error: message });
       }
+      if (message === "contributor_already_exists") {
+        return reply.code(409).send({ error: message });
+      }
       throw error;
     }
   });

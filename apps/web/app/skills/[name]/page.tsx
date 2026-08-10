@@ -37,7 +37,7 @@ import { HaluCatchRadar } from "../../../components/HaluCatchRadar";
 import { FindingConfidenceBadge } from "../../../components/FindingConfidenceBadge";
 import { SkillCategoryLabel } from "../../../components/SkillCategoryIcon";
 import { EvaluationBadge, SeverityBadge, VerdictBadge } from "../../../components/StatusBadge";
-import { isSkillContributor, isSkillOwner } from "../../../lib/skill-contributors";
+import { findSkillContributorByHandle, isSkillContributor, isSkillOwner } from "../../../lib/skill-contributors";
 import {
   addSkillContributor,
   addSkillRating,
@@ -126,6 +126,9 @@ function formatContributorError(message: string): string {
   }
   if (message === "cannot_modify_owner_contributor") {
     return "不能修改 Skill 所有者的 contributor 记录。";
+  }
+  if (message === "contributor_already_exists") {
+    return "已经添加该用户。";
   }
   if (message === "only_owner_can_add_contributors") {
     return "仅 Skill Owner 可添加 contributor。";
@@ -498,6 +501,16 @@ export default function SkillDetailPage() {
     const name = contributorName.trim();
     if (!name) {
       setErrorToast("请输入 contributor 用户名。");
+      return;
+    }
+
+    const existingContributor = findSkillContributorByHandle(skill, name);
+    if (existingContributor) {
+      if (existingContributor.role === "owner") {
+        setErrorToast(formatContributorError("cannot_modify_owner_contributor"));
+      } else {
+        setErrorToast(formatContributorError("contributor_already_exists"));
+      }
       return;
     }
 
