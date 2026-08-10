@@ -48,23 +48,23 @@ export default function ReviewsPage() {
 
   const hasExplicitSelection = selectedSlugs.size > 0;
 
-  const exportRows = useMemo(() => {
-    if (!hasExplicitSelection) {
-      return auditRows;
-    }
-    return auditRows.filter((row) => selectedSlugs.has(row.slug));
-  }, [auditRows, hasExplicitSelection, selectedSlugs]);
+  const allSummariesSelected =
+    summaries.length > 0 && summaries.every((item) => selectedSlugs.has(item.slug));
+  const someSummariesSelected = summaries.some((item) => selectedSlugs.has(item.slug));
 
-  const allVisibleSelected =
-    auditRows.length > 0 && auditRows.every((row) => selectedSlugs.has(row.slug));
-  const someVisibleSelected = auditRows.some((row) => selectedSlugs.has(row.slug));
+  const exportRowCount = useMemo(() => {
+    if (!hasExplicitSelection) {
+      return auditRows.length;
+    }
+    return selectedSlugs.size;
+  }, [auditRows.length, hasExplicitSelection, selectedSlugs.size]);
 
   useEffect(() => {
     const input = selectAllRef.current;
     if (input) {
-      input.indeterminate = someVisibleSelected && !allVisibleSelected;
+      input.indeterminate = someSummariesSelected && !allSummariesSelected;
     }
-  }, [allVisibleSelected, someVisibleSelected]);
+  }, [allSummariesSelected, someSummariesSelected]);
 
   function toggleSlug(slug: string, checked: boolean) {
     setSelectedSlugs((current) => {
@@ -78,19 +78,36 @@ export default function ReviewsPage() {
     });
   }
 
-  function setAllVisibleSelected(checked: boolean) {
-    const visibleSlugs = auditRows.map((row) => row.slug);
-    setSelectedSlugs((current) => {
-      const next = new Set(current);
-      for (const slug of visibleSlugs) {
-        if (checked) {
-          next.add(slug);
-        } else {
-          next.delete(slug);
-        }
+  function setAllSummariesSelected(checked: boolean) {
+    setSelectedSlugs(() => {
+      if (!checked) {
+        return new Set();
       }
-      return next;
+      return new Set(summaries.map((item) => item.slug));
     });
+  }
+
+  async function resolveExportRows(): Promise<AuditRow[]> {
+    if (!hasExplicitSelection) {
+      return auditRows;
+    }
+
+    const selected = [...selectedSlugs];
+    const loadedBySlug = new Map(skills.map((skill) => [skill.slug, skill]));
+    const missingSlugs = selected.filter((slug) => !loadedBySlug.has(slug));
+
+    if (missingSlugs.length > 0) {
+      const fetched = await fetchSkillDetailsBatched(missingSlugs);
+      for (const skill of fetched) {
+        loadedBySlug.set(skill.slug, skill);
+      }
+    }
+
+    const selectedSkills = selected
+      .map((slug) => loadedBySlug.get(slug))
+      .filter((skill): skill is RegistrySkill => skill !== undefined);
+
+    return sortAuditRows(buildAuditRows(selectedSkills), sortField, sortDirection);
   }
 
   useEffect(() => {
@@ -166,24 +183,30 @@ export default function ReviewsPage() {
   }
 
   async function handleExportCsv() {
-    if (exportRows.length === 0) {
+    if (exportRowCount === 0) {
       return;
     }
     setExporting("csv");
+    setError(null);
     try {
-      downloadAuditCsv(exportRows);
+      const rows = await resolveExportRows();
+      downloadAuditCsv(rows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "导出 CSV 失败");
     } finally {
       setExporting(null);
     }
   }
 
   async function handleExportXlsx() {
-    if (exportRows.length === 0) {
+    if (exportRowCount === 0) {
       return;
     }
     setExporting("xlsx");
+    setError(null);
     try {
-      await downloadAuditXlsx(exportRows);
+      const rows = await resolveExportRows();
+      await downloadAuditXlsx(rows);
     } catch (err) {
       setError(err instanceof Error ? err.message : "导出 Excel 失败");
     } finally {
@@ -207,7 +230,7 @@ export default function ReviewsPage() {
             <div className="stat-grid">
               <Stat label="已加载" value={auditRows.length} />
               <Stat label="已勾选" value={selectedSlugs.size} />
-              <Stat label="将导出" value={exportRows.length} />
+              <Stat label="将导出" value={exportRowCount} />
               <Stat label="Skill 总数" value={summaries.length} />
             </div>
           </div>
@@ -221,7 +244,7 @@ export default function ReviewsPage() {
               <div>
                 <h2>审查列表</h2>
                 <p>
-                  与下方表格列一致，可排序。未勾选任何行时导出当前已加载的全部记录；有勾选时仅导出已勾选行。
+                  与下方表格列一致，可排序。全选会勾选全部 Skill（含尚未加载的行）；有勾选时导出全部已勾选记录（未加载的会在导出前自动拉取详情）。
                 </p>
               </div>
             </div>
@@ -246,7 +269,7 @@ export default function ReviewsPage() {
               <div className="audit-export-actions">
                 <button
                   className="button secondary compact"
-                  disabled={loading || exportRows.length === 0 || exporting !== null}
+                  disabled={loading || exportRowCount === 0 || exporting !== null}
                   onClick={() => void handleExportCsv()}
                   type="button"
                 >
@@ -255,7 +278,7 @@ export default function ReviewsPage() {
                 </button>
                 <button
                   className="button secondary compact"
-                  disabled={loading || exportRows.length === 0 || exporting !== null}
+                  disabled={loading || exportRowCount === 0 || exporting !== null}
                   onClick={() => void handleExportXlsx()}
                   type="button"
                 >
@@ -282,10 +305,10 @@ export default function ReviewsPage() {
                     <tr>
                       <th className="audit-table-select-col" scope="col">
                         <input
-                          aria-label="全选当前列表"
-                          checked={allVisibleSelected}
+                          aria-label="全选全部 Skill"
+                          checked={allSummariesSelected}
                           className="audit-row-checkbox"
-                          onChange={(event) => setAllVisibleSelected(event.target.checked)}
+                          onChange={(event) => setAllSummariesSelected(event.target.checked)}
                           ref={selectAllRef}
                           type="checkbox"
                         />
@@ -418,4 +441,13 @@ async function fetchSkillDetails(slugs: string[]): Promise<RegistrySkill[]> {
     return [];
   }
   return Promise.all(slugs.map((slug) => getSkill(slug)));
+}
+
+async function fetchSkillDetailsBatched(slugs: string[], batchSize = AUDIT_PAGE_SIZE): Promise<RegistrySkill[]> {
+  const results: RegistrySkill[] = [];
+  for (let offset = 0; offset < slugs.length; offset += batchSize) {
+    const batch = slugs.slice(offset, offset + batchSize);
+    results.push(...(await fetchSkillDetails(batch)));
+  }
+  return results;
 }
