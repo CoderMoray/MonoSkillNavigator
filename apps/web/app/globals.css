@@ -2589,19 +2589,22 @@ button {
 }
 
 .version-col-download {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.version-action-leading {
   display: flex;
   justify-content: flex-end;
   align-items: center;
   min-width: 0;
 }
 
-.version-action-buttons {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .version-download-button {
+  grid-column: 2;
   justify-content: center;
   white-space: nowrap;
 }

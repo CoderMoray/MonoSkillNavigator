@@ -1229,21 +1229,35 @@ export default function SkillDetailPage() {
                           onClick={(event) => event.stopPropagation()}
                           onKeyDown={(event) => event.stopPropagation()}
                         >
-                          {isVersionUnpublished ? (
-                            isOwner ? (
+                          <div className="version-action-leading">
+                            {isVersionUnpublished ? (
+                              isOwner ? (
+                                <button
+                                  className="button secondary compact version-restore-button"
+                                  onClick={() => {
+                                    setManageError(null);
+                                    setVersionManageModal({ action: "republish", version: version.version });
+                                  }}
+                                  type="button"
+                                >
+                                  恢复上架
+                                </button>
+                              ) : null
+                            ) : isOwner && !isLatest && viewer ? (
                               <button
-                                className="button secondary compact version-restore-button"
+                                className="button secondary compact danger version-unpublish-button"
                                 onClick={() => {
                                   setManageError(null);
-                                  setVersionManageModal({ action: "republish", version: version.version });
+                                  setVersionManageModal({ action: "unpublish", version: version.version });
                                 }}
                                 type="button"
                               >
-                                恢复上架
+                                下架
                               </button>
-                            ) : null
-                          ) : viewer ? (
-                            <div className="version-action-buttons">
+                            ) : null}
+                          </div>
+                          {!isVersionUnpublished ? (
+                            viewer ? (
                               <button
                                 className="button secondary compact version-download-button"
                                 disabled={downloadingVersion === version.version}
@@ -1253,25 +1267,13 @@ export default function SkillDetailPage() {
                                 <Download size={14} />
                                 {downloadingVersion === version.version ? "Downloading…" : "Download version"}
                               </button>
-                              {isOwner && !isLatest ? (
-                                <button
-                                  className="button secondary compact danger version-unpublish-button"
-                                  onClick={() => {
-                                    setManageError(null);
-                                    setVersionManageModal({ action: "unpublish", version: version.version });
-                                  }}
-                                  type="button"
-                                >
-                                  下架
-                                </button>
-                              ) : null}
-                            </div>
-                          ) : (
-                            <Link className="button secondary compact version-download-button" href="/login">
-                              <Download size={14} />
-                              Download version
-                            </Link>
-                          )}
+                            ) : (
+                              <Link className="button secondary compact version-download-button" href="/login">
+                                <Download size={14} />
+                                Download version
+                              </Link>
+                            )
+                          ) : null}
                         </div>
                         <span aria-hidden="true" className="version-expand-icon">
                           {isExpanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
