@@ -288,19 +288,14 @@ program
   .description("Add or update a skill contributor")
   .argument("<slug>", "Skill slug")
   .requiredOption("--person <person>", "Contributor display name")
-  .option("--role <role>", "owner or contributor", "contributor")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
   .option("--token <token>", "Bearer token, defaults to SKILL_AUTH_TOKEN")
-  .action(async (slug: string, options: { person: string; role: string; registry: string; token?: string }) => {
-    const role = options.role.trim().toLowerCase();
-    if (role !== "owner" && role !== "contributor") {
-      throw new Error("Role must be owner or contributor");
-    }
+  .action(async (slug: string, options: { person: string; registry: string; token?: string }) => {
     const response = await postJson<Record<string, unknown>>(
       `${options.registry}/skills/${encodeURIComponent(slug)}/contributors`,
       {
         name: options.person,
-        role
+        role: "contributor"
       },
       requireAuthToken(options.token)
     );

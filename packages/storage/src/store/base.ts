@@ -21,7 +21,7 @@ import type {
   SkillSlugAvailability,
 } from "../types";
 import { skillRecyclePurgeAt } from "../recycle-bin";
-import { assertContributorRole } from "../contributors";
+import { assertAssignableContributorRole } from "../contributors";
 import {
   createId,
   createOwnerContributor,
@@ -149,10 +149,13 @@ export abstract class JsonRegistryStore implements RegistryStore {
     const data = await this.load();
     const skill = data.skills[slug];
     if (!skill) throw new Error(`Skill not found: ${slug}`);
-    const role = assertContributorRole(contributor.role);
+    const role = assertAssignableContributorRole(contributor.role);
     const existing = skill.contributors.find((item) => item.name.toLowerCase() === contributor.name.toLowerCase());
     const now = new Date().toISOString();
     if (existing) {
+      if (existing.role === "owner") {
+        throw new Error("cannot_modify_owner_contributor");
+      }
       existing.role = role;
       skill.updatedAt = now;
       await this.save(data);

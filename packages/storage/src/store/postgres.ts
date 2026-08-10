@@ -27,7 +27,7 @@ import type {
 import { skillRecyclePurgeAt, skillRecycleRetentionMs } from "../recycle-bin";
 import { parseSkillSpectorReviewRow, skillSpectorReviewColumns } from "../skillspector-review";
 import { parseVirusTotalReviewRow, virusTotalReviewColumns } from "../virustotal-review";
-import { normalizeContributorRole, assertContributorRole } from "../contributors";
+import { normalizeContributorRole, assertAssignableContributorRole } from "../contributors";
 import { JsonRegistryStore } from "./base";
 
 type DB = NodePgDatabase<typeof schema>;
@@ -711,7 +711,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
 
   async addContributor(slug: string, contributor: { userId?: string; username?: string; name: string; role: string }): Promise<RegistryContributor> {
     await this.ensureSchema();
-    const role = assertContributorRole(contributor.role);
+    const role = assertAssignableContributorRole(contributor.role);
     const addedAt = new Date();
     const id = `contributor_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -721,6 +721,9 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       .limit(1);
 
     if (existing) {
+      if (normalizeContributorRole(existing.role) === "owner") {
+        throw new Error("cannot_modify_owner_contributor");
+      }
       await this.db.update(schema.skillContributors)
         .set({ role })
         .where(eq(schema.skillContributors.id, existing.id));

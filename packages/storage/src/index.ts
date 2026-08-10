@@ -1,5 +1,6 @@
 export {
-  assertContributorRole,
+  assertAssignableContributorRole,
+  ASSIGNABLE_CONTRIBUTOR_ROLES,
   CONTRIBUTOR_ROLES,
   isContributorRole,
   normalizeContributorRole,

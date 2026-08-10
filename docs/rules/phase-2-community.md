@@ -26,10 +26,10 @@ HaluCatch 的五维静态检查（地基、代码风险、规则、护栏、复�
 
 Contributor 用于标注多人协作关系：
 
-- `owner`：Skill 所有者，默认来自发布用户。
-- `contributor`：一般贡献者，可参与协作维护。
+- `owner`：Skill 所有者，**仅在发布时自动设置**，不可通过邀请或手动添加。
+- `contributor`：协作贡献者，Owner 可通过 API / Web 添加。
 
-已移除 `maintainer` 与 `reviewer` 角色；历史数据会迁移为 `contributor`。
+已移除 `maintainer`、`reviewer` 以及手动指定 `owner` 的能力；历史非 owner 角色会迁移为 `contributor`。
 
 同一名字重复添加时更新角色，不创建重复记录。
 

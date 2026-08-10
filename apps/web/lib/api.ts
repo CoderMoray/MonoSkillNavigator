@@ -227,15 +227,14 @@ export async function publishSkillArchive(
 export async function addSkillContributor(
   token: string,
   skillSlug: string,
-  name: string,
-  role: RegistryContributor["role"]
+  name: string
 ): Promise<RegistryContributor> {
   const data = await request<{ contributor: RegistryContributor }>(
     new URL(`/skills/${encodeURIComponent(skillSlug)}/contributors`, API_BASE_URL),
     {
       method: "POST",
       token,
-      body: JSON.stringify({ name, role })
+      body: JSON.stringify({ name, role: "contributor" })
     }
   );
   return data.contributor;

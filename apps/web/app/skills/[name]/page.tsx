@@ -103,6 +103,12 @@ function formatContributorError(message: string): string {
   if (message === "contributor_username_required") {
     return "请输入 contributor 用户名。";
   }
+  if (message === "invalid_contributor_role") {
+    return "仅可添加 contributor 角色，不能指定 owner。";
+  }
+  if (message === "cannot_modify_owner_contributor") {
+    return "不能修改 Skill 所有者的 contributor 记录。";
+  }
   return message;
 }
 
@@ -143,7 +149,6 @@ export default function SkillDetailPage() {
   const [expandedVersionNames, setExpandedVersionNames] = useState<Set<string>>(() => new Set());
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [contributorName, setContributorName] = useState("");
-  const [contributorRole, setContributorRole] = useState<RegistryContributor["role"]>("contributor");
   const [contributorError, setContributorError] = useState<string | null>(null);
   const [addingContributor, setAddingContributor] = useState(false);
   const [issueType, setIssueType] = useState<RegistryIssue["type"]>("bug");
@@ -475,7 +480,7 @@ export default function SkillDetailPage() {
 
     setAddingContributor(true);
     try {
-      const contributor = await addSkillContributor(token, skill.slug, name, contributorRole);
+      const contributor = await addSkillContributor(token, skill.slug, name);
       setSkill((current) => {
         if (!current) {
           return current;
@@ -491,8 +496,7 @@ export default function SkillDetailPage() {
         };
       });
       setContributorName("");
-      setContributorRole("contributor");
-      setSuccessToast(`已添加 ${contributor.name} 为 ${contributor.role}`);
+      setSuccessToast(`已添加 ${contributor.name} 为 contributor`);
     } catch (err) {
       setContributorError(formatContributorError(err instanceof Error ? err.message : "添加 contributor 失败"));
     } finally {
@@ -1003,18 +1007,7 @@ export default function SkillDetailPage() {
                           placeholder="输入已注册用户名，例如 bob"
                           value={contributorName}
                         />
-                        <small>仅可添加已在平台注册的用户，用户名区分大小写不敏感。</small>
-                      </label>
-                      <label className="field">
-                        <span>角色</span>
-                        <select
-                          className="select contributor-select"
-                          onChange={(event) => setContributorRole(event.target.value as RegistryContributor["role"])}
-                          value={contributorRole}
-                        >
-                          <option value="contributor">contributor</option>
-                          <option value="owner">owner</option>
-                        </select>
+                        <small>仅可添加已在平台注册的用户，用户名区分大小写不敏感。新成员角色固定为 contributor。</small>
                       </label>
                       {contributorError ? <div className="error compact-error">{contributorError}</div> : null}
                       <button className="button primary" disabled={addingContributor} type="submit">
