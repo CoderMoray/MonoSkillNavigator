@@ -840,42 +840,9 @@ export default function SkillDetailPage() {
                   <Bookmark size={16} /> 登录后收藏
                 </Link>
               )}
-              {isOwner ? (
-                <>
-                  {viewer ? (
-                    <button
-                      className="button secondary"
-                      disabled={downloadingVersion === currentVersion.version}
-                      onClick={() => void handleDownload(currentVersion.version)}
-                      type="button"
-                    >
-                      <Download size={16} />
-                      {downloadingVersion === currentVersion.version ? "下载中…" : "下载 Skill"}
-                    </button>
-                  ) : (
-                    <Link className="button secondary" href="/login">
-                      登录后下载
-                    </Link>
-                  )}
-                  <Link className="button primary" href={`/skills/publish?skill=${encodeURIComponent(skill.slug)}`}>
-                    <Plus size={16} /> 发布新版本
-                  </Link>
-                  {!isUnpublished ? (
-                    <button className="button secondary" onClick={() => setUnpublishModalOpen(true)} type="button">
-                      <EyeOff size={16} /> 下架
-                    </button>
-                  ) : (
-                    <button className="button secondary" onClick={() => setRepublishModalOpen(true)} type="button">
-                      <Upload size={16} /> 上架
-                    </button>
-                  )}
-                  <button className="button secondary danger" onClick={() => setDeleteModalOpen(true)} type="button">
-                    <Trash2 size={16} /> 删除
-                  </button>
-                </>
-              ) : viewer ? (
+              {viewer ? (
                 <button
-                  className="button primary"
+                  className={isOwner ? "button secondary" : "button primary"}
                   disabled={downloadingVersion === currentVersion.version}
                   onClick={() => void handleDownload(currentVersion.version)}
                   type="button"
@@ -884,8 +851,8 @@ export default function SkillDetailPage() {
                   {downloadingVersion === currentVersion.version ? "下载中…" : "下载 Skill"}
                 </button>
               ) : (
-                <Link className="button primary" href="/login">
-                  登录后下载
+                <Link className={isOwner ? "button secondary" : "button primary"} href="/login">
+                  <Download size={16} /> 登录后下载
                 </Link>
               )}
             </div>
@@ -918,22 +885,25 @@ export default function SkillDetailPage() {
                 <p className="stat-label">Ratings</p>
               </div>
             </div>
-            {viewer ? (
-              <button
-                className="button secondary"
-                disabled={downloadingVersion === currentVersion.version}
-                onClick={() => void handleDownload(currentVersion.version)}
-                style={{ width: "100%", marginTop: 18 }}
-                type="button"
-              >
-                <Download size={16} />
-                {downloadingVersion === currentVersion.version ? "下载中…" : `下载 v${currentVersion.version}`}
-              </button>
-            ) : (
-              <Link className="button secondary" href="/login" style={{ width: "100%", marginTop: 18 }}>
-                登录后下载
-              </Link>
-            )}
+            {isOwner ? (
+              <div className="detail-summary-actions">
+                <Link className="button primary" href={`/skills/publish?skill=${encodeURIComponent(skill.slug)}`}>
+                  <Plus size={16} /> 发布新版本
+                </Link>
+                {!isUnpublished ? (
+                  <button className="button secondary" onClick={() => setUnpublishModalOpen(true)} type="button">
+                    <EyeOff size={16} /> 下架
+                  </button>
+                ) : (
+                  <button className="button secondary" onClick={() => setRepublishModalOpen(true)} type="button">
+                    <Upload size={16} /> 上架
+                  </button>
+                )}
+                <button className="button secondary danger" onClick={() => setDeleteModalOpen(true)} type="button">
+                  <Trash2 size={16} /> 删除
+                </button>
+              </div>
+            ) : null}
           </aside>
         </section>
 

@@ -2076,6 +2076,17 @@ button {
   text-transform: uppercase;
 }
 
+.detail-summary-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.detail-summary-actions .button {
+  width: 100%;
+  justify-content: center;
+}
+
 .skill-detail-navigation {
   display: grid;
   gap: 14px;
