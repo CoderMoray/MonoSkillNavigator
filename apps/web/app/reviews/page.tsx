@@ -285,6 +285,9 @@ export default function ReviewsPage() {
                   <FileSpreadsheet size={15} />
                   {exporting === "xlsx" ? "导出中…" : "导出 Excel"}
                 </button>
+                {hasExplicitSelection ? (
+                  <span className="audit-selection-count">已选 {selectedSlugs.size} 条</span>
+                ) : null}
               </div>
             </div>
           </div>

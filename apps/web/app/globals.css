@@ -1064,7 +1064,14 @@ button {
 .audit-export-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
+}
+
+.audit-selection-count {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .audit-load-more {
