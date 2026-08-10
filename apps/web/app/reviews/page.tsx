@@ -217,6 +217,7 @@ export default function ReviewsPage() {
       {exportConfirm ? (
         <ConfirmToast
           confirming={exporting !== null}
+          confirmingLabel="导出中…"
           message={`当前已选中 ${exportRowCount} 条记录，确定导出为 ${exportConfirm === "csv" ? "CSV" : "Excel"} 吗？`}
           onCancel={() => {
             if (exporting === null) {

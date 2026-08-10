@@ -8,6 +8,8 @@ interface ConfirmToastProps {
   confirmLabel?: string;
   cancelLabel?: string;
   confirming?: boolean;
+  confirmingLabel?: string;
+  confirmClassName?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -18,6 +20,8 @@ export function ConfirmToast({
   confirmLabel = "确认",
   cancelLabel = "取消",
   confirming = false,
+  confirmingLabel = "处理中…",
+  confirmClassName = "button compact",
   onConfirm,
   onCancel
 }: ConfirmToastProps) {
@@ -48,8 +52,8 @@ export function ConfirmToast({
           <button className="button secondary compact" disabled={confirming} onClick={onCancel} type="button">
             {cancelLabel}
           </button>
-          <button className="button compact" disabled={confirming} onClick={onConfirm} type="button">
-            {confirming ? "导出中…" : confirmLabel}
+          <button className={confirmClassName} disabled={confirming} onClick={onConfirm} type="button">
+            {confirming ? confirmingLabel : confirmLabel}
           </button>
         </div>
       </div>

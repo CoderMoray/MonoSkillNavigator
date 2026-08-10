@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BadgeCheck, KeyRound, LogOut, RotateCcw, Trash2 } from "lucide-react";
 import { SkillCard } from "./SkillCard";
+import { ConfirmToast } from "./ConfirmToast";
 import { ErrorToast } from "./ErrorToast";
 import { SuccessToast } from "./SuccessToast";
 import { clearAuthToken, getAuthToken } from "../lib/auth-token";
@@ -37,6 +38,7 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [restoringSlug, setRestoringSlug] = useState<string | null>(null);
   const [purgingSlug, setPurgingSlug] = useState<string | null>(null);
+  const [purgeConfirm, setPurgeConfirm] = useState<{ slug: string; name: string } | null>(null);
   const [bookmarkItems, setBookmarkItems] = useState<SkillSearchResult[]>([]);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [bookmarkError, setBookmarkError] = useState<string | null>(null);
@@ -160,17 +162,23 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
     }
   }
 
-  async function handlePurge(slug: string, name: string) {
-    const token = getAuthToken();
-    if (!token) {
-      setErrorToast("请先登录后再删除 Skill。");
+  function requestPurge(slug: string, name: string) {
+    if (purgingSlug !== null) {
+      return;
+    }
+    setPurgeConfirm({ slug, name });
+  }
+
+  async function handleConfirmPurge() {
+    if (!purgeConfirm || purgingSlug !== null) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `确定立即永久删除 Skill「${name}」（${slug}）吗？此操作不可恢复，相关版本与 artifact 将被清除。`
-    );
-    if (!confirmed) {
+    const { slug, name } = purgeConfirm;
+    const token = getAuthToken();
+    if (!token) {
+      setPurgeConfirm(null);
+      setErrorToast("请先登录后再删除 Skill。");
       return;
     }
 
@@ -181,6 +189,7 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
       setRecycleItems((current) => current.filter((item) => item.slug !== slug));
       setSuccessToast(`已永久删除 Skill「${name}」。`);
       router.refresh();
+      setPurgeConfirm(null);
     } catch (err) {
       setErrorToast(err instanceof Error ? err.message : "永久删除失败");
     } finally {
@@ -190,6 +199,22 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
 
   return (
     <>
+      {purgeConfirm ? (
+        <ConfirmToast
+          confirmClassName="button secondary compact danger"
+          confirmLabel="立即删除"
+          confirming={purgingSlug === purgeConfirm.slug}
+          confirmingLabel="删除中…"
+          message={`确定立即永久删除 Skill「${purgeConfirm.name}」（${purgeConfirm.slug}）吗？此操作不可恢复，相关版本与 artifact 将被清除。`}
+          onCancel={() => {
+            if (purgingSlug === null) {
+              setPurgeConfirm(null);
+            }
+          }}
+          onConfirm={() => void handleConfirmPurge()}
+          title="确认永久删除"
+        />
+      ) : null}
       {errorToast ? <ErrorToast message={errorToast} onClose={() => setErrorToast(null)} /> : null}
       {successToast ? <SuccessToast message={successToast} onClose={() => setSuccessToast(null)} /> : null}
       <div className="market-stack">
@@ -344,8 +369,8 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
                           </button>
                           <button
                             className="button secondary compact danger"
-                            disabled={restoringSlug === item.slug || purgingSlug === item.slug}
-                            onClick={() => void handlePurge(item.slug, item.name)}
+                            disabled={restoringSlug === item.slug || purgingSlug === item.slug || purgeConfirm !== null}
+                            onClick={() => requestPurge(item.slug, item.name)}
                             type="button"
                           >
                             <Trash2 size={14} /> {purgingSlug === item.slug ? "删除中…" : "立即删除"}
