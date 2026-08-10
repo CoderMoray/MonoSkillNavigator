@@ -84,4 +84,4 @@ SkillSpector 的「不建议安装」是 **安全建议**，与页面「已拒�
 ## 相关文档
 
 - [Skill 格式](./skill-format.md) — 避免 frontmatter 触发误报  
-- [HaluCatch 审查](./halucatch-review.md) — 质量维度与安全互补
+- [质量审查](./halucatch-review.md) — 质量维度与安全互补

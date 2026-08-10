@@ -1,4 +1,4 @@
-# HaluCatch 审查
+# 质量审查
 
 发布或重审时，平台默认使用 **HaluCatch** 对 Skill 包做 **五维静态质量评估**。与 SkillSpector 互补：HaluCatch 关注 **可维护性、规则完整性、护栏与复杂度**，不替代安全扫描。
 

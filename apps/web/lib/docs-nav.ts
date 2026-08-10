@@ -39,8 +39,8 @@ export const DOC_NAV: DocNavItem[] = [
   },
   {
     slug: "halucatch-review",
-    title: "HaluCatch 审查",
-    sidebarTitle: "HaluCatch 审查",
+    title: "质量审查",
+    sidebarTitle: "质量审查",
     href: "/docs/halucatch-review",
     filename: "halucatch-review.md"
   }

@@ -31,7 +31,7 @@ MonoSkillNavigator（Skill 管理平台）是一个用于 **发布、审查、�
 平台 **不** 向用户展示单一的「综合安全分」或「综合质量分」作为主结论，而是：
 
 - **安全**：以 SkillSpector 的 **包级风险分 / 风险等级 / 安装建议** 与逐条 **finding** 为准（见 [安全检测](./security-scan.md)）。
-- **质量**：以 **HaluCatch 五维雷达** 与 Markdown 报告为准（见 [HaluCatch 审查](./halucatch-review.md)）。
+- **质量**：以 **HaluCatch 五维雷达** 与 Markdown 报告为准（见 [质量审查](./halucatch-review.md)）。
 - **发布状态（verdict）**：由全部审查 finding 的最高严重度决定——存在严重或高危 finding 时可能为「已拒绝」或「需复核」。
 
 ## 技术说明（简要）

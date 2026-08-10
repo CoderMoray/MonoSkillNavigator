@@ -74,4 +74,4 @@ CLI 与 Web 共用同一 API 与审查逻辑；Web 发布额外校验分类等�
 ## 相关文档
 
 - [安全检测](./security-scan.md)
-- [HaluCatch 审查](./halucatch-review.md)
+- [质量审查](./halucatch-review.md)
