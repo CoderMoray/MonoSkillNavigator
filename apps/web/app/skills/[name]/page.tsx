@@ -130,6 +130,12 @@ function formatContributorError(message: string): string {
   if (message === "only_owner_can_add_contributors") {
     return "仅 Skill Owner 可添加 contributor。";
   }
+  if (message === "Unauthorized") {
+    return "请先登录后再添加 contributor。";
+  }
+  if (message === "skill_not_found") {
+    return "Skill 不存在或已被删除。";
+  }
   return message;
 }
 
@@ -170,7 +176,6 @@ export default function SkillDetailPage() {
   const [expandedVersionNames, setExpandedVersionNames] = useState<Set<string>>(() => new Set());
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [contributorName, setContributorName] = useState("");
-  const [contributorError, setContributorError] = useState<string | null>(null);
   const [addingContributor, setAddingContributor] = useState(false);
   const [issueType, setIssueType] = useState<RegistryIssue["type"]>("bug");
   const [issueSeverity, setIssueSeverity] = useState<RegistryIssue["severity"]>("medium");
@@ -475,25 +480,24 @@ export default function SkillDetailPage() {
 
   async function handleAddContributor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setContributorError(null);
 
     const token = getAuthToken();
     if (!token) {
-      setContributorError("请先登录后再添加 contributor。");
+      setErrorToast("请先登录后再添加 contributor。");
       return;
     }
     if (!skill) {
-      setContributorError("Skill 数据尚未加载完成。");
+      setErrorToast("Skill 数据尚未加载完成。");
       return;
     }
     if (!viewer || !isSkillOwner(skill, viewer)) {
-      setContributorError("仅 Skill Owner 可添加 contributor。");
+      setErrorToast("仅 Skill Owner 可添加 contributor。");
       return;
     }
 
     const name = contributorName.trim();
     if (!name) {
-      setContributorError("请输入 contributor 用户名。");
+      setErrorToast("请输入 contributor 用户名。");
       return;
     }
 
@@ -518,13 +522,7 @@ export default function SkillDetailPage() {
       setSuccessToast(`已添加 ${contributor.name} 为 contributor`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "添加 contributor 失败";
-      const formatted = formatContributorError(message);
-      if (message === "user_not_found") {
-        setContributorError(null);
-        setErrorToast(formatted);
-      } else {
-        setContributorError(formatted);
-      }
+      setErrorToast(formatContributorError(message));
     } finally {
       setAddingContributor(false);
     }
@@ -1036,7 +1034,6 @@ export default function SkillDetailPage() {
                         />
                         <small>仅可添加已在平台注册的用户，用户名区分大小写不敏感。新成员角色固定为 contributor。</small>
                       </label>
-                      {contributorError ? <div className="error compact-error">{contributorError}</div> : null}
                       <button className="button primary" disabled={addingContributor} type="submit">
                         <Plus size={15} />
                         {addingContributor ? "添加中..." : "添加 contributor"}
