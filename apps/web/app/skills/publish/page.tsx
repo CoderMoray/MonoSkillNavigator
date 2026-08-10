@@ -423,7 +423,7 @@ function PublishSkillPageContent() {
       if (filledFields.length > 0) {
         setSuccessToast(`已从 Skill 入口文件自动填入：${filledFields.join("、")}。`);
       } else {
-        setArchiveHint("已上传 Skill 包，但未读取到可用的 frontmatter 字段。");
+        setSuccessToast("已上传 Skill 包，但未读取到可用的 frontmatter 字段。");
       }
     } catch (err) {
       setArchiveHint(
