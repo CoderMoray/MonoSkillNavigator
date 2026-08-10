@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { evaluateSkillSnapshot } from "@skill-platform/evaluator";
 import { reviewAndEvaluateSkillSnapshot } from "@skill-platform/review-engine";
 import {
+  applySkillAuthor,
   applySkillPublishMetadata,
   findSkillEntryFile,
   getSkillSlug,
@@ -319,9 +320,10 @@ export function buildServer() {
     try {
       const changelog = normalizeChangelog(request.body.changelog);
       const uploaded = readSkillFromBody(request.body, { looseEntry: Boolean(request.body.metadata) });
-      const snapshot = request.body.metadata
+      let snapshot = request.body.metadata
         ? applySkillPublishMetadata(uploaded.snapshot, request.body.metadata)
         : uploaded.snapshot;
+      snapshot = applySkillAuthor(snapshot, user.username);
       const version = request.body.metadata?.version ?? uploaded.version;
       const slug = getSkillSlug(snapshot.manifest);
       const existingSkill = await store.getSkill(slug);

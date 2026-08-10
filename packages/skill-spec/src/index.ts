@@ -202,6 +202,48 @@ export function applySkillPublishMetadata(
   };
 }
 
+export function applySkillAuthor(snapshot: SkillSnapshot, author: string): SkillSnapshot {
+  const trimmedAuthor = author.trim();
+  if (!trimmedAuthor) {
+    throw new Error("author is required");
+  }
+
+  const skillEntry = findSkillEntryFile(snapshot.files);
+  if (!skillEntry) {
+    throw new Error(`Skill package must include one of: ${SKILL_ENTRY_BASENAMES.join(", ")}`);
+  }
+
+  const { rawFrontmatter, body } = splitSkillEntryMarkdown(skillEntry.content);
+  const frontmatter = {
+    ...rawFrontmatter,
+    author: trimmedAuthor
+  };
+  const manifest = skillManifestSchema.parse(frontmatter);
+  const content = `---\n${yaml.dump(frontmatter, { lineWidth: -1, noRefs: true })}---\n${body}`;
+  const files = snapshot.files.map((file) =>
+    file.path === skillEntry.path
+      ? {
+          ...file,
+          content,
+          size: Buffer.byteLength(content, "utf8"),
+          sha256: sha256(content)
+        }
+      : file
+  );
+
+  return {
+    manifest: {
+      ...manifest,
+      slug: getSkillSlug(manifest)
+    },
+    readme: body,
+    files,
+    contentHash: hashSnapshotFiles(files),
+    createdAt: snapshot.createdAt,
+    entryPath: skillEntry.path
+  };
+}
+
 export async function readSkillDirectory(rootDir: string): Promise<SkillSnapshot> {
   const absoluteRoot = path.resolve(rootDir);
   const skillEntry = await resolveSkillEntryOnDisk(absoluteRoot);

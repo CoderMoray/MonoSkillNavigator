@@ -8,6 +8,7 @@ import {
   validatePublishMetadataInput
 } from "../packages/skill-spec/src/skill-format.js";
 import {
+  applySkillAuthor,
   applySkillPublishMetadata,
   parseSkillMarkdown,
   readSkillZipBuffer,
@@ -257,5 +258,42 @@ No YAML frontmatter.`)
     expect(snapshot.manifest.name).toBe("Test Skill");
     expect(snapshot.manifest.description).toBe(publishMetadata.summary);
     expect(snapshot.files[0]?.content.startsWith("---\n")).toBe(true);
+  });
+
+  it("writes publisher username into SKILL.md author frontmatter", () => {
+    const snapshot = applySkillAuthor(
+      {
+        manifest: {
+          slug: "demo-skill",
+          name: "Demo Skill",
+          description: "Demo",
+          author: "skill-platform"
+        },
+        readme: "# Demo",
+        files: [
+          {
+            path: "SKILL.md",
+            content: `---
+slug: demo-skill
+name: Demo Skill
+description: Demo
+author: skill-platform
+---
+# Demo
+`,
+            size: 100,
+            sha256: "abc"
+          }
+        ],
+        contentHash: "hash",
+        createdAt: new Date().toISOString(),
+        entryPath: "SKILL.md"
+      },
+      "alice"
+    );
+
+    expect(snapshot.manifest.author).toBe("alice");
+    expect(snapshot.files[0]?.content).toContain("author: alice");
+    expect(snapshot.files[0]?.content).not.toContain("author: skill-platform");
   });
 });
