@@ -46,7 +46,7 @@ export function publishNoticeTitle(notice: PublishNotice): string {
     return notice.isNewVersion ? "新版本发布成功" : "Skill 发布成功";
   }
   if (notice.verdict === "needs-review") {
-    return notice.isNewVersion ? "新版本已提交，等待审查" : "Skill 已提交，等待审查";
+    return notice.isNewVersion ? "新版本发布成功（需复核）" : "Skill 发布成功（需复核）";
   }
   return notice.isNewVersion ? "新版本发布被拒绝" : "Skill 发布被拒绝";
 }
@@ -58,7 +58,7 @@ export function publishNoticeDescription(notice: PublishNotice): string {
     return `${label} 已通过审查并发布到平台。`;
   }
   if (notice.verdict === "needs-review") {
-    return `${label} 已上传并完成初步审查，需要人工复核后方可公开。`;
+    return `${label} 已发布到平台。审查存在需关注的 finding，建议在详情页「审查与评估」查看后再推广。`;
   }
   return `${label} 未通过审查，请查看详情页了解原因并修改后重新发布。`;
 }
