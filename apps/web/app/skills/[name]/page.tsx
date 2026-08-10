@@ -31,6 +31,7 @@ import {
   X
 } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
+import { ErrorToast } from "../../../components/ErrorToast";
 import { SuccessToast } from "../../../components/SuccessToast";
 import { HaluCatchRadar } from "../../../components/HaluCatchRadar";
 import { FindingConfidenceBadge } from "../../../components/FindingConfidenceBadge";
@@ -182,6 +183,7 @@ export default function SkillDetailPage() {
   const [ratingError, setRatingError] = useState<string | null>(null);
   const [submittingRating, setSubmittingRating] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
   const [issueModalOpen, setIssueModalOpen] = useState(false);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [downloadingVersion, setDownloadingVersion] = useState<string | null>(null);
@@ -515,7 +517,14 @@ export default function SkillDetailPage() {
       setContributorName("");
       setSuccessToast(`已添加 ${contributor.name} 为 contributor`);
     } catch (err) {
-      setContributorError(formatContributorError(err instanceof Error ? err.message : "添加 contributor 失败"));
+      const message = err instanceof Error ? err.message : "添加 contributor 失败";
+      const formatted = formatContributorError(message);
+      if (message === "user_not_found") {
+        setContributorError(null);
+        setErrorToast(formatted);
+      } else {
+        setContributorError(formatted);
+      }
     } finally {
       setAddingContributor(false);
     }
@@ -762,6 +771,7 @@ export default function SkillDetailPage() {
 
   return (
     <AppShell title={skill.name}>
+      {errorToast ? <ErrorToast message={errorToast} onClose={() => setErrorToast(null)} /> : null}
       {successToast ? <SuccessToast message={successToast} onClose={() => setSuccessToast(null)} /> : null}
       <div className="page-stack">
         <Link className="button secondary" href="/skills" style={{ width: "fit-content" }}>
