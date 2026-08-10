@@ -15,24 +15,25 @@ MonoSkillNavigator（Skill 管理平台）是一个用于 **发布、审查、�
 | **slug** | Skill 的唯一标识，用于 URL、API 与存储；发布后不应随意更改。 |
 | **name** | 展示名称，可随版本更新。 |
 | **version** | 语义化版本（SemVer），同一 slug 下每个版本不可变。 |
-| **审查（review）** | 发布时对包格式、静态安全（SkillSpector）与合规 finding 的记录。 |
+| **审查（review）** | 发布时对包格式、SkillSpector、VirusTotal（可选）与合规 finding 的记录。 |
 | **评估（evaluation）** | 默认由 HaluCatch 对包做五维静态质量检查；环境未配置时可回退到 `tests/*.json` 任务集。 |
 
 ## 你在 Web 上能做什么
 
 1. **浏览与搜索**：首页、Skill 列表、榜单（下载量、评分、最新等）。
-2. **查看详情**：Skill 说明、文件树、版本切换、审查与评估、评分与 Issue。
+2. **查看详情**：Skill 说明、文件树、版本切换、审查与评估、评分与 Issue；可 **下载** 或 **复制 prompt** 供 AI 安装。
 3. **发布**：登录后上传 ZIP 或文件夹，填写分类与版本信息（见 [发布流程](./publish-workflow.md)）。
 4. **审查中心**：聚合各 Skill 最新版本的 finding 与 HaluCatch 雷达对比。
-5. **下载**：按 slug + 版本下载 ZIP，供本地 Agent 或 CI 使用。
+5. **下载与安装**：按 slug + 版本下载 ZIP；或使用 **复制 prompt** 将安装说明粘贴给 AI 助手代为安装。
+6. **协作**：Skill **所有者** 可在详情页添加 **contributor**（仅 contributor 角色，可协助发版；添加 contributor 仅 owner 可操作）。
 
 ## 审查与评分如何理解
 
 平台 **不** 向用户展示单一的「综合安全分」或「综合质量分」作为主结论，而是：
 
-- **安全**：以 SkillSpector 的 **包级风险分 / 风险等级 / 安装建议** 与逐条 **finding** 为准（见 [安全检测](./security-scan.md)）。
+- **安全**：以 SkillSpector 的 **包级风险分 / 风险等级 / 安装建议**、VirusTotal 检出与逐条 **finding** 为准（见 [安全检测](./security-scan.md)）。
 - **质量**：以 **HaluCatch 五维雷达** 与 Markdown 报告为准（见 [质量审查](./halucatch-review.md)）。
-- **发布状态（verdict）**：由全部审查 finding 的最高严重度决定——存在严重或高危 finding 时可能为「已拒绝」或「需复核」。
+- **发布状态（verdict）**：**已发布** 表示无 finding；**需复核** 表示有 finding 但未触发 SkillSpector/VirusTotal 自动拒绝；**已拒绝** 表示命中 high 级或 SkillSpector 高置信度 medium 规则（详见 [发布流程](./publish-workflow.md)）。
 
 ## 技术说明（简要）
 

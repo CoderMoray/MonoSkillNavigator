@@ -1,6 +1,11 @@
-# 安全检测（SkillSpector）
+# 安全检测（SkillSpector 与 VirusTotal）
 
-MonoSkillNavigator 使用内置的 **SkillSpector** 对每次发布（或重审）的 Skill 快照做 **静态安全扫描**。平台 **不执行** Skill 内的脚本；扫描在隔离副本上完成，默认 **关闭 LLM**，仅使用规则与静态分析。
+MonoSkillNavigator 对每次发布（或重审）的 Skill 快照做 **静态安全扫描**，主要包括：
+
+1. **SkillSpector**（默认启用）：规则与静态分析，不执行包内脚本。
+2. **VirusTotal**（可选）：对发布 ZIP 的 SHA-256 做 hash lookup；未命中时可按配置上传样本并轮询结果。
+
+扫描在隔离副本上完成；SkillSpector 默认 **关闭 LLM**，仅使用规则与静态分析。
 
 ## 在详情页哪里看
 
@@ -16,7 +21,10 @@ MonoSkillNavigator 使用内置的 **SkillSpector** 对每次发布（或重审�
 2. **Finding 列表**  
    每条包含：类别标题（中文）、**严重度徽章**（低/中/高/严重）、**置信度**（若规则提供）、说明、修复建议、命中证据片段。
 
-部分 **平台合规/质量** finding（如 tags、description 规范）计入审查记录，但 **不在安全区域列表展示**；它们仍可能影响发布 verdict。
+3. **VirusTotal**（已配置 API 且扫描完成时）  
+   展示 malicious / suspicious 统计、威胁结论、各 AV 引擎逐条 finding，以及报告链接（若有）。
+
+部分 **平台合规/质量** finding（如 tags、description 规范）计入审查记录，但 **不在安全区域列表展示**；它们仍可能影响发布 verdict（通常为 **需复核**）。
 
 ## Finding 严重度分级（一句话）
 
@@ -25,8 +33,8 @@ MonoSkillNavigator 使用内置的 **SkillSpector** 对每次发布（或重审�
 | 等级 | 一句话 |
 | --- | --- |
 | **低** | 多为规范或习惯类提示，一般 **不会** 单独导致「不能安装」，但仍建议顺手改一改。 |
-| **中** | 存在 **值得人工看一眼** 的问题，可能误用或扩大权限，平台常会标成 **需复核** 再推广。 |
-| **高** | 有较明确的 **安全或滥用风险**（如外泄、越权、危险操作），通常 **不应直接当可信 Skill 用**。 |
+| **中** | 存在 **值得人工看一眼** 的问题；SkillSpector **medium 且置信度 ≥ 90%** 会 **拒绝发布**，其余 medium 多为 **需复核**。 |
+| **高** | 有较明确的 **安全或滥用风险**；SkillSpector / VirusTotal 的 high 级 finding 会 **拒绝发布**。 |
 | **严重** | 属于 **最严重** 一类（如明确恶意特征、可造成严重危害），应 **停止安装** 并优先修复或下架。 |
 
 ## 包级风险分怎么理解
@@ -42,17 +50,18 @@ SkillSpector 对每条 finding 按 **严重度** 与 **置信度** 贡献分数�
 
 **注意**：单条 finding 的徽章（例如「中」）表示 **该条规则** 的严重度，与包级「中」不是同一计数方式。例如一条「中」级 MP2 finding 可能只贡献较低风险分，包级仍为「低」。
 
-## Finding 严重度与发布
+## Finding 严重度与发布（verdict）
 
-平台 **verdict** 看 **全部** 审查 finding（含合规项）的最高严重度：
+平台 **verdict** 由审查 finding 综合判定，**自动拒绝** 仅看 SkillSpector 与 VirusTotal 的特定规则：
 
-| Finding 严重度 | 对 verdict 的影响 |
-| --- | --- |
-| critical / high | 通常为 **已拒绝** |
-| medium | 通常为 **需复核** |
-| low | 一般不单独阻断 |
+| 来源 | 已拒绝（rejected） | 需复核（needs-review） |
+| --- | --- | --- |
+| **SkillSpector** | `high` / `critical`；或 `medium` 且置信度 **≥ 90%** | 其余 SkillSpector finding |
+| **VirusTotal** | `high` / `critical`（如 malicious 检出） | 其余（如 suspicious 检出） |
+| **平台规则等** | 不自动拒绝 | 存在任意 finding 时为需复核 |
+| **无任何 finding** | — | **已发布（published）** |
 
-SkillSpector 的「不建议安装」是 **安全建议**，与页面「已拒绝」徽章可能同时出现，也可能在合规通过时仅作提示。
+SkillSpector 的「不建议安装」是 **包级安全建议**，与页面「已拒绝 / 需复核」徽章相关但不完全等同。
 
 ## 覆盖的安全主题（示例）
 
@@ -74,6 +83,7 @@ SkillSpector 的「不建议安装」是 **安全建议**，与页面「已拒�
 
 - `SKILLSPECTOR_ENABLED=false` 可关闭 SkillSpector  
 - `SKILLSPECTOR_PYTHON`、`SKILLSPECTOR_DIR`、`SKILLSPECTOR_TIMEOUT_MS` 用于指定解释器、目录与超时  
+- `VIRUSTOTAL_API_KEY` 启用 VirusTotal；`VIRUSTOTAL_UPLOAD_ON_MISS` 等控制未命中时是否上传样本
 
 ## 如何修复与重新发布
 

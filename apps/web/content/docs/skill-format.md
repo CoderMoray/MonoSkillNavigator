@@ -66,7 +66,7 @@ allowed-tools:
 
 | 字段 | 说明 |
 | --- | --- |
-| `author`、`license`、`tags` | 展示与发现 |
+| `author`、`license`、`tags` | 展示与发现；**Web/CLI 发布时 `author` 会自动写入当前登录用户名** |
 | `supportedAgents` | 声明支持的 Agent 类型 |
 | `allowed-tools` / `disallowed-tools` | 工具权限声明；SkillSpector 会对照代码能力做最小权限检查 |
 | `topics` | 主题标签 |
