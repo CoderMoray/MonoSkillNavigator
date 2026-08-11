@@ -166,7 +166,7 @@ describe("VirusTotal package review adapter", () => {
         severity: "high",
         title: "VirusTotal (malicious)",
         message: "Kaspersky, Microsoft Defender classified this package as malicious.",
-        evidence: expect.stringMatching(/Result: Trojan\.Generic, Trojan:Script\/Wacatac/),
+        evidence: expect.stringMatching(/Result:\n\tKaspersky: Trojan\.Generic\n\tMicrosoft Defender: Trojan:Script\/Wacatac/),
         recommendation:
           "Do not publish this package until the flagged content is removed or the VirusTotal detection is reviewed and cleared."
       })

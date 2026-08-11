@@ -389,7 +389,7 @@ function buildGroupedEvidence(
   category: "malicious" | "suspicious",
   engines: VirusTotalEngineResult[]
 ): string {
-  const results = engines.map((engine) => engine.result).join(", ");
+  const resultLines = engines.map((engine) => `\t${engine.engine}: ${engine.result}`).join("\n");
   const methods = [...new Set(engines.map((engine) => engine.method).filter(Boolean))].join(", ");
   const engineUpdates = [...new Set(engines.map((engine) => engine.engineUpdate).filter(Boolean))].join(", ");
 
@@ -397,7 +397,7 @@ function buildGroupedEvidence(
     `SHA-256: ${summary.sha256}`,
     ...(summary.threatVerdict ? [`Threat verdict: ${summary.threatVerdict}`] : []),
     `Category: ${category}`,
-    `Result: ${results}`,
+    `Result:\n${resultLines}`,
     ...(methods ? [`Method: ${methods}`] : []),
     ...(engineUpdates ? [`Engine update: ${engineUpdates}`] : []),
     ...(summary.analysisUrl ? [`Report: ${summary.analysisUrl}`] : [])

@@ -453,15 +453,15 @@ export function buildServer() {
   });
 
   app.post<{ Params: SkillParams; Body: ContributorBody }>("/skills/:slug/contributors", async (request, reply) => {
-    const user = await getAuthenticatedUser(request.headers.authorization, authStore);
-    if (!user) {
-      return reply.code(401).send({ error: "Unauthorized" });
-    }
+      const user = await getAuthenticatedUser(request.headers.authorization, authStore);
+      if (!user) {
+        return reply.code(401).send({ error: "Unauthorized" });
+      }
 
-    const skill = await store.getSkill(request.params.slug);
-    if (!skill) {
-      return reply.code(404).send({ error: "skill_not_found" });
-    }
+      const skill = await store.getSkill(request.params.slug);
+      if (!skill) {
+        return reply.code(404).send({ error: "skill_not_found" });
+      }
     if (!isSkillOwner(skill, user)) {
       return reply.code(403).send({ error: "only_owner_can_add_contributors" });
     }
