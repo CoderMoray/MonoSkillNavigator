@@ -42,7 +42,7 @@
 | --- | --- |
 | **已发布（published）** | 审查流水线 **无任何 finding** |
 | **需复核（needs-review）** | 存在 finding，但未触发自动拒绝规则；版本已入库，建议人工确认后再推广 |
-| **已拒绝（rejected）** | 触发 SkillSpector 或 VirusTotal 的 **自动拒绝** 规则（见下） |
+| **已拒绝（rejected）** | 触发 SkillSpector 或 VirusTotal 的 **自动拒绝** 规则（见下）；版本仍会入库，但 **不会出现在 Skill 搜索、首页榜单或他人 Creator 主页** |
 
 ### 自动拒绝规则（rejected）
 
@@ -56,6 +56,22 @@
 **平台合规/质量** finding（如 tags 缺失、description 不规范、内置降级规则命中等）**不会**单独导致 rejected，但会使 verdict 为 **需复核**。
 
 平台还会在发布前做 **包格式校验**；格式错误可能无法完成发布。
+
+## 公开可见性（搜索与发现）
+
+Skill 是否出现在 **首页、Skill 列表 / 搜索、榜单** 以及 **其他用户的 Creator 主页**，由以下规则共同决定：
+
+| 情况 | 公开搜索 / 榜单 | 拥有者个人中心 | 直接打开详情页 |
+| --- | --- | --- | --- |
+| 正常公开（verdict 非 rejected，且未下架） | ✅ | ✅ | ✅ |
+| **已拒绝（rejected）** | ❌ | ✅（仅 Skill 拥有者本人） | ✅（便于查看 finding 与修复） |
+| **已下架（unpublish）** | ❌ | ✅（仅 Skill 拥有者本人） | ✅（拥有者可访问；他人通常 404） |
+
+说明：
+
+- **已拒绝** 与 **已下架** 是两套独立机制：前者来自审查 verdict，后者由拥有者手动下架。
+- 拥有者登录后进入 **个人中心**（`/creators/<你的用户名>`），可在 Skill 列表中看到已拒绝与已下架的 Skill（带对应状态徽章）；页面顶部会有提示说明这些 Skill 不会出现在 Skill 广场或搜索页。
+- 其他用户（包括未登录访客）在搜索与浏览流程中 **看不到** 最新版本 verdict 为 **已拒绝** 的 Skill。
 
 ## 下架与重新上架
 
@@ -83,7 +99,7 @@ CLI 与 Web 共用同一 API 与审查逻辑；Web 发布额外校验分类等�
 
 - **slug 冲突或版本已存在**：更换 slug 或提高 version。
 - **frontmatter 缺字段或 SemVer 不合法**：对照 [Skill 格式](./skill-format.md) 修改。
-- **审查 rejected**：打开详情 →「审查与评估」，处理 SkillSpector / VirusTotal 的 high 级 finding，或降低 SkillSpector medium finding 的误报后发新版本。
+- **审查 rejected**：版本已保存但 **不会出现在搜索页**；打开 Skill 详情 →「审查与评估」，处理 SkillSpector / VirusTotal 的 high 级 finding，或降低 SkillSpector medium finding 的误报后 **发新版本**；修复后 verdict 变为非 rejected 时才会重新出现在公开搜索中。
 - **需复核**：版本已保存，可在修复非阻断 finding 后发新版本，或由管理员人工确认后推广。
 - **HaluCatch / SkillSpector 不可用**：联系管理员检查 Python 与 `packages` 内 vendored 组件；平台可能写入「不可用」类 finding 或回退评估方式。
 
