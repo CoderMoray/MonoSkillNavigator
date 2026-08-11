@@ -751,7 +751,6 @@ function PublishSkillPageContent() {
                               setError(null);
                               setSlug(event.target.value);
                             }}
-                            pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?"
                             placeholder="例如 github-issue-triage"
                             readOnly={isNewVersion}
                             required
@@ -858,7 +857,6 @@ function PublishSkillPageContent() {
                             setError(null);
                             setVersion(event.target.value);
                           }}
-                          pattern="(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?"
                           placeholder="1.0.0"
                           required
                           value={version}
