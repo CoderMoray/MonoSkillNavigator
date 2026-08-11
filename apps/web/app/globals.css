@@ -413,6 +413,15 @@ button {
   gap: 20px;
 }
 
+.hero:has(> .hero-card:only-child) {
+  grid-template-columns: 1fr;
+}
+
+.hero:has(> .hero-card:only-child) h1,
+.hero:has(> .hero-card:only-child) p {
+  max-width: none;
+}
+
 .hero-card,
 .card {
   border: 1px solid var(--border);

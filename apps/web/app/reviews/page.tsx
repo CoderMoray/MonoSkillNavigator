@@ -238,14 +238,6 @@ export default function ReviewsPage() {
             <h1>审查中心</h1>
             <p>按 Skill 汇总最新版本的发布时间与 SkillSpector 安全分（100 − 风险分）、HaluCatch 质量分。</p>
           </div>
-          <div className="stats-card hero-card">
-            <div className="stat-grid">
-              <Stat label="已加载" value={auditRows.length} />
-              <Stat label="已勾选" value={selectedSlugs.size} />
-              <Stat label="将导出" value={exportRowCount} />
-              <Stat label="Skill 总数" value={summaries.length} />
-            </div>
-          </div>
         </section>
 
         {error ? <div className="error">{error}。请确认 API 已通过 npm run dev:api 启动。</div> : null}
@@ -425,15 +417,6 @@ function AuditTableRow({
       <td>{formatScore(row.skillSpectorSafetyScore)}</td>
       <td>{formatHaluCatchScore(row.haluCatchScore)}</td>
     </tr>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="stat">
-      <p className="stat-value">{value}</p>
-      <p className="stat-label">{label}</p>
-    </div>
   );
 }
 
