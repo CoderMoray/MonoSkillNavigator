@@ -9,6 +9,8 @@ import { registerUser } from "../../lib/api";
 import { setAuthToken } from "../../lib/auth-token";
 import { creatorProfilePath } from "../../lib/creators";
 
+const USERNAME_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+
 function setRegisterUsernameValidity(input: HTMLInputElement) {
   if (input.validity.valueMissing) {
     input.setCustomValidity("请输入用户名。");
@@ -20,7 +22,7 @@ function setRegisterUsernameValidity(input: HTMLInputElement) {
     );
     return;
   }
-  if (input.validity.patternMismatch) {
+  if (!USERNAME_PATTERN.test(input.value)) {
     input.setCustomValidity("用户名只能包含字母、数字、点、下划线或连字符。");
     return;
   }
@@ -90,6 +92,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!USERNAME_PATTERN.test(username.trim())) {
+      setError("用户名需为 3–64 个字符，仅含字母、数字、点、下划线或连字符");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const session = await registerUser(username, password, email);
@@ -122,7 +129,6 @@ export default function RegisterPage() {
                 onChange={(event) => setUsername(event.target.value)}
                 onInput={(event) => setRegisterUsernameValidity(event.currentTarget)}
                 onInvalid={(event) => setRegisterUsernameValidity(event.currentTarget)}
-                pattern="[a-zA-Z0-9_.-]+"
                 required
                 value={username}
               />
