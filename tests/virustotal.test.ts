@@ -109,7 +109,7 @@ describe("VirusTotal engine result parsing", () => {
 });
 
 describe("VirusTotal package review adapter", () => {
-  test("adds per-engine findings from an existing VirusTotal report", async () => {
+  test("adds grouped findings by category from an existing VirusTotal report", async () => {
     configureVirusTotal();
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({
@@ -162,24 +162,28 @@ describe("VirusTotal package review adapter", () => {
     expect(report.virusTotal?.engineResults).toHaveLength(3);
     expect(report.findings).toContainEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^virustotal-malicious-.*-kaspersky$/),
+        id: expect.stringMatching(/^virustotal-malicious-[a-f0-9]{16}$/),
         severity: "high",
-        title: "VirusTotal (Kaspersky): Trojan.Generic"
+        title: "VirusTotal (malicious)",
+        message: "Kaspersky, Microsoft Defender classified this package as malicious.",
+        evidence: expect.stringMatching(/Result: Trojan\.Generic, Trojan:Script\/Wacatac/),
+        recommendation:
+          "Do not publish this package until the flagged content is removed or the VirusTotal detection is reviewed and cleared."
       })
     );
     expect(report.findings).toContainEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^virustotal-malicious-.*-microsoft-defender$/),
-        severity: "high"
+        id: expect.stringMatching(/^virustotal-suspicious-[a-f0-9]{16}$/),
+        severity: "medium",
+        title: "VirusTotal (suspicious)",
+        message: "Elastic classified this package as suspicious."
       })
     );
-    expect(report.findings).toContainEqual(
-      expect.objectContaining({
-        id: expect.stringMatching(/^virustotal-suspicious-.*-elastic$/),
-        severity: "medium"
-      })
-    );
-    expect(report.findings.filter((finding) => finding.id.startsWith("virustotal-"))).toHaveLength(3);
+    const virusTotalFindings = report.findings.filter((finding) => finding.id.startsWith("virustotal-"));
+    expect(virusTotalFindings).toHaveLength(2);
+    for (const finding of virusTotalFindings) {
+      expect(finding.evidence).not.toMatch(/^Engine:/m);
+    }
   });
 
   test("does not upload an unknown archive unless explicitly enabled", async () => {
@@ -251,9 +255,10 @@ describe("VirusTotal package review adapter", () => {
     });
     expect(scan.findings).toContainEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^virustotal-suspicious-.*-cynet-security$/),
+        id: expect.stringMatching(/^virustotal-suspicious-[a-f0-9]{16}$/),
         severity: "medium",
-        title: "VirusTotal (Cynet Security): Suspicious.Zip"
+        title: "VirusTotal (suspicious)",
+        message: "Cynet Security classified this package as suspicious."
       })
     );
   });

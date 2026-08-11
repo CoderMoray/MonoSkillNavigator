@@ -304,29 +304,39 @@ function createFindings(summary: VirusTotalScanSummary, engineResults: VirusTota
     return [];
   }
 
-  const flagged = engineResults.filter(
-    (engine) => engine.category === "malicious" || engine.category === "suspicious"
-  );
-  if (flagged.length > 0) {
-    return flagged.map((engine) => createEngineFinding(summary, engine));
+  const maliciousEngines = engineResults.filter((engine) => engine.category === "malicious");
+  const suspiciousEngines = engineResults.filter((engine) => engine.category === "suspicious");
+  if (maliciousEngines.length > 0 || suspiciousEngines.length > 0) {
+    const findings: ReviewFinding[] = [];
+    if (maliciousEngines.length > 0) {
+      findings.push(createGroupedCategoryFinding(summary, "malicious", maliciousEngines));
+    }
+    if (suspiciousEngines.length > 0) {
+      findings.push(createGroupedCategoryFinding(summary, "suspicious", suspiciousEngines));
+    }
+    return findings;
   }
 
   return createAggregateFindings(summary);
 }
 
-function createEngineFinding(summary: VirusTotalScanSummary, engine: VirusTotalEngineResult): ReviewFinding {
-  const severity = engine.category === "malicious" ? "high" : "medium";
-  const engineKey = slugifyEngineName(engine.engine);
+function createGroupedCategoryFinding(
+  summary: VirusTotalScanSummary,
+  category: "malicious" | "suspicious",
+  engines: VirusTotalEngineResult[]
+): ReviewFinding {
+  const severity = category === "malicious" ? "high" : "medium";
+  const engineNames = engines.map((engine) => engine.engine).join(", ");
 
   return {
-    id: `virustotal-${engine.category}-${summary.sha256.slice(0, 16)}-${engineKey}`,
+    id: `virustotal-${category}-${summary.sha256.slice(0, 16)}`,
     category: "security",
     severity,
-    title: `VirusTotal (${engine.engine}): ${engine.result}`,
-    message: `${engine.engine} classified this package as ${engine.category}.`,
-    evidence: buildEngineEvidence(summary, engine),
+    title: `VirusTotal (${category})`,
+    message: `${engineNames} classified this package as ${category}.`,
+    evidence: buildGroupedEvidence(summary, category, engines),
     recommendation:
-      engine.category === "malicious"
+      category === "malicious"
         ? "Do not publish this package until the flagged content is removed or the VirusTotal detection is reviewed and cleared."
         : "Review the package and VirusTotal report before publishing; remove suspicious behavior or document a verified false positive."
   };
@@ -374,26 +384,24 @@ function createAggregateFindings(summary: VirusTotalScanSummary): ReviewFinding[
   return [];
 }
 
-function buildEngineEvidence(summary: VirusTotalScanSummary, engine: VirusTotalEngineResult): string {
+function buildGroupedEvidence(
+  summary: VirusTotalScanSummary,
+  category: "malicious" | "suspicious",
+  engines: VirusTotalEngineResult[]
+): string {
+  const results = engines.map((engine) => engine.result).join(", ");
+  const methods = [...new Set(engines.map((engine) => engine.method).filter(Boolean))].join(", ");
+  const engineUpdates = [...new Set(engines.map((engine) => engine.engineUpdate).filter(Boolean))].join(", ");
+
   return [
     `SHA-256: ${summary.sha256}`,
     ...(summary.threatVerdict ? [`Threat verdict: ${summary.threatVerdict}`] : []),
-    `Engine: ${engine.engine}`,
-    `Category: ${engine.category}`,
-    `Result: ${engine.result}`,
-    ...(engine.method ? [`Method: ${engine.method}`] : []),
-    ...(engine.engineUpdate ? [`Engine update: ${engine.engineUpdate}`] : []),
+    `Category: ${category}`,
+    `Result: ${results}`,
+    ...(methods ? [`Method: ${methods}`] : []),
+    ...(engineUpdates ? [`Engine update: ${engineUpdates}`] : []),
     ...(summary.analysisUrl ? [`Report: ${summary.analysisUrl}`] : [])
   ].join("\n");
-}
-
-function slugifyEngineName(engine: string): string {
-  const slug = engine
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug || "engine";
 }
 
 function getNestedValue(value: unknown, path: string[]): unknown {
