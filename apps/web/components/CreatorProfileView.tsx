@@ -2,16 +2,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { BadgeCheck, KeyRound, LogOut, RotateCcw, Trash2, UserX } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowDownUp, BadgeCheck, KeyRound, LogOut, RotateCcw, Search, Trash2, UserX } from "lucide-react";
 import { SkillCard } from "./SkillCard";
 import { ConfirmToast } from "./ConfirmToast";
 import { ErrorToast } from "./ErrorToast";
 import { SuccessToast } from "./SuccessToast";
+import { PillSelect } from "./PillSelect";
 import { clearAuthToken, getAuthToken } from "../lib/auth-token";
 import { getBookmarkedSkills, getRecycleBin, logoutUser, purgeRecycleBinSkill, restoreSkill, type RecycleBinSkill } from "../lib/api";
 import { normalizeHandle, type CreatorSummary } from "../lib/creators";
 import { formatDateTime, formatNumber } from "../lib/format";
+import {
+  listProfileSkills,
+  PROFILE_SKILL_SORT_OPTIONS,
+  type ProfileSkillSort
+} from "../lib/profile-skills";
 import type { PublicUser, SkillSearchResult } from "../lib/types";
 
 const RECYCLE_RETENTION_DAYS = 3;
@@ -42,7 +48,13 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
   const [bookmarkItems, setBookmarkItems] = useState<SkillSearchResult[]>([]);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [bookmarkError, setBookmarkError] = useState<string | null>(null);
+  const [skillQuery, setSkillQuery] = useState("");
+  const [skillSort, setSkillSort] = useState<ProfileSkillSort>("recent");
   const isOwner = Boolean(viewer && normalizeHandle(viewer.username) === creator.handle);
+  const visibleSkills = useMemo(
+    () => listProfileSkills(creator.skills, skillQuery, skillSort),
+    [creator.skills, skillQuery, skillSort]
+  );
   const topSkillNames = creator.skills
     .slice(0, 3)
     .map((skill) => skill.name)
@@ -319,6 +331,27 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
                 </button>
               ) : null}
             </div>
+            {activeTab === "skills" && creator.skills.length > 0 ? (
+              <div className="toolbar inset">
+                <div className="searchbox compact-search">
+                  <Search size={16} color="var(--muted)" />
+                  <input
+                    aria-label="搜索 Skill"
+                    onChange={(event) => setSkillQuery(event.target.value)}
+                    placeholder="按名称、Slug 或描述搜索…"
+                    value={skillQuery}
+                  />
+                </div>
+                <PillSelect
+                  ariaLabel="排序方式"
+                  className="compact"
+                  icon={<ArrowDownUp size={16} />}
+                  onChange={(value) => setSkillSort(value as ProfileSkillSort)}
+                  options={PROFILE_SKILL_SORT_OPTIONS}
+                  value={skillSort}
+                />
+              </div>
+            ) : null}
           </div>
 
           {activeTab === "skills" ? (
@@ -337,11 +370,15 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
                     已下架或审查未通过（已拒绝）的 Skill 仅在此个人中心对你可见，不会出现在 Skill 广场或搜索页。
                   </p>
                 ) : null}
-                <div className="claw-list">
-                  {creator.skills.map((skill) => (
-                    <SkillCard key={skill.slug} skill={skill} variant="row" />
-                  ))}
-                </div>
+                {visibleSkills.length === 0 ? (
+                  <div className="empty">暂无匹配的 Skill。</div>
+                ) : (
+                  <div className="claw-list">
+                    {visibleSkills.map((skill) => (
+                      <SkillCard key={skill.slug} skill={skill} variant="row" />
+                    ))}
+                  </div>
+                )}
               </>
             )
           ) : null}
