@@ -227,6 +227,7 @@ export interface SkillSearchResult {
 export interface PublicUser {
   id: string;
   username: string;
+  email: string | null;
   role: "admin" | "user";
   createdAt: string;
   updatedAt: string;

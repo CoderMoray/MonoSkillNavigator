@@ -17,7 +17,7 @@ test("注册用户", async () => {
   const res = await fetch(`${API}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: "testuser", password: "test123456" }),
+    body: JSON.stringify({ username: "testuser", password: "test123456", email: "testuser@example.com" }),
   });
   // API 可能返回 200/201/400(用户名已存在)/409
   expect([200, 201, 400, 409]).toContain(res.status);
@@ -101,7 +101,7 @@ test("重复注册应拒绝", async () => {
   const res = await fetch(`${API}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: "alice", password: "password123" }),
+    body: JSON.stringify({ username: "alice", password: "password123", email: "alice@example.com" }),
   });
   expect([400, 409]).toContain(res.status);
   const body = await res.json();

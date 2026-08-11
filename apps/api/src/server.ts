@@ -79,6 +79,7 @@ interface RatingBody {
 interface RegisterBody {
   username: string;
   password: string;
+  email: string;
 }
 
 interface LoginBody {
@@ -182,7 +183,11 @@ export function buildServer() {
 
   app.post<{ Body: RegisterBody }>("/auth/register", async (request, reply) => {
     try {
-      const user = await authStore.register(request.body.username, request.body.password);
+      const user = await authStore.register(
+        request.body.username,
+        request.body.password,
+        request.body.email
+      );
       const session = await authStore.login(request.body.username, request.body.password);
       return reply.code(201).send({ user, token: session.token, expiresAt: session.expiresAt });
     } catch (error) {

@@ -6,6 +6,7 @@ import pg from "pg";
 export interface PublicUser {
   id: string;
   username: string;
+  email: string | null;
   role: "admin" | "user";
   createdAt: string;
   updatedAt: string;
@@ -35,7 +36,7 @@ export interface LoginResult {
 }
 
 export interface AuthStore {
-  register(username: string, password: string): Promise<PublicUser>;
+  register(username: string, password: string, email: string): Promise<PublicUser>;
   login(username: string, password: string): Promise<LoginResult>;
   logout(token: string): Promise<void>;
   getUserByToken(token: string): Promise<PublicUser | undefined>;
@@ -50,8 +51,9 @@ const emptyAuthData: AuthData = {
 };
 
 abstract class JsonAuthStore implements AuthStore {
-  async register(username: string, password: string): Promise<PublicUser> {
+  async register(username: string, password: string, email: string): Promise<PublicUser> {
     const normalizedUsername = normalizeUsername(username);
+    const normalizedEmail = normalizeEmail(email);
     assertPassword(password);
     const data = await this.load();
 
@@ -59,11 +61,20 @@ abstract class JsonAuthStore implements AuthStore {
       throw new Error("Username already exists");
     }
 
+    if (
+      Object.values(data.users).some(
+        (user) => user.email !== null && user.email.toLowerCase() === normalizedEmail
+      )
+    ) {
+      throw new Error("Email already exists");
+    }
+
     const now = new Date().toISOString();
     const isFirstUser = Object.keys(data.users).length === 0;
     const user: StoredUser = {
       id: randomUUID(),
       username: normalizedUsername,
+      email: normalizedEmail,
       role: isFirstUser ? "admin" : "user",
       passwordHash: hashPassword(password),
       createdAt: now,
@@ -212,6 +223,7 @@ type AuthDatabaseTimestamp = Date | string;
 interface DatabaseUserRow {
   id: string;
   username: string;
+  email: string | null;
   role: "admin" | "user";
   password_hash: string;
   created_at: AuthDatabaseTimestamp;
@@ -226,8 +238,9 @@ export class PostgresAuthStore implements AuthStore {
     this.pool = pool ?? new pg.Pool({ connectionString: databaseUrl });
   }
 
-  async register(username: string, password: string): Promise<PublicUser> {
+  async register(username: string, password: string, email: string): Promise<PublicUser> {
     const normalizedUsername = normalizeUsername(username);
+    const normalizedEmail = normalizeEmail(email);
     assertPassword(password);
     await this.ensureSchema();
 
@@ -236,10 +249,26 @@ export class PostgresAuthStore implements AuthStore {
       await client.query("begin");
       await client.query("select pg_advisory_xact_lock($1::bigint)", [81024001]);
       const count = await client.query<{ count: string }>("select count(*)::text as count from platform_users");
+      const existing = await client.query<{ username: string; email: string | null }>(
+        `select username, email
+         from platform_users
+         where lower(username) = lower($1)
+            or (email is not null and lower(email) = lower($2))
+         limit 1`,
+        [normalizedUsername, normalizedEmail]
+      );
+      if (existing.rows[0]) {
+        if (existing.rows[0].username.toLowerCase() === normalizedUsername.toLowerCase()) {
+          throw new Error("Username already exists");
+        }
+        throw new Error("Email already exists");
+      }
+
       const now = new Date().toISOString();
       const user: StoredUser = {
         id: randomUUID(),
         username: normalizedUsername,
+        email: normalizedEmail,
         role: Number(count.rows[0]?.count ?? 0) === 0 ? "admin" : "user",
         passwordHash: hashPassword(password),
         createdAt: now,
@@ -248,9 +277,9 @@ export class PostgresAuthStore implements AuthStore {
 
       try {
         await client.query(
-          `insert into platform_users (id, username, role, password_hash, created_at, updated_at)
-           values ($1, $2, $3, $4, $5, $6)`,
-          [user.id, user.username, user.role, user.passwordHash, user.createdAt, user.updatedAt]
+          `insert into platform_users (id, username, email, role, password_hash, created_at, updated_at)
+           values ($1, $2, $3, $4, $5, $6, $7)`,
+          [user.id, user.username, user.email, user.role, user.passwordHash, user.createdAt, user.updatedAt]
         );
       } catch (error) {
         if (isUniqueViolation(error)) {
@@ -273,7 +302,7 @@ export class PostgresAuthStore implements AuthStore {
     const normalizedUsername = normalizeUsername(username);
     await this.ensureSchema();
     const result = await this.pool.query<DatabaseUserRow>(
-      `select id, username, role, password_hash, created_at, updated_at
+      `select id, username, email, role, password_hash, created_at, updated_at
        from platform_users
        where lower(username) = lower($1)
        limit 1`,
@@ -311,7 +340,7 @@ export class PostgresAuthStore implements AuthStore {
     await this.ensureSchema();
     await this.pool.query("delete from auth_sessions where expires_at <= now()");
     const result = await this.pool.query<DatabaseUserRow>(
-      `select u.id, u.username, u.role, u.password_hash, u.created_at, u.updated_at
+      `select u.id, u.username, u.email, u.role, u.password_hash, u.created_at, u.updated_at
        from auth_sessions s
        join platform_users u on u.id = s.user_id
        where s.token_hash = $1 and s.expires_at > now()
@@ -326,7 +355,7 @@ export class PostgresAuthStore implements AuthStore {
     const normalizedUsername = normalizeUsername(username);
     await this.ensureSchema();
     const result = await this.pool.query<DatabaseUserRow>(
-      `select id, username, role, password_hash, created_at, updated_at
+      `select id, username, email, role, password_hash, created_at, updated_at
        from platform_users
        where lower(username) = lower($1)
        limit 1`,
@@ -339,7 +368,7 @@ export class PostgresAuthStore implements AuthStore {
   async listUsers(): Promise<PublicUser[]> {
     await this.ensureSchema();
     const result = await this.pool.query<DatabaseUserRow>(
-      `select id, username, role, password_hash, created_at, updated_at
+      `select id, username, email, role, password_hash, created_at, updated_at
        from platform_users
        order by lower(username)`
     );
@@ -356,7 +385,7 @@ export class PostgresAuthStore implements AuthStore {
       await client.query("begin");
       await client.query("delete from auth_sessions where expires_at <= now()");
       const result = await client.query<DatabaseUserRow>(
-        `select u.id, u.username, u.role, u.password_hash, u.created_at, u.updated_at
+        `select u.id, u.username, u.email, u.role, u.password_hash, u.created_at, u.updated_at
          from auth_sessions s
          join platform_users u on u.id = s.user_id
          where s.token_hash = $1
@@ -382,13 +411,11 @@ export class PostgresAuthStore implements AuthStore {
       );
       await client.query("commit");
 
-      return {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        createdAt: toAuthIsoString(user.created_at),
-        updatedAt
-      };
+      return toPublicDatabaseUser({
+        ...user,
+        password_hash: passwordHash,
+        updated_at: updatedAt
+      });
     } catch (error) {
       await client.query("rollback").catch(() => undefined);
       throw error;
@@ -418,10 +445,10 @@ export class PostgresAuthStore implements AuthStore {
 
       for (const user of Object.values(data.users)) {
         await client.query(
-          `insert into platform_users (id, username, role, password_hash, created_at, updated_at)
-           values ($1, $2, $3, $4, $5, $6)
+          `insert into platform_users (id, username, email, role, password_hash, created_at, updated_at)
+           values ($1, $2, $3, $4, $5, $6, $7)
            on conflict (id) do nothing`,
-          [user.id, user.username, user.role, user.passwordHash, user.createdAt, user.updatedAt]
+          [user.id, user.username, user.email ?? null, user.role, user.passwordHash, user.createdAt, user.updatedAt]
         );
       }
 
@@ -443,6 +470,31 @@ export class PostgresAuthStore implements AuthStore {
     );
   }
 
+  private async migrateEmailColumn(client: pg.PoolClient): Promise<void> {
+    const migrationName = "auth-add-email-v1";
+    const applied = await client.query<{ name: string }>(
+      "select name from platform_schema_migrations where name = $1",
+      [migrationName]
+    );
+    if (applied.rows.length > 0) {
+      return;
+    }
+
+    await client.query(`alter table platform_users add column if not exists email text`);
+    await client.query(
+      `create unique index if not exists platform_users_email_lower_key
+       on platform_users (lower(email))
+       where email is not null`
+    );
+
+    await client.query(
+      `insert into platform_schema_migrations (name, applied_at)
+       values ($1, now())
+       on conflict (name) do nothing`,
+      [migrationName]
+    );
+  }
+
   private ensureSchema(): Promise<void> {
     this.schemaReady ??= (async () => {
       const client = await this.pool.connect();
@@ -451,6 +503,7 @@ export class PostgresAuthStore implements AuthStore {
         await client.query("select pg_advisory_xact_lock($1::bigint)", [81024002]);
         await client.query(relationalAuthSchema);
         await this.migrateLegacyAuth(client);
+        await this.migrateEmailColumn(client);
         await client.query("commit");
       } catch (error) {
         await client.query("rollback").catch(() => undefined);
@@ -539,6 +592,14 @@ function normalizeUsername(username: string): string {
   return normalized;
 }
 
+function normalizeEmail(email: string): string {
+  const normalized = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    throw new Error("Invalid email address");
+  }
+  return normalized;
+}
+
 function assertPassword(password: string): void {
   if (password.length < 8) {
     throw new Error("Password must be at least 8 characters");
@@ -558,6 +619,7 @@ function toPublicUser(user: StoredUser): PublicUser {
   return {
     id: user.id,
     username: user.username,
+    email: user.email ?? null,
     role: user.role,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
@@ -568,6 +630,7 @@ function toPublicDatabaseUser(user: DatabaseUserRow): PublicUser {
   return {
     id: user.id,
     username: user.username,
+    email: user.email,
     role: user.role,
     createdAt: toAuthIsoString(user.created_at),
     updatedAt: toAuthIsoString(user.updated_at)
@@ -583,8 +646,16 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 function normalizeAuthData(data: AuthData): AuthData {
+  const users: Record<string, StoredUser> = {};
+  for (const [id, user] of Object.entries(data.users ?? {})) {
+    users[id] = {
+      ...user,
+      email: user.email ?? null
+    };
+  }
+
   return {
-    users: data.users ?? {},
+    users,
     sessions: data.sessions ?? {}
   };
 }

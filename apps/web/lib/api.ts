@@ -143,10 +143,10 @@ export function getApiBaseUrl(): string {
   return API_BASE_URL;
 }
 
-export async function registerUser(username: string, password: string): Promise<AuthResponse> {
+export async function registerUser(username: string, password: string, email: string): Promise<AuthResponse> {
   return request<AuthResponse>(new URL("/auth/register", API_BASE_URL), {
     method: "POST",
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ username, password, email })
   });
 }
 

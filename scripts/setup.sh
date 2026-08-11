@@ -3,6 +3,7 @@ set -euo pipefail
 
 API="http://127.0.0.1:3000"
 USERNAME="alice"
+EMAIL="alice@example.com"
 PASSWORD="password123"
 SKILL_PATH="examples/demo-skill"
 
@@ -28,7 +29,7 @@ echo "  ✅ API running"
 echo "[2/6] Registering user '$USERNAME'..."
 RESP=$(curl -sf -X POST "$API/auth/register" \
   -H "Content-Type: application/json" \
-  -d "{\"username\":\"$USERNAME\",\"password\":\"$PASSWORD\"}") || true
+  -d "{\"username\":\"$USERNAME\",\"password\":\"$PASSWORD\",\"email\":\"$EMAIL\"}") || true
 
 if echo "$RESP" | grep -q '"error"'; then
   echo "  ⚠️  Registration failed (maybe user exists), trying login..."

@@ -41,9 +41,41 @@ function setRegisterPasswordValidity(input: HTMLInputElement, label: string) {
   input.setCustomValidity("");
 }
 
+function formatRegisterError(message: string): string {
+  if (message === "Username already exists") {
+    return "该用户名已被注册";
+  }
+  if (message === "Email already exists") {
+    return "该邮箱已被注册";
+  }
+  if (message === "Invalid email address") {
+    return "请输入有效的邮箱地址";
+  }
+  if (message.startsWith("Username must be")) {
+    return "用户名需为 3–64 个字符，仅含字母、数字、点、下划线或连字符";
+  }
+  if (message === "Password must be at least 8 characters") {
+    return "密码至少需要 8 个字符";
+  }
+  return message;
+}
+
+function setRegisterEmailValidity(input: HTMLInputElement) {
+  if (input.validity.valueMissing) {
+    input.setCustomValidity("请输入邮箱。");
+    return;
+  }
+  if (input.validity.typeMismatch) {
+    input.setCustomValidity("请输入有效的邮箱地址。");
+    return;
+  }
+  input.setCustomValidity("");
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -60,11 +92,11 @@ export default function RegisterPage() {
 
     setSubmitting(true);
     try {
-      const session = await registerUser(username, password);
+      const session = await registerUser(username, password, email);
       setAuthToken(session.token);
       router.push(creatorProfilePath(session.user.username));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "注册失败");
+      setError(formatRegisterError(err instanceof Error ? err.message : "注册失败"));
     } finally {
       setSubmitting(false);
     }
@@ -93,6 +125,18 @@ export default function RegisterPage() {
                 pattern="[a-zA-Z0-9_.-]+"
                 required
                 value={username}
+              />
+            </label>
+            <label className="field">
+              <span>邮箱</span>
+              <input
+                autoComplete="email"
+                onChange={(event) => setEmail(event.target.value)}
+                onInput={(event) => setRegisterEmailValidity(event.currentTarget)}
+                onInvalid={(event) => setRegisterEmailValidity(event.currentTarget)}
+                required
+                type="email"
+                value={email}
               />
             </label>
             <label className="field">
