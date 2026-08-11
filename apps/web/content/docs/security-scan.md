@@ -74,14 +74,15 @@ SkillSpector 对每条 finding 按 **严重度** 与 **置信度** 贡献分数�
 
 ## Finding 严重度与发布（verdict）
 
-平台 **verdict** 由审查 finding 综合判定，**自动拒绝** 仅看 SkillSpector 与 VirusTotal 的特定规则：
+平台 **verdict** 由审查 finding 综合判定，**自动拒绝** 仅看 SkillSpector、VirusTotal 与 HaluCatch 是否 **成功完成**，以及 SkillSpector / VirusTotal 的特定安全 finding：
 
 | 来源 | 已拒绝（rejected） | 需复核（needs-review） |
 | --- | --- | --- |
-| **SkillSpector** | `high` / `critical`；或 `medium` 且置信度 **≥ 90%** | 其余 SkillSpector finding |
-| **VirusTotal** | `high` / `critical`（如 malicious 检出） | 其余（如 suspicious 检出） |
+| **SkillSpector**（已启用） | 扫描未完成；`high` / `critical`；或 `medium` 且置信度 **≥ 90%** | 其余 SkillSpector finding |
+| **VirusTotal**（已启用） | 扫描未完成（超时等）；`high` / `critical`（如 malicious 检出） | 其余（如 suspicious 检出） |
+| **HaluCatch**（已启用） | 评估未完成 | 评估成功后的 warn/fail 等（见质量文档） |
 | **平台规则等** | 不自动拒绝 | 存在任意 finding 时为需复核 |
-| **无任何 finding** | — | **已发布（published）** |
+| **无任何 finding 且各启用步骤均成功** | — | **已发布（published）** |
 
 SkillSpector 的「不建议安装」是 **包级安全建议**，与页面「已拒绝 / 需复核」徽章相关但不完全等同。
 

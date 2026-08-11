@@ -292,7 +292,7 @@ describe("VirusTotal package review adapter", () => {
     );
   });
 
-  test("records a failed scan summary instead of a security finding", async () => {
+  test("records a failed scan summary and rejects publish", async () => {
     configureVirusTotal();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("fetch failed")));
 
@@ -303,6 +303,12 @@ describe("VirusTotal package review adapter", () => {
       status: "failed",
       error: "fetch failed"
     });
-    expect(report.findings.some((finding) => finding.id === "virustotal-unavailable")).toBe(false);
+    expect(report.findings).toContainEqual(
+      expect.objectContaining({
+        id: "virustotal-scan-failed",
+        severity: "high"
+      })
+    );
+    expect(report.verdict).toBe("rejected");
   });
 });

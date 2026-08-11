@@ -208,6 +208,11 @@ export async function reviewAndEvaluateSkillSnapshot(
     runPlatformRulesReview(snapshot, findings, { includeContentRules: !skillSpectorAvailable });
   }
 
+  if (isHaluCatchEnabled() && !haluCatchAvailable) {
+    const unavailableFinding = evaluation.findings.find((finding) => finding.id === "halucatch-unavailable");
+    findings.push(createHaluCatchUnavailableReviewFinding(unavailableFinding?.message));
+  }
+
   const scores = calculateScores(findings, evaluation, skillSpector);
   const verdict = calculateReviewVerdict(findings);
 
@@ -400,7 +405,13 @@ function calculateScores(
 const SKILLSPECTOR_FINDING_PREFIX = "skillspector-";
 const VIRUSTOTAL_FINDING_PREFIX = "virustotal-";
 const SKILLSPECTOR_UNAVAILABLE_FINDING_ID = "skillspector-unavailable";
+const VIRUSTOTAL_SCAN_FAILED_FINDING_ID = "virustotal-scan-failed";
+const REVIEW_HALUCATCH_UNAVAILABLE_FINDING_ID = "review-halucatch-unavailable";
 const MEDIUM_CONFIDENCE_REJECT_PERCENT = 90;
+
+function isHaluCatchEnabled(): boolean {
+  return process.env.HALUCATCH_ENABLED?.toLowerCase() !== "false";
+}
 
 export function isSkillSpectorReviewFinding(finding: ReviewFinding): boolean {
   return (
@@ -414,6 +425,10 @@ export function isVirusTotalReviewFinding(finding: ReviewFinding): boolean {
 }
 
 export function shouldRejectSkillSpectorFinding(finding: ReviewFinding): boolean {
+  if (finding.id === SKILLSPECTOR_UNAVAILABLE_FINDING_ID) {
+    return finding.severity === "critical" || finding.severity === "high";
+  }
+
   if (!isSkillSpectorReviewFinding(finding)) {
     return false;
   }
@@ -434,10 +449,18 @@ export function shouldRejectVirusTotalFinding(finding: ReviewFinding): boolean {
   return isVirusTotalReviewFinding(finding) && (finding.severity === "critical" || finding.severity === "high");
 }
 
+export function shouldRejectReviewInfrastructureFinding(finding: ReviewFinding): boolean {
+  return (
+    finding.id === REVIEW_HALUCATCH_UNAVAILABLE_FINDING_ID &&
+    (finding.severity === "critical" || finding.severity === "high")
+  );
+}
+
 export function calculateReviewVerdict(findings: ReviewFinding[]): ReviewVerdict {
   if (
     findings.some(shouldRejectSkillSpectorFinding) ||
-    findings.some(shouldRejectVirusTotalFinding)
+    findings.some(shouldRejectVirusTotalFinding) ||
+    findings.some(shouldRejectReviewInfrastructureFinding)
   ) {
     return "rejected";
   }
@@ -476,13 +499,13 @@ async function runSkillSpectorReviewStep(snapshot: SkillSnapshot): Promise<{
       skillSpectorAvailable: false,
       findings: [
         {
-          id: "skillspector-unavailable",
+          id: SKILLSPECTOR_UNAVAILABLE_FINDING_ID,
           category: "security",
-          severity: "low",
+          severity: "high",
           title: "SkillSpector security scan unavailable",
           message: `SkillSpector static security scan could not run: ${truncateError(error)}`,
           recommendation:
-            "Install Python 3.12+ with SkillSpector dependencies, keep packages/SkillSpector-main available, or set SKILLSPECTOR_PYTHON. Falling back to built-in platform review rules."
+            "Install Python 3.12+ with SkillSpector dependencies, keep packages/SkillSpector-main available, or set SKILLSPECTOR_PYTHON before publishing."
         }
       ]
     };
@@ -504,11 +527,36 @@ async function runVirusTotalReviewStep(snapshot: SkillSnapshot): Promise<{
       findings: scan.findings
     };
   } catch (error) {
+    const message = truncateError(error);
     return {
       virusTotal: createFailedVirusTotalSummary(snapshot, error),
-      findings: []
+      findings: [
+        {
+          id: VIRUSTOTAL_SCAN_FAILED_FINDING_ID,
+          category: "security",
+          severity: "high",
+          title: "VirusTotal package scan failed",
+          message: `VirusTotal static AV scan could not complete: ${message}`,
+          recommendation:
+            "Resolve the VirusTotal scan error (network, API key, timeout, or upload settings) and publish again."
+        }
+      ]
     };
   }
+}
+
+function createHaluCatchUnavailableReviewFinding(message?: string): ReviewFinding {
+  return {
+    id: REVIEW_HALUCATCH_UNAVAILABLE_FINDING_ID,
+    category: "reliability",
+    severity: "high",
+    title: "HaluCatch reliability evaluation unavailable",
+    message:
+      message ??
+      "HaluCatch reliability evaluation did not complete successfully for this publish.",
+    recommendation:
+      "Install Python 3.8+ and keep packages/halucatch-1.8.8 available, or set HALUCATCH_PYTHON before publishing."
+  };
 }
 
 function createFailedVirusTotalSummary(snapshot: SkillSnapshot, error: unknown): VirusTotalScanSummary {

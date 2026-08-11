@@ -42,7 +42,7 @@
 | --- | --- |
 | **已发布（published）** | 审查流水线 **无任何 finding** |
 | **需复核（needs-review）** | 存在 finding，但未触发自动拒绝规则；版本已入库，建议人工确认后再推广 |
-| **已拒绝（rejected）** | 触发 SkillSpector 或 VirusTotal 的 **自动拒绝** 规则（见下）；版本仍会入库，但 **不会出现在 Skill 搜索、首页榜单或他人 Creator 主页** |
+| **已拒绝（rejected）** | 触发 SkillSpector 或 VirusTotal 的 **自动拒绝** 规则（见下）；或 **任一已启用的审查/评估步骤未完成**（如 VirusTotal 超时、SkillSpector/HaluCatch 不可用） |
 
 ### 自动拒绝规则（rejected）
 
@@ -50,8 +50,9 @@
 
 | 来源 | 拒绝条件 |
 | --- | --- |
-| **SkillSpector** | 任意 `high` / `critical` finding；或 `medium` finding 且 **置信度 ≥ 90%** |
-| **VirusTotal** | 任意 `high` / `critical` finding（存在 **malicious** 类别检出时，合并为一条 high 级 finding） |
+| **SkillSpector**（已启用） | 扫描 **未完成**；或任意 `high` / `critical` finding；或 `medium` 且 **置信度 ≥ 90%** |
+| **VirusTotal**（已启用） | 扫描 **未完成**（超时、网络/API 错误等）；或存在 **malicious** 类别检出（合并为一条 high 级 finding） |
+| **HaluCatch**（已启用） | 评估 **未完成**（Python/运行时不可用或未产出 `halucatch-adapter` 报告） |
 
 **平台合规/质量** finding（如 tags 缺失、description 不规范、内置降级规则命中等）**不会**单独导致 rejected，但会使 verdict 为 **需复核**。
 

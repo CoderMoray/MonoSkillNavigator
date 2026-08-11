@@ -73,10 +73,24 @@ describe("calculateReviewVerdict", () => {
     expect(calculateReviewVerdict([])).toBe("published");
   });
 
-  test("does not reject when SkillSpector is unavailable", () => {
+  test("rejects publish when SkillSpector is unavailable", () => {
     const verdict = calculateReviewVerdict([
-      finding({ id: "skillspector-unavailable", severity: "low" })
+      finding({ id: "skillspector-unavailable", severity: "high" })
     ]);
-    expect(verdict).toBe("needs-review");
+    expect(verdict).toBe("rejected");
+  });
+
+  test("rejects publish when VirusTotal scan fails", () => {
+    const verdict = calculateReviewVerdict([
+      finding({ id: "virustotal-scan-failed", severity: "high" })
+    ]);
+    expect(verdict).toBe("rejected");
+  });
+
+  test("rejects publish when HaluCatch is unavailable", () => {
+    const verdict = calculateReviewVerdict([
+      finding({ id: "review-halucatch-unavailable", severity: "high", category: "reliability" })
+    ]);
+    expect(verdict).toBe("rejected");
   });
 });
