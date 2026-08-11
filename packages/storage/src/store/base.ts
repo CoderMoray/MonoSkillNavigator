@@ -31,6 +31,8 @@ import {
   normalizeReleaseTags,
   resolveVersionReference,
   skillMatchesCategoryFilters,
+  compareIsoTimestampsDesc,
+  getRecentSortTimestamp,
   toSearchResult,
   updateRatingAggregate,
 } from "../utils";
@@ -290,7 +292,8 @@ export abstract class JsonRegistryStore implements RegistryStore {
         case "quality": return b.scores.qualityScore - a.scores.qualityScore;
         case "security": return b.scores.securityScore - a.scores.securityScore;
         case "reliability": return b.scores.reliabilityScore - a.scores.reliabilityScore;
-        case "recent": return b.updatedAt.localeCompare(a.updatedAt);
+        case "recent":
+          return compareIsoTimestampsDesc(getRecentSortTimestamp(a), getRecentSortTimestamp(b));
         default: return b.downloads - a.downloads;
       }
     }).slice(0, Math.max(1, Math.min(limit, 100)));

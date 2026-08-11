@@ -58,6 +58,10 @@ export {
   isSkillContributor,
   isSkillOwner,
   normalizeCategoryFilters,
+  compareIsoTimestampsDesc,
+  getRecentSortTimestamp,
+  sortSkillSearchResultsByRecent,
+  toIsoTimestampString,
 } from "./utils";
 
 export {

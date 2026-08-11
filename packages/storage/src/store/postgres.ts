@@ -28,6 +28,9 @@ import { skillRecyclePurgeAt, skillRecycleRetentionMs } from "../recycle-bin";
 import { parseSkillSpectorReviewRow, skillSpectorReviewColumns } from "../skillspector-review";
 import { parseVirusTotalReviewRow, virusTotalReviewColumns } from "../virustotal-review";
 import { normalizeContributorRole, assertAssignableContributorRole } from "../contributors";
+import {
+  toIsoTimestampString,
+} from "../utils";
 import { JsonRegistryStore } from "./base";
 
 type DB = NodePgDatabase<typeof schema>;
@@ -64,7 +67,7 @@ function mapContributorRow(row: {
     username: row.username ?? undefined,
     name: row.name,
     role: normalizeContributorRole(row.role),
-    addedAt: String(row.addedAt),
+    addedAt: toIsoTimestampString(row.addedAt),
   };
 }
 
@@ -182,6 +185,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         ratingCount: schema.skills.ratingCount,
         totalDownloads: sql<number>`coalesce(sum(${schema.skillVersions.downloads}), 0)`.mapWith(Number),
         updatedAt: schema.skills.updatedAt,
+        latestVersionCreatedAt: schema.skillVersions.createdAt,
         openIssues: sql<number>`(
           select count(*) from ${schema.skillIssues}
           where ${schema.skillIssues.skillSlug} = ${schema.skills.slug}
@@ -228,9 +232,9 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         schema.skills.latestVersion, schema.skillVersions.status, schema.skillVersions.categories,
         schema.skillReviews.qualityScore, schema.skillReviews.securityScore,
         schema.skillReviews.reliabilityScore, schema.skills.averageRating,
-        schema.skills.ratingCount, schema.skills.updatedAt
+        schema.skills.ratingCount, schema.skills.updatedAt, schema.skillVersions.createdAt
       )
-      .orderBy(desc(schema.skills.updatedAt));
+      .orderBy(desc(schema.skillVersions.createdAt));
 
     const slugs = rows.map((r) => r.slug);
     if (slugs.length === 0) return [];
@@ -265,7 +269,8 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       openIssues: r.openIssues,
       contributors: contributorsMap.get(r.slug) ?? [],
       downloads: r.totalDownloads,
-      updatedAt: String(r.updatedAt),
+      updatedAt: toIsoTimestampString(r.updatedAt),
+      latestVersionCreatedAt: toIsoTimestampString(r.latestVersionCreatedAt),
       published: true,
     }));
   }
@@ -297,6 +302,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         ratingCount: schema.skills.ratingCount,
         totalDownloads: sql<number>`coalesce(sum(${schema.skillVersions.downloads}), 0)`.mapWith(Number),
         updatedAt: schema.skills.updatedAt,
+        latestVersionCreatedAt: schema.skillVersions.createdAt,
         openIssues: sql<number>`(
           select count(*) from ${schema.skillIssues}
           where ${schema.skillIssues.skillSlug} = ${schema.skills.slug}
@@ -331,9 +337,10 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         schema.skillReviews.reliabilityScore,
         schema.skills.averageRating,
         schema.skills.ratingCount,
-        schema.skills.updatedAt
+        schema.skills.updatedAt,
+        schema.skillVersions.createdAt
       )
-      .orderBy(desc(schema.skills.updatedAt));
+      .orderBy(desc(schema.skillVersions.createdAt));
 
     const slugs = rows.map((r) => r.slug);
     if (slugs.length === 0) return [];
@@ -367,7 +374,8 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       openIssues: r.openIssues,
       contributors: contributorsMap.get(r.slug) ?? [],
       downloads: r.totalDownloads,
-      updatedAt: String(r.updatedAt),
+      updatedAt: toIsoTimestampString(r.updatedAt),
+      latestVersionCreatedAt: toIsoTimestampString(r.latestVersionCreatedAt),
       published: false,
     }));
   }
@@ -400,6 +408,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         ratingCount: schema.skills.ratingCount,
         totalDownloads: sql<number>`coalesce(sum(${schema.skillVersions.downloads}), 0)`.mapWith(Number),
         updatedAt: schema.skills.updatedAt,
+        latestVersionCreatedAt: schema.skillVersions.createdAt,
         openIssues: sql<number>`(
           select count(*) from ${schema.skillIssues}
           where ${schema.skillIssues.skillSlug} = ${schema.skills.slug}
@@ -435,9 +444,10 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         schema.skillReviews.reliabilityScore,
         schema.skills.averageRating,
         schema.skills.ratingCount,
-        schema.skills.updatedAt
+        schema.skills.updatedAt,
+        schema.skillVersions.createdAt
       )
-      .orderBy(desc(schema.skills.updatedAt));
+      .orderBy(desc(schema.skillVersions.createdAt));
 
     const slugs = rows.map((r) => r.slug);
     if (slugs.length === 0) return [];
@@ -471,7 +481,8 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       openIssues: r.openIssues,
       contributors: contributorsMap.get(r.slug) ?? [],
       downloads: r.totalDownloads,
-      updatedAt: String(r.updatedAt),
+      updatedAt: toIsoTimestampString(r.updatedAt),
+      latestVersionCreatedAt: toIsoTimestampString(r.latestVersionCreatedAt),
       published: r.published,
     }));
   }
@@ -1409,6 +1420,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         ratingCount: schema.skills.ratingCount,
         totalDownloads: sql<number>`coalesce(sum(${schema.skillVersions.downloads}), 0)`.mapWith(Number),
         updatedAt: schema.skills.updatedAt,
+        latestVersionCreatedAt: schema.skillVersions.createdAt,
         openIssues: sql<number>`(
           select count(*) from ${schema.skillIssues}
           where ${schema.skillIssues.skillSlug} = ${schema.skills.slug}
@@ -1452,6 +1464,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         schema.skills.averageRating,
         schema.skills.ratingCount,
         schema.skills.updatedAt,
+        schema.skillVersions.createdAt,
         schema.skillBookmarks.createdAt
       )
       .orderBy(desc(schema.skillBookmarks.createdAt));
@@ -1490,7 +1503,8 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       openIssues: r.openIssues,
       contributors: contributorsMap.get(r.slug) ?? [],
       downloads: r.totalDownloads,
-      updatedAt: String(r.updatedAt),
+      updatedAt: toIsoTimestampString(r.updatedAt),
+      latestVersionCreatedAt: toIsoTimestampString(r.latestVersionCreatedAt),
       published: true,
     }));
   }

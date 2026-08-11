@@ -112,6 +112,8 @@ export interface SkillSearchResult {
   contributors: RegistryContributor[];
   downloads: number;
   updatedAt: string;
+  /** Latest version publish time; used for "recent" sort */
+  latestVersionCreatedAt?: string;
   /** Omitted or true for public search; false when listed only on owner profile */
   published?: boolean;
 }

@@ -220,6 +220,7 @@ export interface SkillSearchResult {
   contributors: RegistryContributor[];
   downloads: number;
   updatedAt: string;
+  latestVersionCreatedAt?: string;
   published?: boolean;
 }
 

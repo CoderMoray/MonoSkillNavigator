@@ -111,6 +111,30 @@ export function skillMatchesCategoryFilters(skillCategories: string[] | undefine
   return normalizedSelected.some((item) => normalizedSkill.includes(item));
 }
 
+export function toIsoTimestampString(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return String(value);
+}
+
+export function getRecentSortTimestamp(result: Pick<SkillSearchResult, "latestVersionCreatedAt" | "updatedAt">): string {
+  return result.latestVersionCreatedAt ?? result.updatedAt;
+}
+
+export function compareIsoTimestampsDesc(a: string, b: string): number {
+  return b.localeCompare(a);
+}
+
+export function sortSkillSearchResultsByRecent(skills: SkillSearchResult[]): SkillSearchResult[] {
+  return [...skills].sort((a, b) =>
+    compareIsoTimestampsDesc(getRecentSortTimestamp(a), getRecentSortTimestamp(b))
+  );
+}
+
 export function toSearchResult(skill: RegistrySkill): SkillSearchResult {
   const latest = skill.versions[skill.latestVersion];
   if (!latest) {
@@ -130,6 +154,7 @@ export function toSearchResult(skill: RegistrySkill): SkillSearchResult {
     contributors: skill.contributors,
     downloads: Object.values(skill.versions).reduce((t, v) => t + v.downloads, 0),
     updatedAt: skill.updatedAt,
+    latestVersionCreatedAt: latest.createdAt,
     published: skill.published !== false,
   };
 }

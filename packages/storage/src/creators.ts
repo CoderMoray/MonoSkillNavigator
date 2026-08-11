@@ -1,5 +1,6 @@
 import type { PublicUser } from "./auth";
 import type { RegistryContributor, SkillSearchResult } from "./types";
+import { sortSkillSearchResultsByRecent } from "./utils";
 
 export interface CreatorSummary {
   name: string;
@@ -103,7 +104,7 @@ export function mergeOwnerUnpublishedSkills(
     return creator;
   }
 
-  const skills = [...creator.skills, ...extra].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const skills = sortSkillSearchResultsByRecent([...creator.skills, ...extra]);
   return { ...creator, skills };
 }
 
@@ -118,7 +119,7 @@ export function mergeOwnerRejectedSkills(
     return creator;
   }
 
-  const skills = [...creator.skills, ...extra].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const skills = sortSkillSearchResultsByRecent([...creator.skills, ...extra]);
   return { ...creator, skills };
 }
 
