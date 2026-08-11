@@ -5,28 +5,36 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { LogIn } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
+import { ErrorToast } from "../../components/ErrorToast";
 import { loginUser } from "../../lib/api";
 import { setAuthToken } from "../../lib/auth-token";
 import { creatorProfilePath } from "../../lib/creators";
+
+function formatLoginError(message: string): string {
+  if (message === "Invalid username or password") {
+    return "用户名或密码错误";
+  }
+  return message;
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
-    setError(null);
+    setErrorToast(null);
 
     try {
       const session = await loginUser(username, password);
       setAuthToken(session.token);
       router.push(creatorProfilePath(session.user.username));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "登录失败");
+      setErrorToast(formatLoginError(err instanceof Error ? err.message : "登录失败"));
     } finally {
       setSubmitting(false);
     }
@@ -34,6 +42,7 @@ export default function LoginPage() {
 
   return (
     <AppShell title="登录">
+      {errorToast ? <ErrorToast message={errorToast} onClose={() => setErrorToast(null)} /> : null}
       <div className="auth-page">
         <section className="auth-card card">
           <span className="eyebrow">
@@ -59,7 +68,6 @@ export default function LoginPage() {
                 value={password}
               />
             </label>
-            {error ? <div className="error compact-error">{error}</div> : null}
             <button className="button primary" disabled={submitting} type="submit">
               {submitting ? "登录中..." : "登录"}
             </button>
