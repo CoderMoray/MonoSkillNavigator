@@ -62,6 +62,8 @@ export {
   getRecentSortTimestamp,
   sortSkillSearchResultsByRecent,
   toIsoTimestampString,
+  resolveLatestApprovedVersion,
+  resolveVersionReference,
 } from "./utils";
 
 export {

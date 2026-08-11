@@ -642,8 +642,8 @@ export function buildServer() {
     }
 
     const registryVersion = await store.getVersion(request.params.slug, request.params.version);
-    if (!canAccessVersion(skill, registryVersion, user)) {
-      return reply.code(404).send({ error: "version_unpublished" });
+    if (!registryVersion || !canAccessVersion(skill, registryVersion, user)) {
+      return reply.code(404).send({ error: registryVersion ? "version_unpublished" : "version_not_found" });
     }
 
     const snapshot = await store.downloadSnapshot(request.params.slug, request.params.version);
@@ -651,7 +651,7 @@ export function buildServer() {
       return reply.code(404).send({ error: "version_not_found" });
     }
 
-    const fileName = `${getSkillSlug(snapshot.manifest)}-${request.params.version}.zip`;
+    const fileName = `${getSkillSlug(snapshot.manifest)}-${registryVersion.version}.zip`;
     return reply
       .header("content-type", "application/zip")
       .header("content-disposition", `attachment; filename="${fileName}"`)

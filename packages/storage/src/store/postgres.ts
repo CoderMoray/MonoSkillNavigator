@@ -30,6 +30,7 @@ import { parseVirusTotalReviewRow, virusTotalReviewColumns } from "../virustotal
 import { normalizeContributorRole, assertAssignableContributorRole } from "../contributors";
 import {
   toIsoTimestampString,
+  resolveVersionReference,
 } from "../utils";
 import { JsonRegistryStore } from "./base";
 
@@ -861,9 +862,10 @@ export class PostgresRegistryStore extends JsonRegistryStore {
 
   async downloadSnapshot(slug: string, version = "latest"): Promise<any | undefined> {
     await this.ensureSchema();
-    const resolved = version === "latest"
-      ? (await this.db.select({ v: schema.skills.latestVersion }).from(schema.skills).where(eq(schema.skills.slug, slug)).limit(1))[0]?.v
-      : version;
+    const skill = await this.getSkill(slug);
+    if (!skill) return undefined;
+
+    const resolved = resolveVersionReference(skill, version);
     if (!resolved) return undefined;
 
     const [v] = await this.db.select()
@@ -1186,7 +1188,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
   async getVersion(slug: string, ver = "latest"): Promise<RegistryVersion | undefined> {
     const skill = await this.getSkill(slug);
     if (!skill) return undefined;
-    const resolved = ver === "latest" ? skill.latestVersion : ver;
+    const resolved = resolveVersionReference(skill, ver);
     return skill.versions[resolved];
   }
 

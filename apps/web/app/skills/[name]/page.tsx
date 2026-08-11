@@ -654,7 +654,8 @@ export default function SkillDetailPage() {
       saveBlobAsFile(blob, fileName);
       const updated = await getSkill(skill.slug, token);
       setSkill(updated);
-      setSuccessToast(`已下载 v${version}（${fileName}）`);
+      const downloadedVersion = fileName.replace(/\.zip$/i, "").slice(skill.slug.length + 1);
+      setSuccessToast(`已下载 v${downloadedVersion}（${fileName}）`);
     } catch (err) {
       setDownloadError(formatVersionManageError(err instanceof Error ? err.message : "下载失败"));
     } finally {
@@ -863,12 +864,12 @@ export default function SkillDetailPage() {
               {viewer ? (
                 <button
                   className={isOwner ? "button secondary" : "button primary"}
-                  disabled={downloadingVersion === currentVersion.version}
-                  onClick={() => void handleDownload(currentVersion.version)}
+                  disabled={downloadingVersion === "latest"}
+                  onClick={() => void handleDownload("latest")}
                   type="button"
                 >
                   <Download size={16} />
-                  {downloadingVersion === currentVersion.version ? "下载中…" : "下载 Skill"}
+                  {downloadingVersion === "latest" ? "下载中…" : "下载 Skill"}
                 </button>
               ) : (
                 <Link className={isOwner ? "button secondary" : "button primary"} href="/login">

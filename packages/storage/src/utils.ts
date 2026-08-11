@@ -1,5 +1,6 @@
 import type { ReviewReport } from "@skill-platform/review-engine";
 import type { SkillSnapshot } from "@skill-platform/skill-spec";
+import { compareSemver } from "@skill-platform/skill-spec/skill-format";
 import {
   type RegistryContributor,
   type RegistryData,
@@ -173,8 +174,24 @@ export function normalizeReleaseTags(tags: unknown): string[] {
   return ["latest"];
 }
 
+export function resolveLatestApprovedVersion(skill: RegistrySkill): string | undefined {
+  const candidates = Object.values(skill.versions)
+    .filter((version) => version.status !== "rejected")
+    .sort((a, b) => {
+      const compared = compareSemver(b.version, a.version);
+      if (compared !== null && compared !== 0) {
+        return compared;
+      }
+      return b.createdAt.localeCompare(a.createdAt);
+    });
+
+  return candidates[0]?.version;
+}
+
 export function resolveVersionReference(skill: RegistrySkill, version: string): string {
-  if (version === "latest") return skill.latestVersion;
+  if (version === "latest") {
+    return resolveLatestApprovedVersion(skill) ?? skill.latestVersion;
+  }
   for (const [versionKey, registryVersion] of Object.entries(skill.versions)) {
     if (registryVersion.releaseTags.includes(version)) return versionKey;
   }
