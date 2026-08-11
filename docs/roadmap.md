@@ -1,6 +1,6 @@
 # 路线图
 
-**更新日期**：2026-08-07（待办清单扩充）
+**更新日期**：2026-08-11
 
 本文档跟踪 Skill 管理平台的阶段目标与完成情况。详细架构见 [architecture.md](./architecture.md)，进度见 [progress-summary.md](./progress-summary.md)。
 
@@ -8,15 +8,13 @@
 
 ## 阶段总览
 
-
-| 阶段        | 主题                          | 状态     |
-| --------- | --------------------------- | ------ |
-| Phase 0   | 核心规范与静态审查                   | ✅ 完成   |
-| Phase 1   | API / CLI / 注册表             | ✅ 完成   |
-| Phase 1.5 | Web UI + PostgreSQL + MinIO | ✅ 完成   |
-| Phase 2   | 外部扫描集成与安全增强                 | 🔄 进行中 |
-| Phase 3   | 社区、治理与规模化                   | 📋 规划中 |
-
+| 阶段 | 主题 | 状态 |
+| --- | --- | --- |
+| Phase 0 | 核心规范与静态审查 | ✅ 完成 |
+| Phase 1 | API / CLI / 注册表 | ✅ 完成 |
+| Phase 1.5 | Web UI + PostgreSQL + MinIO | 🔄 进行中 |
+| Phase 2 | 外部扫描集成与安全增强 | 🔄 进行中 |
+| Phase 3 | 社区、治理与规模化 | 📋 规划中 |
 
 ---
 
@@ -43,7 +41,7 @@
 
 ---
 
-## Phase 1.5：Web UI + 持久化 ✅
+## Phase 1.5：Web UI + 持久化 🔄
 
 - [x] Next.js Web（端口 3001）
 - [x] PostgreSQL 强制存储（Drizzle ORM + 迁移）
@@ -55,17 +53,16 @@
 - [x] 回收站（软删除 + 定时 purge）
 - [x] 书签
 - [x] 发布 metadata 合并与 loose frontmatter（Web 自动补全 description 等）
-- [ ] 更新网页Docs
+- [x] **站内文档（近期）**：VT 分组合并展示、审查拒绝规则、rejected 可见性（`apps/web/content/docs/`）
 - [ ] **版本可见性与下载策略**
-  - 未通过审查的新版本：公开搜索不可见；创作者个人中心可见
-  - 默认下载指向「最新通过审查」的版本，而非最新上传版本
-- [ ] **Skill 详情页操作区调整**
-  - 右侧去掉独立下载按钮；改为「发布新版本 / 删除 / 下架」
-  - 版本列表：Release 标签对齐；Download 按钮对齐；「下架」置于左侧
-  - 下载旁增加「复制 prompt」按钮（参考产品示例）
-- [ ] **VirusTotal Report 展示简化**
-  - 顶部统计并展示参与扫描的总厂家数量
-  - 描述中列出各 AV 厂家名称；同一风险等级合并到同一展示框
+  - [x] **rejected** 最新版本：公开搜索 / 榜单不可见；创作者个人中心可见
+  - [ ] 默认下载指向「最新通过审查」的版本，而非 latest 上传版本
+- [x] **Skill 详情页操作区调整**
+  - [x] 拥有者操作（发布新版本 / 删除 / 下架）置于右侧摘要卡片；Hero 保留下载与收藏
+  - [x] 版本列表：Release 标签对齐；Download 按钮对齐；「下架」置于左侧
+  - [x] 下载旁 **复制 prompt** 按钮
+- [x] **VirusTotal Report 展示简化**
+  - [x] malicious / suspicious **按类别各一条** finding（描述列 AV 厂家名称；证据区汇总 Result / Method / Engine update）
 - [ ] **审查列表导出**
   - 支持全选（含尚未分页加载的条目）
   - 导出前二次确认：展示选中数量，确认 / 取消
@@ -85,7 +82,7 @@
 - [x] **VirusTotal 静态 AV 扫描**
   - [x] SHA256 hash lookup
   - [x] 可选 upload-on-miss + poll + file re-fetch
-  - [x] per-engine malicious/suspicious findings
+  - [x] **按 category 合并** malicious / suspicious findings（aggregate fallback）
   - [x] `threat_verdict` 解析与 Web 展示
   - [x] 与 SkillSpector 并行，不阻塞审查流水线
 - [ ] CI 发布烟雾测试 + VT 超时策略
@@ -93,10 +90,10 @@
   - 梳理 hash lookup / upload / poll / re-fetch 各步骤
   - 每步独立 timeout（约十几秒），超时 retry 一次
   - 仍失败则记录原因并写入 review summary
-- [ ] **审查拒绝规则（文档 + 实现）**
-  - SkillSpector：`high` 一律拒绝；`medium` 且置信度 > 90% 拒绝
-  - VirusTotal：`high`（malicious）一律拒绝
-  - 同步更新 `docs/rules/` 与 Web 站内文档
+- [x] **审查拒绝规则（文档 + 实现）**
+  - [x] SkillSpector：`high` / `critical` 一律拒绝；`medium` 且置信度 ≥ 90% 拒绝
+  - [x] VirusTotal：`high`（malicious）一律拒绝
+  - [x] 同步更新 `docs/rules/review-rubric.md` 与 Web 站内文档
 
 ### 2.2 可靠性评估 ✅
 
@@ -107,7 +104,7 @@
 
 ### 2.3 评分与裁决 🔄
 
-- [x] Verdict 基于 findings severity
+- [x] Verdict 基于 findings severity（SkillSpector / VirusTotal 自动拒绝 + 其余 needs-review）
 - [x] finding confidence 字段
 
 ### 2.4 合规与许可证 🔄
@@ -140,21 +137,19 @@
 
 ## 基础设施清单
 
-
-| 组件     | 选型                 | 状态   |
-| ------ | ------------------ | ---- |
-| 语言     | TypeScript (ESM)   | ✅    |
-| API    | Fastify            | ✅    |
-| Web    | Next.js            | ✅    |
-| CLI    | Commander          | ✅    |
-| 数据库    | PostgreSQL         | ✅ 强制 |
-| ORM    | Drizzle            | ✅    |
-| 对象存储   | MinIO              | ✅ 可选 |
-| 迁移     | drizzle-kit + 自动执行 | ✅    |
-| 安全扫描   | SkillSpector       | ✅ 可选 |
-| 恶意软件扫描 | VirusTotal（静态 AV）  | ✅ 可选 |
-| 可靠性    | HaluCatch          | ✅ 可选 |
-
+| 组件 | 选型 | 状态 |
+| --- | --- | --- |
+| 语言 | TypeScript (ESM) | ✅ |
+| API | Fastify | ✅ |
+| Web | Next.js | ✅ |
+| CLI | Commander | ✅ |
+| 数据库 | PostgreSQL | ✅ 强制 |
+| ORM | Drizzle | ✅ |
+| 对象存储 | MinIO | ✅ 可选 |
+| 迁移 | drizzle-kit + 自动执行 | ✅ |
+| 安全扫描 | SkillSpector | ✅ 可选 |
+| 恶意软件扫描 | VirusTotal（静态 AV） | ✅ 可选 |
+| 可靠性 | HaluCatch | ✅ 可选 |
 
 ---
 
@@ -169,18 +164,13 @@
 ### P1 — 审查与安全
 
 - [ ] VirusTotal API 分步 timeout + retry
-- [ ] SkillSpector / VirusTotal 拒绝规则（实现 + 文档）
-- [ ] 未过审版本可见性 & 默认下载最新过审版本
+- [x] SkillSpector / VirusTotal 拒绝规则（实现 + 文档）
+- [ ] **默认下载最新通过审查版本**（rejected 搜索隐藏与个人中心可见 ✅ 已完成）
 
 ### P2 — Web UX
 
-- [ ] 更新网页Docs
-- [ ] Skill 详情操作区（发布新版本 / 删除 / 下架 / 复制 prompt）
-- [ ] 版本列表布局对齐（Release 标签、Download、下架位置）
-- [ ] VirusTotal Report 简化（厂家总数、按等级分框、厂家名称）
 - [ ] 审查列表全选导出 + 二次确认 + 确认导出交付方式
 - [ ] 回收站立即删除 → 居中 Toast
-- [x] 文档「HaluCatch 审查」→「质量审查」
 
 ### P3 — CLI & 账号
 
@@ -194,9 +184,9 @@
 
 ## 下一步建议（优先级）
 
-1. **P0**：修复 API `server.ts` 启动报错
-2. **P1**：VT timeout/retry、审查拒绝规则、版本可见性策略
-3. **P2**：Skill 详情与 VT Report UI、审查列表导出
+1. **P0**：修复 API `server.ts` 启动报错（若仍复现）
+2. **P1**：VT timeout/retry、**默认下载指向最新过审版本**
+3. **P2**：审查列表导出、回收站 Toast UX
 4. **P3**：CLI 完善、RBAC、邮箱与 Contributor 邀请流
 
 ---
@@ -207,4 +197,3 @@
 - [progress-summary.md](./progress-summary.md) — 详细进度
 - [AGENTS.md](../AGENTS.md) — 开发约定
 - [docs/rules/](./rules/) — Skill 规范与审查规则
-

@@ -1,6 +1,6 @@
 # 项目进度总结
 
-**更新日期**：2026-08-07
+**更新日期**：2026-08-11
 
 ## 概述
 
@@ -22,9 +22,8 @@ Skill 管理平台是一个 TypeScript npm workspaces monorepo，用于 Agent Sk
 - [x] 目录/ZIP 读取与 `SkillSnapshot` 生成
 - [x] 显式 `slug` 要求与 immutable 语义
 - [x] 发布 metadata 合并（`applySkillPublishMetadata`）
+- [x] 发布时写入 `author`（`applySkillAuthor`，覆盖包内值为当前登录用户名）
 - [x] 宽松 frontmatter 读取（`readSkillZipBufferLoose`），Web 发布时自动补全 description 等字段
-
-
 
 ### review-engine
 
@@ -34,21 +33,20 @@ Skill 管理平台是一个 TypeScript npm workspaces monorepo，用于 Agent Sk
 - [x] **VirusTotal 集成**：
   - SHA256 hash lookup + 可选 upload-on-miss
   - `last_analysis_stats` / `last_analysis_results` 解析
-  - per-engine malicious/suspicious findings（aggregate fallback）
+  - **按 category 合并** malicious / suspicious findings（每类一条；无逐引擎明细时 aggregate fallback）
   - `threat_verdict` 解析、存储与 Web 展示
   - 与 SkillSpector 并行执行
-- [x] Verdict：critical/high → rejected，medium → needs-review
+- [x] **Verdict 拒绝规则**（`calculateReviewVerdict`）：
+  - SkillSpector：`high` / `critical`；或 `medium` 且置信度 ≥ 90% → `rejected`
+  - VirusTotal：`high` / `critical`（如 malicious 合并 finding）→ `rejected`
+  - 其余 finding → `needs-review`；无 finding → `published`
 - [x] 三维度评分结构（quality / security / reliability）
-
-
 
 ### evaluator
 
 - [x] HaluCatch 五维静态可靠性评估
 - [x] `tests/*.json` 功能性评估回退
 - [x] HaluCatch report JSON 持久化
-
-
 
 ### storage
 
@@ -59,8 +57,8 @@ Skill 管理平台是一个 TypeScript npm workspaces monorepo，用于 Agent Sk
 - [x] 书签
 - [x] Contributor、Issue、Rating、榜单
 - [x] Review 扩展：SkillSpector、VirusTotal（含 threat_verdict）、HaluCatch、finding confidence
-
-
+- [x] **公开搜索排除 rejected**：`search()` / 榜单不返回最新版本 verdict 为 `rejected` 的 Skill
+- [x] **拥有者个人中心可见 rejected**：`listRejectedSkillsForOwner` + `mergeOwnerRejectedSkills`
 
 ### API
 
@@ -69,49 +67,42 @@ Skill 管理平台是一个 TypeScript npm workspaces monorepo，用于 Agent Sk
 - [x] 审查重跑（Worker）
 - [x] 回收站 restore / purge
 - [x] 书签 CRUD
-- [x] 创作者主页与 unpublished 合并展示
-
-
+- [x] 创作者主页：unpublished + **rejected** 合并展示（仅 profile owner）
 
 ### Web UI
 
-- [x] 首页搜索与 Skill 卡片
+- [x] 首页搜索与 Skill 卡片（不含 rejected Skill）
 - [x] Skill 详情：审查 findings、SkillSpector 摘要、**VirusTotal 卡片**（status、stats、SHA256、threat verdict、链接）
-- [x] 安全 findings 列表含 `virustotal-*` 条目
+- [x] VirusTotal finding **按 malicious / suspicious 分组合并展示**（描述列厂家、证据区汇总 Result/Method）
+- [x] 详情页 **复制 prompt**（`skill-install-prompt.ts`）；Hero 保留下载与收藏
+- [x] 拥有者操作区：发布新版本 / 下架 / 删除（右侧摘要卡片）；版本列表 Release / Download / 下架对齐
 - [x] HaluCatch 雷达图与详情页
-- [x] 发布页（Description 标签、ZIP 上传、frontmatter 自动补全）
-- [x] 创作者主页、榜单、审查列表
-- [x] 站内文档（格式、安全扫描、HaluCatch 等）
-
-
+- [x] 发布页（Description 标签、ZIP 上传、frontmatter 自动补全、Toast 提示）
+- [x] 创作者主页、榜单、审查列表；个人中心提示 rejected / 已下架仅 owner 可见
+- [x] 站内文档（格式、发布流程、安全扫描、质量审查等；已同步 VT 合并展示与 rejected 可见性）
 
 ### CLI & Worker
 
 - [x] CLI：publish、search、install、review 等
 - [x] Worker：批量重审注册表 Skill
 
-
-
 ### 测试
 
 - [x] API 烟雾测试（`tests/smoke.test.ts`）
 - [x] skill-spec 单元测试（含 loose publish 路径）
-- [x] VirusTotal 单元测试（engine 解析、threat_verdict、upload 重取，7 cases）
+- [x] VirusTotal 单元测试（engine 解析、**分组 finding**、threat_verdict、upload 重取）
+- [x] `tests/review-verdict.test.ts`（SkillSpector / VirusTotal 拒绝规则）
+- [x] `tests/creator-profile-skills.test.ts`（owner profile rejected 合并）
 - [x] SkillSpector、HaluCatch、license-compliance、review-score-dimensions 等
-
-
 
 ## 当前限制
 
-
-| 领域  | 限制                          |
-| --- | --------------------------- |
-| 认证  | Session 为主，无 OAuth/JWT/RBAC |
-| 测试  | 烟雾测试未覆盖重复注册、token 过期、回收站边界等 |
-| CI  | 无 VT 集成的发布超时策略              |
-
-
-
+| 领域 | 限制 |
+| --- | --- |
+| 认证 | Session 为主，无 OAuth/JWT/RBAC |
+| 发现 | **rejected** 已从搜索/榜单隐藏；**默认下载仍指向 latest 版本**，尚未切换为「最新通过审查」版本 |
+| 测试 | 烟雾测试未覆盖重复注册、token 过期、回收站边界等 |
+| CI / VT | upload-on-miss 轮询默认 90s 超时；无分步 timeout + retry |
 
 ## 验证命令
 
@@ -122,18 +113,17 @@ npm run dev         # 本地 API + Web
 npm run setup       # 种子用户 + Demo Skill
 ```
 
-
-
 ## 关键文件索引
 
-
-| 领域           | 路径                                          |
-| ------------ | ------------------------------------------- |
-| 审查入口         | `packages/review-engine/src/index.ts`       |
-| VirusTotal   | `packages/review-engine/src/virustotal.ts`  |
-| VT 存储        | `packages/storage/src/virustotal-review.ts` |
-| 发布 API       | `apps/api/src/server.ts`                    |
-| Skill 详情 Web | `apps/web/app/skills/[name]/page.tsx`       |
-| 迁移           | `packages/storage/drizzle/`                 |
-
-
+| 领域 | 路径 |
+| --- | --- |
+| 审查入口 / verdict | `packages/review-engine/src/index.ts` |
+| VirusTotal | `packages/review-engine/src/virustotal.ts` |
+| VT 存储 | `packages/storage/src/virustotal-review.ts` |
+| 搜索 / rejected 过滤 | `packages/storage/src/store/postgres.ts` |
+| Creator 合并 | `packages/storage/src/creators.ts` |
+| 发布 API | `apps/api/src/server.ts` |
+| Skill 详情 Web | `apps/web/app/skills/[name]/page.tsx` |
+| 安装 prompt | `apps/web/lib/skill-install-prompt.ts` |
+| Web 帮助文档 | `apps/web/content/docs/` |
+| 迁移 | `packages/storage/drizzle/` |

@@ -115,7 +115,13 @@ Web 发布路径会在审查前补全缺失或不完整的 frontmatter，避免�
 5. 汇总 findings → verdict + 三维度评分
 ```
 
-**Verdict 规则**：存在 `critical`/`high` → `rejected`；存在 `medium` → `needs-review`；否则 → `published`。
+**Verdict 规则**（`calculateReviewVerdict`，仅 SkillSpector / VirusTotal 触发自动拒绝）：
+
+- **rejected**：SkillSpector 任意 `high` / `critical`；或 SkillSpector `medium` 且置信度 ≥ 90%；或 VirusTotal 任意 `high` / `critical`（如 malicious 类别合并 finding）
+- **needs-review**：存在其他 finding（含 suspicious VT、平台合规/质量规则等）
+- **published**：无任何 finding
+
+**公开发现**：`search()` / 榜单排除最新版本 verdict 为 `rejected` 的 Skill；拥有者个人中心通过 `listRejectedSkillsForOwner` 合并展示。
 
 **评分维度**：`qualityScore`、`securityScore`、`reliabilityScore` 三个独立维度，不计算综合分。
 
@@ -154,8 +160,8 @@ Worker POST /reviews/rerun → 对注册表 Skill 重跑审查
 | ------------ | ------------------------------------------------------------------------ |
 | 平台规则         | 合规、泄露、隐私、混淆代码等静态模式                                                       |
 | SkillSpector | 调用 Python SkillSpector，解析 per-finding 结果与 summary                        |
-| VirusTotal   | SHA256 查 hash；可选 upload-on-miss；per-engine malicious/suspicious findings |
-| 评分/裁决        | `calculateScores`、`calculateVerdict`                                     |
+| VirusTotal   | SHA256 查 hash；可选 upload-on-miss；**按 category 合并** malicious / suspicious findings（每类一条） |
+| 评分/裁决        | `calculateScores`、`calculateReviewVerdict`                                     |
 
 
 SkillSpector 与 VirusTotal **并行**执行（`Promise.all`），互不阻塞。
@@ -168,7 +174,8 @@ SkillSpector 与 VirusTotal **并行**执行（`Promise.all`），互不阻塞�
 | `GET /files/{sha256}` hash lookup               | ✅                              |
 | upload-on-miss + poll + re-fetch                | ✅（`VIRUSTOTAL_UPLOAD_ON_MISS`） |
 | `last_analysis_stats` / `last_analysis_results` | ✅                              |
-| per-engine malicious/suspicious findings        | ✅                              |
+| 按 category 合并 malicious / suspicious findings | ✅（每类一条；无逐引擎明细时 aggregate fallback） |
+| `engineResults` 逐引擎明细持久化于 review summary      | ✅（供 stats；UI finding 已合并展示）          |
 | `threat_verdict` 解析与展示                          | ✅                              |
 | sandbox_verdicts / behaviours / GTI             | ❌ 未接入                          |
 
@@ -176,6 +183,13 @@ SkillSpector 与 VirusTotal **并行**执行（`Promise.all`），互不阻塞�
 配置：`VIRUSTOTAL_API_KEY`（必需）、`VIRUSTOTAL_UPLOAD_ON_MISS`（默认 false）、超时与轮询间隔见 `.env.example`。
 
 扫描对象：发布包整体 ZIP 的 SHA256（非单文件扫描）。
+
+**Finding 形态**（`createGroupedCategoryFinding`）：
+
+- **malicious** / **suspicious** 各至多一条 security finding
+- **message**：列出该类别下全部 AV 厂家名称（逗号分隔）
+- **evidence**：共享 SHA-256、Category、Report；汇总 Result / Method / Engine update（无单独 Engine 行）
+- 原始 `last_analysis_results` 仍解析为 `engineResults` 写入 `skill_reviews` 扩展字段
 
 ### 5.4 evaluator
 
@@ -201,7 +215,7 @@ SkillSpector 与 VirusTotal **并行**执行（`Promise.all`），互不阻塞�
 Review 扩展列（近期）：
 
 - SkillSpector summary + findings
-- VirusTotal：status、stats、sha256、link、error、threat_verdict
+- VirusTotal：status、stats、sha256、link、error、threat_verdict、**engineResults**（逐引擎明细）
 - HaluCatch report JSON
 - finding confidence
 
@@ -234,7 +248,7 @@ Review 扩展列（近期）：
 
 ### 6.2 Web（Next.js）
 
-- 首页搜索、Skill 详情（审查 findings、SkillSpector/VirusTotal 摘要、HaluCatch 雷达图）
+- 首页搜索、Skill 详情（审查 findings、SkillSpector/VirusTotal 摘要、HaluCatch 雷达图；**rejected Skill 不出现在搜索/榜单**）
 - 发布页（Description 字段、ZIP 上传、metadata 自动补全）
 - 创作者主页、榜单、审查列表
 - 站内文档（skill-format、security-scan、halucatch-review 等）
