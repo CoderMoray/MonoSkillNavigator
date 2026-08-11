@@ -51,7 +51,7 @@
 | 来源 | 拒绝条件 |
 | --- | --- |
 | **SkillSpector** | 任意 `high` / `critical` finding；或 `medium` finding 且 **置信度 ≥ 90%** |
-| **VirusTotal** | 任意 `high` / `critical` finding（如 AV 引擎报 **malicious**） |
+| **VirusTotal** | 任意 `high` / `critical` finding（存在 **malicious** 类别检出时，合并为一条 high 级 finding） |
 
 **平台合规/质量** finding（如 tags 缺失、description 不规范、内置降级规则命中等）**不会**单独导致 rejected，但会使 verdict 为 **需复核**。
 

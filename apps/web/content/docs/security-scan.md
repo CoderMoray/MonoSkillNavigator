@@ -18,11 +18,33 @@ MonoSkillNavigator 对每次发布（或重审）的 Skill 快照做 **静态安
    - **安装建议**：可安装（SAFE）/ 谨慎（CAUTION）/ 不建议安装（DO_NOT_INSTALL）  
    - **模式**：通常为「仅静态扫描」
 
-2. **Finding 列表**  
-   每条包含：类别标题（中文）、**严重度徽章**（低/中/高/严重）、**置信度**（若规则提供）、说明、修复建议、命中证据片段。
+2. **Finding 列表**（SkillSpector 与 VirusTotal 等）  
+   每条包含：标题、**严重度徽章**（低/中/高/严重）、**置信度**（SkillSpector 规则若提供）、说明、修复建议、命中证据片段。VirusTotal 的 malicious/suspicious 按上节 **按类别合并** 展示。
 
-3. **VirusTotal**（已配置 API 且扫描完成时）  
-   展示 malicious / suspicious 统计、威胁结论、各 AV 引擎逐条 finding，以及报告链接（若有）。
+3. **VirusTotal 摘要**（已配置 API 时）  
+   独立卡片展示扫描器名称、状态（已完成 / 未命中历史报告 / 扫描失败）、恶意与可疑 **检出数量**、威胁结论（若有）、SHA-256 前缀与 **VirusTotal 报告链接**（若有）。
+
+4. **VirusTotal finding**（扫描 **completed** 且存在 malicious 或 suspicious 检出时）  
+   按 **风险类别** 合并展示，**不是** 每个 AV 引擎单独一条：
+   - **malicious** 检出 → 一条 **高** 级 finding（会触发 **已拒绝**）
+   - **suspicious** 检出 → 一条 **中** 级 finding（通常为 **需复核**）
+
+   每条合并 finding 包含：
+   - **标题**：如 `VirusTotal (malicious)` / `VirusTotal (suspicious)`
+   - **说明**：列出所有检出该类的 AV 厂家名称（逗号分隔），如「AhnLab-V3, Kaspersky, … classified this package as malicious.」
+   - **建议**：malicious 与 suspicious 各有一条固定修复建议（与单引擎时相同）
+   - **证据区**（同一类别内汇总）：
+
+   | 字段 | 说明 |
+   | --- | --- |
+   | SHA-256 | 被扫描 ZIP 的哈希，整份报告唯一 |
+   | Category | 该框的类别（`malicious` 或 `suspicious`） |
+   | Result | 各引擎的检出名称，逗号分隔（通常较长） |
+   | Method | 各引擎的判定方式，去重后逗号分隔（常见为 `blacklist`） |
+   | Engine update | 各引擎病毒库版本日期，去重后逗号分隔（不同厂家更新节奏不同，故可能出现多个日期） |
+   | Report | 该文件在 VirusTotal 上的分析页链接 |
+
+   证据区 **不再单独列出 Engine 行**（厂家名称已在说明中）。若仅有统计、无逐引擎明细，则回退为一条 **汇总** malicious/suspicious finding。
 
 部分 **平台合规/质量** finding（如 tags、description 规范）计入审查记录，但 **不在安全区域列表展示**；它们仍可能影响发布 verdict（通常为 **需复核**）。
 
@@ -83,7 +105,7 @@ SkillSpector 的「不建议安装」是 **包级安全建议**，与页面「�
 
 - `SKILLSPECTOR_ENABLED=false` 可关闭 SkillSpector  
 - `SKILLSPECTOR_PYTHON`、`SKILLSPECTOR_DIR`、`SKILLSPECTOR_TIMEOUT_MS` 用于指定解释器、目录与超时  
-- `VIRUSTOTAL_API_KEY` 启用 VirusTotal；`VIRUSTOTAL_UPLOAD_ON_MISS` 等控制未命中时是否上传样本
+- `VIRUSTOTAL_API_KEY` 启用 VirusTotal；`VIRUSTOTAL_UPLOAD_ON_MISS` 控制未命中 hash 时是否上传样本（上传后需轮询分析，可能受 `VIRUSTOTAL_TIMEOUT_MS` 默认 90s 限制）
 
 ## 如何修复与重新发布
 
