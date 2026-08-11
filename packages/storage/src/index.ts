@@ -65,6 +65,7 @@ export {
   createEmptyCreatorSummary,
   listCreators,
   mergeOwnerUnpublishedSkills,
+  mergeOwnerRejectedSkills,
   normalizeHandle,
   type CreatorSummary,
 } from "./creators";

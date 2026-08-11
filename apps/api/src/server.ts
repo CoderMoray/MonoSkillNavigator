@@ -27,6 +27,7 @@ import {
   listCreators,
   loadDotEnvIfPresent,
   mergeOwnerUnpublishedSkills,
+  mergeOwnerRejectedSkills,
   normalizeCategoryFilters,
   normalizeHandle,
   type ContributorRole,
@@ -265,14 +266,21 @@ export function buildServer() {
     const skills = await store.search("");
     const isProfileOwner = Boolean(viewer && normalizeHandle(viewer.username) === handle);
     let unpublished: Awaited<ReturnType<typeof store.listUnpublishedSkillsForOwner>> = [];
+    let rejected: Awaited<ReturnType<typeof store.listRejectedSkillsForOwner>> = [];
     if (isProfileOwner && viewer) {
-      unpublished = await store.listUnpublishedSkillsForOwner(viewer.id);
+      [unpublished, rejected] = await Promise.all([
+        store.listUnpublishedSkillsForOwner(viewer.id),
+        store.listRejectedSkillsForOwner(viewer.id)
+      ]);
     }
+
+    const mergeOwnerOnlySkills = (creator: ReturnType<typeof createEmptyCreatorSummary>) =>
+      mergeOwnerRejectedSkills(mergeOwnerUnpublishedSkills(creator, unpublished), rejected);
 
     const matched = aggregateCreators(skills).find((item) => item.handle === handle);
     if (matched) {
       return {
-        creator: isProfileOwner ? mergeOwnerUnpublishedSkills(matched, unpublished) : matched
+        creator: isProfileOwner ? mergeOwnerOnlySkills(matched) : matched
       };
     }
 
@@ -283,7 +291,7 @@ export function buildServer() {
 
     let creator = createEmptyCreatorSummary(user.username);
     if (isProfileOwner) {
-      creator = mergeOwnerUnpublishedSkills(creator, unpublished);
+      creator = mergeOwnerOnlySkills(creator);
     }
     return { creator };
   });

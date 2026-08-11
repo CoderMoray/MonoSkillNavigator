@@ -199,6 +199,7 @@ export interface RegistryStore {
   addRating(slug: string, rating: CreateRatingInput): Promise<RegistryRating>;
   search(query?: string, categories?: string[]): Promise<SkillSearchResult[]>;
   listUnpublishedSkillsForOwner(ownerUserId: string): Promise<SkillSearchResult[]>;
+  listRejectedSkillsForOwner(ownerUserId: string): Promise<SkillSearchResult[]>;
   getSkill(slug: string): Promise<RegistrySkill | undefined>;
   getSkillSlugAvailability(slug: string): Promise<SkillSlugAvailability>;
   getVersion(slug: string, version?: string): Promise<RegistryVersion | undefined>;

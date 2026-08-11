@@ -107,6 +107,21 @@ export function mergeOwnerUnpublishedSkills(
   return { ...creator, skills };
 }
 
+/** Appends owner-only rejected skills to a creator profile (does not change published count). */
+export function mergeOwnerRejectedSkills(
+  creator: CreatorSummary,
+  rejected: SkillSearchResult[]
+): CreatorSummary {
+  const existingSlugs = new Set(creator.skills.map((skill) => skill.slug));
+  const extra = rejected.filter((skill) => !existingSlugs.has(skill.slug));
+  if (extra.length === 0) {
+    return creator;
+  }
+
+  const skills = [...creator.skills, ...extra].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return { ...creator, skills };
+}
+
 function unknownContributor(): RegistryContributor {
   return {
     id: "unknown",

@@ -221,6 +221,7 @@ export abstract class JsonRegistryStore implements RegistryStore {
     return Object.values(data.skills)
       .filter((s) => s.published !== false)
       .filter((s) => !s.deletedAt)
+      .filter((s) => s.versions[s.latestVersion]?.status !== "rejected")
       .filter((s) => !q || s.slug.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))
       .filter((s) => {
         const latest = s.versions[s.latestVersion];
@@ -235,6 +236,15 @@ export abstract class JsonRegistryStore implements RegistryStore {
     return Object.values(data.skills)
       .filter((skill) => skill.published === false && !skill.deletedAt && isSkillOwner(skill, { id: ownerUserId, username: "" }))
       .map((skill) => ({ ...toSearchResult(skill), published: false }))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  async listRejectedSkillsForOwner(ownerUserId: string): Promise<SkillSearchResult[]> {
+    const data = await this.load();
+    return Object.values(data.skills)
+      .filter((skill) => !skill.deletedAt && isSkillOwner(skill, { id: ownerUserId, username: "" }))
+      .filter((skill) => skill.versions[skill.latestVersion]?.status === "rejected")
+      .map((skill) => ({ ...toSearchResult(skill), published: skill.published !== false }))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 

@@ -11,7 +11,7 @@ import {
 } from "@skill-platform/skill-spec";
 import { compareSemver } from "@skill-platform/skill-spec/skill-format";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { eq, and, sql, desc, or, ilike, inArray, isNull, isNotNull, lte } from "drizzle-orm";
+import { eq, and, sql, desc, or, ilike, inArray, isNull, isNotNull, lte, ne } from "drizzle-orm";
 import pg from "pg";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../schema";
@@ -207,6 +207,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         and(
           isNull(schema.skills.deletedAt),
           eq(schema.skills.published, true),
+          ne(schema.skillVersions.status, "rejected"),
           q
             ? or(
                 ilike(schema.skills.slug, searchPattern),
@@ -368,6 +369,110 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       downloads: r.totalDownloads,
       updatedAt: String(r.updatedAt),
       published: false,
+    }));
+  }
+
+  async listRejectedSkillsForOwner(ownerUserId: string): Promise<SkillSearchResult[]> {
+    await this.ensureSchema();
+    const ownerMatch = or(
+      eq(schema.skills.ownerUserId, ownerUserId),
+      sql`exists (
+        select 1 from ${schema.skillContributors} sc
+        where sc.skill_slug = ${schema.skills.slug}
+        and sc.role = 'owner'
+        and sc.user_id = ${ownerUserId}
+      )`
+    );
+
+    const rows = await this.db
+      .select({
+        slug: schema.skills.slug,
+        name: schema.skills.name,
+        description: schema.skills.description,
+        latestVersion: schema.skills.latestVersion,
+        published: schema.skills.published,
+        status: schema.skillVersions.status,
+        categories: schema.skillVersions.categories,
+        qualityScore: schema.skillReviews.qualityScore,
+        securityScore: schema.skillReviews.securityScore,
+        reliabilityScore: schema.skillReviews.reliabilityScore,
+        averageRating: schema.skills.averageRating,
+        ratingCount: schema.skills.ratingCount,
+        totalDownloads: sql<number>`coalesce(sum(${schema.skillVersions.downloads}), 0)`.mapWith(Number),
+        updatedAt: schema.skills.updatedAt,
+        openIssues: sql<number>`(
+          select count(*) from ${schema.skillIssues}
+          where ${schema.skillIssues.skillSlug} = ${schema.skills.slug}
+          and ${schema.skillIssues.status} != 'closed'
+        )`.mapWith(Number),
+      })
+      .from(schema.skills)
+      .innerJoin(
+        schema.skillVersions,
+        and(
+          eq(schema.skillVersions.skillSlug, schema.skills.slug),
+          eq(schema.skillVersions.version, schema.skills.latestVersion)
+        )
+      )
+      .innerJoin(
+        schema.skillReviews,
+        and(
+          eq(schema.skillReviews.skillSlug, schema.skills.slug),
+          eq(schema.skillReviews.version, schema.skills.latestVersion)
+        )
+      )
+      .where(and(isNull(schema.skills.deletedAt), eq(schema.skillVersions.status, "rejected"), ownerMatch))
+      .groupBy(
+        schema.skills.slug,
+        schema.skills.name,
+        schema.skills.description,
+        schema.skills.latestVersion,
+        schema.skills.published,
+        schema.skillVersions.status,
+        schema.skillVersions.categories,
+        schema.skillReviews.qualityScore,
+        schema.skillReviews.securityScore,
+        schema.skillReviews.reliabilityScore,
+        schema.skills.averageRating,
+        schema.skills.ratingCount,
+        schema.skills.updatedAt
+      )
+      .orderBy(desc(schema.skills.updatedAt));
+
+    const slugs = rows.map((r) => r.slug);
+    if (slugs.length === 0) return [];
+
+    const allContributors = await this.db
+      .select()
+      .from(schema.skillContributors)
+      .where(inArray(schema.skillContributors.skillSlug, slugs));
+
+    const contributorsMap = new Map<string, SkillSearchResult["contributors"]>();
+    for (const c of allContributors) {
+      const list = contributorsMap.get(c.skillSlug) ?? [];
+      list.push(mapContributorRow(c));
+      contributorsMap.set(c.skillSlug, list);
+    }
+
+    return rows.map((r) => ({
+      slug: r.slug,
+      name: r.name,
+      description: r.description,
+      latestVersion: r.latestVersion,
+      status: r.status as SkillSearchResult["status"],
+      scores: {
+        qualityScore: Number(r.qualityScore),
+        securityScore: Number(r.securityScore),
+        reliabilityScore: Number(r.reliabilityScore),
+      },
+      categories: r.categories ?? [],
+      averageRating: Number(r.averageRating),
+      ratingCount: Number(r.ratingCount),
+      openIssues: r.openIssues,
+      contributors: contributorsMap.get(r.slug) ?? [],
+      downloads: r.totalDownloads,
+      updatedAt: String(r.updatedAt),
+      published: r.published,
     }));
   }
 
