@@ -46,6 +46,7 @@ import {
   createSkillIssue,
   deleteSkill,
   downloadSkillVersion,
+  resolveDownloadedSkillVersion,
   getCurrentUser,
   getSkill,
   getSkills,
@@ -650,11 +651,11 @@ export default function SkillDetailPage() {
 
     setDownloadingVersion(version);
     try {
-      const { blob, fileName } = await downloadSkillVersion(token, skill.slug, version);
+      const { blob, fileName } = await downloadSkillVersion(token, skill.slug, version, skill.name);
       saveBlobAsFile(blob, fileName);
       const updated = await getSkill(skill.slug, token);
       setSkill(updated);
-      const downloadedVersion = fileName.replace(/\.zip$/i, "").slice(skill.slug.length + 1);
+      const downloadedVersion = resolveDownloadedSkillVersion(fileName, skill.name, version);
       setSuccessToast(`已下载 v${downloadedVersion}（${fileName}）`);
     } catch (err) {
       setDownloadError(formatVersionManageError(err instanceof Error ? err.message : "下载失败"));

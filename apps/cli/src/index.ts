@@ -23,6 +23,7 @@ interface BinaryResponse {
   status: number;
   body: Buffer;
   error?: string;
+  fileName?: string;
 }
 
 const program = new Command();
@@ -197,7 +198,7 @@ program
       return;
     }
 
-    const outputPath = resolveUserPath(output ?? `${slug}-${options.version}.zip`);
+    const outputPath = resolveUserPath(output ?? response.fileName ?? `${slug}-${options.version}.zip`);
     await writeFile(outputPath, response.body);
     console.log(`Downloaded ${slug}@${options.version} to ${outputPath}`);
   });
@@ -346,8 +347,27 @@ async function getBinary(url: string, token?: string): Promise<BinaryResponse> {
   return {
     status: response.status,
     body,
-    error
+    error,
+    fileName: parseContentDispositionFilename(response.headers.get("content-disposition"))
   };
+}
+
+function parseContentDispositionFilename(header: string | null): string | undefined {
+  if (!header) {
+    return undefined;
+  }
+
+  const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+
+  const asciiMatch = header.match(/filename="([^"]+)"/i) ?? header.match(/filename=([^;]+)/i);
+  return asciiMatch?.[1]?.trim();
 }
 
 async function postJson<T>(url: string, body: unknown, token?: string): Promise<ApiResponse<T>> {

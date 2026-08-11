@@ -339,3 +339,33 @@ export function isSemverGreaterThan(next: string, current: string): boolean {
   const compared = compareSemver(next, current);
   return compared !== null && compared > 0;
 }
+
+export function sanitizeSkillDownloadBaseName(skillName: string): string {
+  const sanitized = skillName
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return sanitized || "skill";
+}
+
+export function buildSkillDownloadFileName(skillName: string, version: string): string {
+  return `${sanitizeSkillDownloadBaseName(skillName)}-${version}.zip`;
+}
+
+export function parseSkillDownloadVersion(fileName: string, skillName: string): string | undefined {
+  const prefix = `${sanitizeSkillDownloadBaseName(skillName)}-`;
+  if (!fileName.toLowerCase().endsWith(".zip")) {
+    return undefined;
+  }
+
+  const base = fileName.slice(0, -4);
+  if (!base.startsWith(prefix)) {
+    return undefined;
+  }
+
+  const version = base.slice(prefix.length);
+  return version || undefined;
+}

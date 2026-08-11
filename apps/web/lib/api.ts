@@ -9,6 +9,7 @@ import type {
   SkillSearchResult
 } from "./types";
 import type { CreatorSummary } from "./creators";
+import { buildSkillDownloadFileName, parseSkillDownloadVersion } from "@skill-platform/skill-spec/skill-format";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:3000";
 
@@ -99,7 +100,8 @@ export interface SkillDownloadResult {
 export async function downloadSkillVersion(
   token: string,
   slug: string,
-  version: string
+  version: string,
+  skillName?: string
 ): Promise<SkillDownloadResult> {
   const url = new URL(
     `/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}/download`,
@@ -118,13 +120,25 @@ export async function downloadSkillVersion(
     throw new Error(data?.error ?? `Download failed: ${response.status} ${response.statusText}`);
   }
 
+  const headerFileName = parseContentDispositionFilename(response.headers.get("content-disposition"));
+  const fallbackVersion = version === "latest" ? undefined : version;
   const fileName =
-    parseContentDispositionFilename(response.headers.get("content-disposition")) ?? `${slug}-${version}.zip`;
+    headerFileName ??
+    (skillName && fallbackVersion
+      ? buildSkillDownloadFileName(skillName, fallbackVersion)
+      : `${slug}-${version}.zip`);
 
   return {
     blob: await response.blob(),
     fileName
   };
+}
+
+export function resolveDownloadedSkillVersion(fileName: string, skillName: string, requestedVersion: string): string {
+  return (
+    parseSkillDownloadVersion(fileName, skillName) ??
+    (requestedVersion === "latest" ? "latest" : requestedVersion)
+  );
 }
 
 export function saveBlobAsFile(blob: Blob, fileName: string): void {

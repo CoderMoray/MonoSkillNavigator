@@ -6,6 +6,7 @@ import { reviewAndEvaluateSkillSnapshot } from "@skill-platform/review-engine";
 import {
   applySkillAuthor,
   applySkillPublishMetadata,
+  buildSkillDownloadFileName,
   findSkillEntryFile,
   getSkillSlug,
   parseSkillFrontmatterHints,
@@ -176,7 +177,8 @@ export function buildServer() {
 
   app.register(cors, {
     origin: true,
-    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    exposedHeaders: ["Content-Disposition"]
   });
 
   app.get("/health", async () => ({
@@ -651,7 +653,7 @@ export function buildServer() {
       return reply.code(404).send({ error: "version_not_found" });
     }
 
-    const fileName = `${getSkillSlug(snapshot.manifest)}-${registryVersion.version}.zip`;
+    const fileName = buildSkillDownloadFileName(skill.name, registryVersion.version);
     return reply
       .header("content-type", "application/zip")
       .header("content-disposition", `attachment; filename="${fileName}"`)
