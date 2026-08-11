@@ -43,6 +43,7 @@ export interface AuthStore {
   getUserByUsername(username: string): Promise<PublicUser | undefined>;
   listUsers(): Promise<PublicUser[]>;
   changePassword(token: string, currentPassword: string, newPassword: string): Promise<PublicUser>;
+  deleteAccount(token: string, password: string): Promise<void>;
 }
 
 const emptyAuthData: AuthData = {
@@ -183,6 +184,32 @@ abstract class JsonAuthStore implements AuthStore {
     user.updatedAt = new Date().toISOString();
     await this.save(data);
     return toPublicUser(user);
+  }
+
+  async deleteAccount(token: string, password: string): Promise<void> {
+    const data = await this.load();
+    pruneExpiredSessions(data);
+    const tokenHash = hashToken(token);
+    const session = Object.values(data.sessions).find((item) => item.tokenHash === tokenHash);
+    const user = session ? data.users[session.userId] : undefined;
+
+    if (!user) {
+      throw new Error("Unauthorized");
+    }
+
+    if (!verifyPassword(password, user.passwordHash)) {
+      throw new Error("Current password is incorrect");
+    }
+
+    assertCanDeleteUser(user, Object.values(data.users));
+
+    for (const [id, item] of Object.entries(data.sessions)) {
+      if (item.userId === user.id) {
+        delete data.sessions[id];
+      }
+    }
+    delete data.users[user.id];
+    await this.save(data);
   }
 
   protected abstract load(): Promise<AuthData>;
@@ -424,6 +451,49 @@ export class PostgresAuthStore implements AuthStore {
     }
   }
 
+  async deleteAccount(token: string, password: string): Promise<void> {
+    await this.ensureSchema();
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("delete from auth_sessions where expires_at <= now()");
+      const result = await client.query<DatabaseUserRow>(
+        `select u.id, u.username, u.email, u.role, u.password_hash, u.created_at, u.updated_at
+         from auth_sessions s
+         join platform_users u on u.id = s.user_id
+         where s.token_hash = $1
+         for update`,
+        [hashToken(token)]
+      );
+      const user = result.rows[0];
+
+      if (!user) {
+        throw new Error("Unauthorized");
+      }
+      if (!verifyPassword(password, user.password_hash)) {
+        throw new Error("Current password is incorrect");
+      }
+
+      const adminCount = await client.query<{ count: string }>(
+        "select count(*)::text as count from platform_users where role = 'admin'"
+      );
+      assertCanDeleteUser(
+        { id: user.id, username: user.username, email: user.email, role: user.role, createdAt: "", updatedAt: "" },
+        [],
+        Number(adminCount.rows[0]?.count ?? 0)
+      );
+
+      await client.query("delete from platform_users where id = $1", [user.id]);
+      await client.query("commit");
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   private async migrateLegacyAuth(client: pg.PoolClient): Promise<void> {
     const migrationName = "auth-json-to-relational-v1";
     const applied = await client.query<{ name: string }>(
@@ -603,6 +673,17 @@ function normalizeEmail(email: string): string {
 function assertPassword(password: string): void {
   if (password.length < 8) {
     throw new Error("Password must be at least 8 characters");
+  }
+}
+
+function assertCanDeleteUser(user: PublicUser, users: PublicUser[], adminCount?: number): void {
+  if (user.role !== "admin") {
+    return;
+  }
+
+  const totalAdmins = adminCount ?? users.filter((item) => item.role === "admin").length;
+  if (totalAdmins <= 1) {
+    throw new Error("Cannot delete the last administrator account");
   }
 }
 

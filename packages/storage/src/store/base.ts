@@ -489,6 +489,30 @@ export abstract class JsonRegistryStore implements RegistryStore {
     return purged;
   }
 
+  async purgeAccountData(userId: string): Promise<void> {
+    const data = await this.load();
+    const ownedSlugs = Object.values(data.skills)
+      .filter(
+        (skill) =>
+          skill.ownerUserId === userId ||
+          skill.contributors?.some((contributor) => contributor.userId === userId && contributor.role === "owner")
+      )
+      .map((skill) => skill.slug);
+
+    for (const slug of ownedSlugs) {
+      await this.permanentlyDeleteSkill(slug);
+    }
+
+    for (const skill of Object.values(data.skills)) {
+      if (!skill.contributors?.length) {
+        continue;
+      }
+      skill.contributors = skill.contributors.filter((contributor) => contributor.userId !== userId);
+    }
+
+    await this.save(data);
+  }
+
   protected async permanentlyDeleteSkill(slug: string): Promise<void> {
     const data = await this.load();
     const skill = data.skills[slug];

@@ -182,6 +182,14 @@ export async function changePassword(
   return data.user;
 }
 
+export async function deleteAccount(token: string, password: string): Promise<void> {
+  await request<{ ok: boolean }>(new URL("/auth/delete-account", API_BASE_URL), {
+    method: "POST",
+    token,
+    body: JSON.stringify({ password })
+  });
+}
+
 export interface PublishSkillFrontmatter {
   name?: string;
   description?: string;

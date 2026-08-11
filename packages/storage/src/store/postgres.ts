@@ -1559,6 +1559,30 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     return rows.length;
   }
 
+  async purgeAccountData(userId: string): Promise<void> {
+    await this.ensureSchema();
+    const owned = await this.db
+      .select({ slug: schema.skills.slug })
+      .from(schema.skills)
+      .where(
+        or(
+          eq(schema.skills.ownerUserId, userId),
+          sql`exists (
+            select 1 from ${schema.skillContributors} sc
+            where sc.skill_slug = ${schema.skills.slug}
+              and sc.user_id = ${userId}
+              and sc.role = 'owner'
+          )`
+        )
+      );
+
+    for (const row of owned) {
+      await this.permanentlyDeleteSkill(row.slug);
+    }
+
+    await this.db.delete(schema.skillContributors).where(eq(schema.skillContributors.userId, userId));
+  }
+
   protected async permanentlyDeleteSkill(slug: string): Promise<void> {
     await this.ensureSchema();
 

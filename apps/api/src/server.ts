@@ -92,6 +92,10 @@ interface ChangePasswordBody {
   newPassword: string;
 }
 
+interface DeleteAccountBody {
+  password: string;
+}
+
 interface SkillParams {
   slug: string;
 }
@@ -239,6 +243,30 @@ export function buildServer() {
     } catch (error) {
       const message = errorMessage(error);
       return reply.code(message === "Unauthorized" ? 401 : 400).send({ error: message });
+    }
+  });
+
+  app.post<{ Body: DeleteAccountBody }>("/auth/delete-account", async (request, reply) => {
+    const token = readBearerToken(request.headers.authorization);
+    if (!token) {
+      return reply.code(401).send({ error: "Unauthorized" });
+    }
+
+    const user = await authStore.getUserByToken(token);
+    if (!user) {
+      return reply.code(401).send({ error: "Unauthorized" });
+    }
+
+    try {
+      await store.purgeAccountData(user.id);
+      await authStore.deleteAccount(token, request.body.password);
+      return { ok: true };
+    } catch (error) {
+      const message = errorMessage(error);
+      if (message === "Unauthorized") {
+        return reply.code(401).send({ error: message });
+      }
+      return reply.code(400).send({ error: message });
     }
   });
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BadgeCheck, KeyRound, LogOut, RotateCcw, Trash2 } from "lucide-react";
+import { BadgeCheck, KeyRound, LogOut, RotateCcw, Trash2, UserX } from "lucide-react";
 import { SkillCard } from "./SkillCard";
 import { ConfirmToast } from "./ConfirmToast";
 import { ErrorToast } from "./ErrorToast";
@@ -276,6 +276,9 @@ export function CreatorProfileView({ creator, viewer = null, showBackLink = true
             <div className="hero-actions">
               <Link className="button secondary" href="/account/change-password">
                 <KeyRound size={15} /> 修改密码
+              </Link>
+              <Link className="button secondary danger" href="/account/delete">
+                <UserX size={15} /> 注销账户
               </Link>
               <button className="button secondary" onClick={handleLogout} type="button">
                 <LogOut size={15} /> 登出

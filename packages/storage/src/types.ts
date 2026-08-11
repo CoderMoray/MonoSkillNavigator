@@ -220,6 +220,7 @@ export interface RegistryStore {
   listBookmarkedSkills(userId: string): Promise<SkillSearchResult[]>;
   isSkillBookmarked(userId: string, slug: string): Promise<boolean>;
   purgeExpiredRecycleBinSkills(): Promise<number>;
+  purgeAccountData(userId: string): Promise<void>;
   reviewAll(
     pipelineFn: (
       snapshot: SkillSnapshot,

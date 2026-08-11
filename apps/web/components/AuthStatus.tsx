@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, KeyRound, LogIn, LogOut, Monitor, Moon, PackagePlus, Sun, UserCircle } from "lucide-react";
+import { ChevronDown, KeyRound, LogIn, LogOut, Monitor, Moon, PackagePlus, Sun, UserCircle, UserX } from "lucide-react";
 import { getCurrentUser, logoutUser } from "../lib/api";
 import { AUTH_TOKEN_CHANGED_EVENT, clearAuthToken, getAuthToken } from "../lib/auth-token";
 import { creatorProfilePath } from "../lib/creators";
@@ -164,6 +164,15 @@ export function AuthStatus() {
           >
             <KeyRound size={15} />
             修改密码
+          </Link>
+          <Link
+            className="user-menu-item danger"
+            href="/account/delete"
+            onClick={() => setMenuOpen(false)}
+            role="menuitem"
+          >
+            <UserX size={15} />
+            注销账户
           </Link>
           <Link
             className="user-menu-item"
