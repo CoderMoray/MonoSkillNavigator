@@ -8,8 +8,11 @@
     "packages/*"
   ],
   "scripts": {
+    "predev": "node scripts/free-port.mjs 3000 3001",
     "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
+    "predev:api": "node scripts/free-port.mjs 3000",
     "dev:api": "npm --workspace @skill-platform/api run dev",
+    "predev:web": "node scripts/free-port.mjs 3001",
     "dev:web": "npm --workspace @skill-platform/web run dev",
     "build:web": "npm --workspace @skill-platform/web run build",
     "dev:worker": "npm --workspace @skill-platform/worker run dev",
