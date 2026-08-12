@@ -22,7 +22,7 @@ MonoSkillNavigator 对每次发布（或重审）的 Skill 快照做 **静态安
    每条包含：标题、**严重度徽章**（低/中/高/严重）、**置信度**（SkillSpector 规则若提供）、说明、修复建议、命中证据片段。VirusTotal 的 malicious/suspicious 按上节 **按类别合并** 展示。
 
 3. **VirusTotal 摘要**（已配置 API 时）  
-   独立卡片展示扫描器名称、状态（已完成 / 未命中历史报告 / 扫描失败）、恶意与可疑 **检出数量**、威胁结论（若有）、SHA-256 前缀与 **VirusTotal 报告链接**（若有）。
+   独立卡片展示扫描器名称、状态（已完成 / 未命中历史报告 / 扫描失败）、恶意与可疑 **检出数量**、**厂家总数**（参与扫描的 AV 引擎数）、威胁结论（若有）、SHA-256 前缀与 **VirusTotal 报告链接**（若有）。
 
 4. **VirusTotal finding**（扫描 **completed** 且存在 malicious 或 suspicious 检出时）  
    按 **风险类别** 合并展示，**不是** 每个 AV 引擎单独一条：
@@ -38,8 +38,9 @@ MonoSkillNavigator 对每次发布（或重审）的 Skill 快照做 **静态安
    | 字段 | 说明 |
    | --- | --- |
    | SHA-256 | 被扫描 ZIP 的哈希，整份报告唯一 |
+   | Total engines | 参与扫描的 AV 厂家总数 |
    | Category | 该框的类别（`malicious` 或 `suspicious`） |
-   | Result | 各引擎的检出名称，逗号分隔（通常较长） |
+   | Result | 各引擎的检出名称，每行一条（`引擎名: 结果`） |
    | Method | 各引擎的判定方式，去重后逗号分隔（常见为 `blacklist`） |
    | Engine update | 各引擎病毒库版本日期，去重后逗号分隔（不同厂家更新节奏不同，故可能出现多个日期） |
    | Report | 该文件在 VirusTotal 上的分析页链接 |
@@ -100,6 +101,110 @@ SkillSpector 的「不建议安装」是 **包级安全建议**，与页面「�
 
 说明文案在 Web 端按 **规则 ID** 展示为 **中文**；证据区仍显示包内原文片段。
 
+## VirusTotal API 配额与速率限制
+
+本节说明 VirusTotal API v3 的 **quota（配额）** 与 **rate limit（速率）**，以及本平台一次发布实际会打哪些接口。规则以 [VirusTotal 官方文档](https://docs.virustotal.com/reference/public-vs-premium-api) 为准；**Public API** 与 **Premium API** 不同，下文默认指 Public 档。
+
+### 总原则
+
+- **一般情况下：1 次 API 调用 = 消耗 1 次 quota**（按 API Key 汇总，所有端点共用同一池子）。
+- 限制对象是 **HTTP 请求次数**，不是 AV 引擎数量，也不是 ZIP 包内的文件个数。
+- 超出 Public 速率或日配额时，常见响应为 HTTP **429**；扫描未完成会导致发布 **已拒绝**。
+
+Public API 文档中的典型上限：
+
+| 维度 | 限制 |
+| --- | --- |
+| 速率 | **4 次请求 / 分钟**（约每 15 秒 1 次） |
+| 日配额 | **500 次请求 / 天**（UTC 0 点重置） |
+
+Premium / 企业 Key 按合同 SLA，无公开固定数字；可用 `/users/{id}/overall_quotas` 等端点查询（需相应权限）。
+
+### 不消耗 quota 的情况（官方例外）
+
+| 场景 | 是否耗 quota |
+| --- | --- |
+| 查配额：`/users/{id}/overall_quotas`、`/users/{id}/api_usage` | 否 |
+| Feeds 相关端点（含 feeds 提供的下载链接） | 否 |
+| `GET /analyses/{id}` 且 `{id}` **无效** | 否 |
+| **上传 VirusTotal 中尚不存在的新文件**（`POST /files`） | 否 |
+| 对该新文件后续的 `GET /files/{sha256}` | 否 |
+| 对该新文件后续的 `GET /analyses/{id}`（轮询分析状态） | 否 |
+
+即：**首次把新样本送入 VT 的 upload → 轮询 → 取报告** 链路，官方写明 **不扣 quota**。
+
+### 仍消耗 quota 的情况
+
+| 场景 | 说明 |
+| --- | --- |
+| 查询 **已在库中** 的文件：`GET /files/{hash}` → 200 | 通常算 1 次 |
+| 查询 **未知 hash** 返回 404 | 文档未列入免费例外，一般仍算 1 次 |
+| 主动重扫：`POST /files/{sha256}/analyse` | 算 1 次（即使刚上传过） |
+| 绝大多数其他普通 API 调用 | 每次 1 次 |
+
+### 本平台：ZIP 算几个 lookup？
+
+**一个 Skill 发布包 = 一个文件对象 = 一次 hash lookup。**
+
+平台对 **整包 ZIP 字节** 计算 SHA-256（`skillSnapshotToZipBuffer`），再调用 `GET /files/{hash}`。包内 `SKILL.md`、脚本等 **不会** 各自再 lookup。只有在外部手动对每个内部文件分别算 hash 并查询时，才会各算 1 次 API 调用。
+
+VirusTotal 收到 ZIP 后可能在内部解压扫描，那是 VT 侧行为，**不会** 按包内文件数倍增你的 API quota。
+
+### 一次发布消耗多少次 API？
+
+取决于 hash 是否已在 VT 库中，以及 `VIRUSTOTAL_UPLOAD_ON_MISS` 是否开启。
+
+**路径 A：Hash 已在 VT（缓存命中，最快）**
+
+```text
+GET /files/{zipSha256}  → 200
+```
+
+→ 约 **1 次 quota** / 次发布。
+
+**路径 B：Hash 不存在且开启 upload-on-miss**
+
+```text
+1. GET  /files/{zipSha256}     → 404（约 1 次 quota）
+2. POST /files                 → 上传 ZIP（新文件：0 次 quota）
+3. GET  /analyses/{id} × N     → 轮询直至 completed（新文件：0 次 quota）
+4. GET  /files/{zipSha256}     → 可选，补 threat_verdict（新文件：0 次 quota）
+```
+
+→ 新包 upload 路径在 quota 上通常 **主要消耗开头那次 404 lookup**；主要瓶颈是 **分析等待时间**（轮询间隔与超时），而非多次扣 quota。
+
+**路径 C：Hash 不存在且关闭 upload-on-miss**
+
+```text
+GET /files/{zipSha256}  → 404
+```
+
+→ 约 **1 次 quota**；审查记录为「未命中历史报告」，不上传样本。
+
+### 并发与容量规划（Public 档粗算）
+
+配额按 **Key** 共享，多用户同时发布会争抢同一池子。本平台 **未** 内置 VT 全局限流，运维需自行控制并发。
+
+| 发布类型 | 每 Skill quota（约） | Public 4/min 下粗算 |
+| --- | --- | --- |
+| 已缓存 hash（仅 lookup） | 1 | 约 **4 个 / 分钟** |
+| 全新包 upload-on-miss | 1（首查 404）+ 0（upload/轮询/取报告） | quota 通常不是瓶颈；**耗时与 429** 是瓶颈 |
+| 主动重扫 | 额外 +1 / 次 | 额外占用 |
+
+**注意：** 即使 upload 链路不扣 quota，高并发 upload 仍可能触发 **429** 或服务端排队，导致 `VirusTotal analysis timed out`。生产环境建议：串行或队列化发布、对 lookup 保留 ≥15s 间隔、upload 场景加大 `VIRUSTOTAL_ANALYSIS_TIMEOUT_MS`。
+
+本地可用 `npm run vt:stress`（`scripts/vt-lookup-stress.mjs`）探测当前 Key 的实际 429 行为。
+
+### 文件大小与其它限制
+
+| 项 | 限制 |
+| --- | --- |
+| 直传上传 | **32 MB**（`POST /files`） |
+| 大文件上传 | **650 MB**（先 `GET /files/upload_url` 再 POST） |
+| 单次 HTTP 超时 | 默认 **90s**（`VIRUSTOTAL_TIMEOUT_MS`） |
+| 分析轮询总时长 | 默认 **90s**（`VIRUSTOTAL_ANALYSIS_TIMEOUT_MS`，未设则同 `VIRUSTOTAL_TIMEOUT_MS`） |
+| 轮询间隔 | 默认 **30s**（`VIRUSTOTAL_POLL_INTERVAL_MS`） |
+
 ## SkillSpector 不可用时
 
 若 Python 或 SkillSpector 依赖缺失，审查记录中可能出现 **SkillSpector unavailable** 类 finding，平台会回退部分内置正则检查。恢复环境后应对该版本 **重跑审查** 以得到完整 SkillSpector 结果。
@@ -108,7 +213,12 @@ SkillSpector 的「不建议安装」是 **包级安全建议**，与页面「�
 
 - `SKILLSPECTOR_ENABLED=false` 可关闭 SkillSpector  
 - `SKILLSPECTOR_PYTHON`、`SKILLSPECTOR_DIR`、`SKILLSPECTOR_TIMEOUT_MS` 用于指定解释器、目录与超时  
-- `VIRUSTOTAL_API_KEY` 启用 VirusTotal；`VIRUSTOTAL_UPLOAD_ON_MISS` 控制未命中 hash 时是否上传样本（上传后需轮询分析，可能受 `VIRUSTOTAL_TIMEOUT_MS` 默认 90s 限制）
+- `VIRUSTOTAL_API_KEY` 启用 VirusTotal（未配置则跳过 VT 扫描）  
+- `VIRUSTOTAL_ENABLED=false` 可显式关闭 VirusTotal  
+- `VIRUSTOTAL_UPLOAD_ON_MISS=true` 未命中 hash 时上传 ZIP 并轮询（见上文 **配额与速率**；上传新文件链路官方不扣 quota，但耗时长）  
+- `VIRUSTOTAL_TIMEOUT_MS` 单次 HTTP 请求超时（默认 90000）  
+- `VIRUSTOTAL_ANALYSIS_TIMEOUT_MS` 上传后分析轮询总超时（默认同 `VIRUSTOTAL_TIMEOUT_MS`）  
+- `VIRUSTOTAL_POLL_INTERVAL_MS` 分析轮询间隔（默认 30000）
 
 ## 如何修复与重新发布
 

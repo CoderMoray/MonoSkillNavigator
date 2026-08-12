@@ -23,6 +23,7 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "review:demo": "npm --workspace @skill-platform/cli run dev -- review examples/demo-skill",
     "test": "vitest run",
+    "vt:stress": "tsx scripts/vt-lookup-stress.mjs --phase all --count 6",
     "test:watch": "vitest",
     "setup": "bash scripts/setup.sh",
     "setup:skillspector": "bash scripts/install-skillspector.sh"
