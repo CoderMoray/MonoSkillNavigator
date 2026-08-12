@@ -1,0 +1,129 @@
+<!-- email_template.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{subject}</title>
+<style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+        background-color: #f9f9fb;
+        color: #1d1d1f;
+        line-height: 1.5;
+        margin: 0;
+        padding: 0;
+    }
+    .container {
+        max-width: 650px;
+        margin: 40px auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+        padding: 40px;
+    }
+    .header {
+        background: #3a5bd7; /* 做一次基础声明用来支持老的前端系统 */
+        background: linear-gradient(135deg, #4A6CF7, #8A2BE2);
+        padding: 0px;
+        border-radius: 10px;
+        margin-bottom: 24px;
+        text-align: center;
+    }
+    .header h1 {
+        color: white;
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: -0.4px;
+        background: rgba(255, 255, 255, 0.18);
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        border: 1.5px solid rgba(255, 255, 255, 0.25);
+        border-radius: 10px;
+        padding: 16px 0;
+        box-shadow: 
+            0 3px 12px rgba(0, 0, 0, 0.15),
+            inset 0 0.5px 0 rgba(255, 255, 255, 0.2);
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+    .content {
+        font-size: 16px;
+        color: #1d1d1f;
+    }
+    .content p {
+        margin: 16px 0;
+    }
+    .comment {
+        margin-top: 16px;
+        font-size: 14px;
+        color: #86868b;
+        line-height: 1.5;
+    }
+    .note {
+        background-color: #fff8e1;
+        padding: 14px;
+        border-left: 4px solid #ffb300;
+        border-radius: 6px;
+        margin: 16px 0;
+        font-size: 15px;
+    }
+    .signature {
+        margin-top: 32px;
+        font-size: 12px;
+        color: #1d1d1f;
+        display: flex;           /* 启用 Flex 布局 */
+        justify-content: space-between; /* 左右分布：文字在左，logo 在右 */
+        align-items: flex-end;   /* 底部对齐，使 logo 与签名文字底部平齐 */
+    }
+    .signature-desc {
+        font-size: 9.5px;
+        color: #86868b;
+        margin: 4px 0 8px 0;
+        line-height: 1.4;
+    }
+    .signature-email {
+        font-size: 11px;
+        color: #86868b;
+        margin-top: 4px;
+    }
+
+</style>
+</head>
+
+<body>
+<div class="container">
+    <div class="header">
+        <h1>${subject}</h1>
+    </div>
+    <div class="content">
+        <p>${name}您好:</p>
+        <p>${main_content}</p>
+        ${note}
+        ${end_content}
+        ${comment}
+    </div>
+
+    <div class="signature">
+        <!-- 左侧：签名文字 -->
+        <div>
+            Best Regards,<br>
+            <strong>${signature_name}</strong><br>
+            ${signature_email}
+            <div class="signature-desc">Real-time Analytics Processing Insights Dashboard</div>
+            <div class="signature-email">Support by APPLE, China |  Rapid Team</div>
+        </div>
+        <!-- 右侧：Logo，和文字同行 -->
+        <div style="margin-left: 16px; margin-right: 4px;">
+            <img src="data:image/png;base64,${logo_base64}" 
+                    alt="Rapid Logo" 
+                    style="width: 40px; 
+                            height: auto; 
+                            opacity: 0.25;
+                            ">
+        </div>
+    </div>
+</div>
+</body>
+</html>
