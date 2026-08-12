@@ -74,6 +74,7 @@ export {
   isVirusTotalUploadOnMissEnabled,
   parseEngineResults,
   parseThreatVerdict,
+  resolveVirusTotalEngineTotal,
   runVirusTotalScan,
   type VirusTotalEngineResult,
   type VirusTotalScanSummary,
@@ -575,11 +576,23 @@ function createFailedVirusTotalSummary(snapshot: SkillSnapshot, error: unknown):
     suspicious: 0,
     harmless: 0,
     undetected: 0,
+    totalEngines: 0,
     error: truncateError(error)
   };
 }
 
 function truncateError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const parts: string[] = [];
+  if (error instanceof Error) {
+    parts.push(error.message);
+    const cause = error.cause;
+    if (cause instanceof Error) {
+      const code = "code" in cause && typeof cause.code === "string" ? cause.code : undefined;
+      parts.push(code ? `${code}: ${cause.message}` : cause.message);
+    }
+  } else {
+    parts.push(String(error));
+  }
+  const message = parts.filter(Boolean).join(" — ");
   return message.length <= 300 ? message : `${message.slice(0, 297)}...`;
 }

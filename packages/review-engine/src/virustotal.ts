@@ -40,6 +40,7 @@ export interface VirusTotalScanSummary {
   suspicious: number;
   harmless: number;
   undetected: number;
+  totalEngines: number;
   analysisUrl?: string;
   error?: string;
   threatVerdict?: VirusTotalThreatVerdict;
@@ -51,6 +52,7 @@ interface VirusTotalStats {
   suspicious: number;
   harmless: number;
   undetected: number;
+  totalEngines: number;
 }
 
 interface VirusTotalReport {
@@ -97,19 +99,17 @@ export async function runVirusTotalScan(
         malicious: 0,
         suspicious: 0,
         harmless: 0,
-        undetected: 0
+        undetected: 0,
+        totalEngines: 0
       },
       findings: []
     };
   }
 
   const analysisId = await uploadArchive(archive, apiKey);
-  await waitForAnalysis(analysisId, apiKey);
-  const report = await lookupFileReport(sha256, apiKey);
-  if (!report) {
-    throw new Error("VirusTotal file report unavailable after upload analysis.");
-  }
-  return completeScan(sha256, report);
+  const report = await waitForAnalysis(analysisId, apiKey);
+  const enrichedReport = await enrichReportWithFileMetadata(sha256, apiKey, report);
+  return completeScan(sha256, enrichedReport);
 }
 
 function completeScan(
@@ -148,6 +148,39 @@ function parseFileReportPayload(payload: unknown, source: string): VirusTotalRep
     engineResults: parseEngineResults(engineResults),
     ...(threatVerdict ? { threatVerdict } : {})
   };
+}
+
+function parseAnalysisReportPayload(payload: unknown, source: string): VirusTotalReport {
+  const stats = getNestedValue(payload, ["data", "attributes", "stats"]);
+  const engineResults = getNestedValue(payload, ["data", "attributes", "results"]);
+  const threatVerdict = parseThreatVerdict(getNestedValue(payload, ["data", "attributes", "threat_verdict"]));
+  return {
+    stats: parseStats(stats, source),
+    engineResults: parseEngineResults(engineResults),
+    ...(threatVerdict ? { threatVerdict } : {})
+  };
+}
+
+async function enrichReportWithFileMetadata(
+  sha256: string,
+  apiKey: string,
+  report: VirusTotalReport
+): Promise<VirusTotalReport> {
+  if (report.threatVerdict) {
+    return report;
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    if (attempt > 0) {
+      await delay(2_000);
+    }
+    const fileReport = await lookupFileReport(sha256, apiKey);
+    if (fileReport?.threatVerdict) {
+      return { ...report, threatVerdict: fileReport.threatVerdict };
+    }
+  }
+
+  return report;
 }
 
 export function parseThreatVerdict(value: unknown): VirusTotalThreatVerdict | undefined {
@@ -190,16 +223,21 @@ async function getLargeFileUploadUrl(apiKey: string): Promise<string> {
   return uploadUrl;
 }
 
-async function waitForAnalysis(analysisId: string, apiKey: string): Promise<void> {
-  const timeoutMs = readPositiveInteger(process.env.VIRUSTOTAL_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
+async function waitForAnalysis(analysisId: string, apiKey: string): Promise<VirusTotalReport> {
+  const timeoutMs = readAnalysisTimeoutMs();
   const pollIntervalMs = readPositiveInteger(
     process.env.VIRUSTOTAL_POLL_INTERVAL_MS,
     DEFAULT_POLL_INTERVAL_MS
   );
   const deadline = Date.now() + timeoutMs;
+  let pollAttempt = 0;
 
   while (Date.now() < deadline) {
-    await delay(Math.min(pollIntervalMs, Math.max(1, deadline - Date.now())));
+    if (pollAttempt > 0) {
+      await delay(Math.min(pollIntervalMs, Math.max(1, deadline - Date.now())));
+    }
+    pollAttempt += 1;
+
     const payload = await readJsonResponse(
       await virusTotalFetch(`${VIRUSTOTAL_API_BASE_URL}/analyses/${encodeURIComponent(analysisId)}`, apiKey),
       "VirusTotal analysis lookup"
@@ -207,7 +245,7 @@ async function waitForAnalysis(analysisId: string, apiKey: string): Promise<void
     const status = getNestedValue(payload, ["data", "attributes", "status"]);
 
     if (status === "completed") {
-      return;
+      return parseAnalysisReportPayload(payload, "VirusTotal analysis");
     }
 
     if (status === "failed") {
@@ -216,6 +254,13 @@ async function waitForAnalysis(analysisId: string, apiKey: string): Promise<void
   }
 
   throw new Error(`VirusTotal analysis timed out after ${timeoutMs}ms.`);
+}
+
+function readAnalysisTimeoutMs(): number {
+  return readPositiveInteger(
+    process.env.VIRUSTOTAL_ANALYSIS_TIMEOUT_MS ?? process.env.VIRUSTOTAL_TIMEOUT_MS,
+    DEFAULT_TIMEOUT_MS
+  );
 }
 
 async function virusTotalFetch(url: string, apiKey: string, init?: RequestInit): Promise<Response> {
@@ -255,12 +300,39 @@ function parseStats(value: unknown, source: string): VirusTotalStats {
     throw new Error(`${source} returned no analysis statistics.`);
   }
 
+  const malicious = readCount(value.malicious);
+  const suspicious = readCount(value.suspicious);
+  const harmless = readCount(value.harmless);
+  const undetected = readCount(value.undetected);
+  const totalEngines = sumAnalysisStats(value) || malicious + suspicious + harmless + undetected;
+
   return {
-    malicious: readCount(value.malicious),
-    suspicious: readCount(value.suspicious),
-    harmless: readCount(value.harmless),
-    undetected: readCount(value.undetected)
+    malicious,
+    suspicious,
+    harmless,
+    undetected,
+    totalEngines
   };
+}
+
+function sumAnalysisStats(value: Record<string, unknown>): number {
+  let total = 0;
+  for (const entry of Object.values(value)) {
+    if (typeof entry === "number" && Number.isFinite(entry) && entry > 0) {
+      total += Math.floor(entry);
+    }
+  }
+  return total;
+}
+
+export function resolveVirusTotalEngineTotal(summary: Pick<
+  VirusTotalScanSummary,
+  "malicious" | "suspicious" | "harmless" | "undetected" | "totalEngines"
+>): number {
+  if (summary.totalEngines > 0) {
+    return summary.totalEngines;
+  }
+  return summary.malicious + summary.suspicious + summary.harmless + summary.undetected;
 }
 
 export function parseEngineResults(value: unknown): VirusTotalEngineResult[] {
@@ -343,10 +415,11 @@ function createGroupedCategoryFinding(
 }
 
 function createAggregateFindings(summary: VirusTotalScanSummary): ReviewFinding[] {
-  const engines = summary.malicious + summary.suspicious + summary.harmless + summary.undetected;
+  const totalEngines = resolveVirusTotalEngineTotal(summary);
   const evidence = [
     `SHA-256: ${summary.sha256}`,
     ...(summary.threatVerdict ? [`Threat verdict: ${summary.threatVerdict}`] : []),
+    `Total engines: ${totalEngines}`,
     `VirusTotal engines: malicious=${summary.malicious}, suspicious=${summary.suspicious}, harmless=${summary.harmless}, undetected=${summary.undetected}`,
     ...(summary.analysisUrl ? [`Report: ${summary.analysisUrl}`] : [])
   ].join("\n");
@@ -358,7 +431,7 @@ function createAggregateFindings(summary: VirusTotalScanSummary): ReviewFinding[
         category: "security",
         severity: "high",
         title: "VirusTotal detected malicious content",
-        message: `VirusTotal reported ${summary.malicious} malicious detection(s)${summary.suspicious ? ` and ${summary.suspicious} suspicious detection(s)` : ""}${engines ? ` across ${engines} engines` : ""}.`,
+        message: `VirusTotal reported ${summary.malicious} malicious detection(s)${summary.suspicious ? ` and ${summary.suspicious} suspicious detection(s)` : ""}${totalEngines ? ` across ${totalEngines} engines` : ""}.`,
         evidence,
         recommendation:
           "Do not publish this package until the flagged content is removed or the VirusTotal detections are reviewed and cleared."
@@ -373,7 +446,7 @@ function createAggregateFindings(summary: VirusTotalScanSummary): ReviewFinding[
         category: "security",
         severity: "medium",
         title: "VirusTotal detected suspicious content",
-        message: `VirusTotal reported ${summary.suspicious} suspicious detection(s)${engines ? ` across ${engines} engines` : ""}.`,
+        message: `VirusTotal reported ${summary.suspicious} suspicious detection(s)${totalEngines ? ` across ${totalEngines} engines` : ""}.`,
         evidence,
         recommendation:
           "Review the package and VirusTotal report before publishing; remove suspicious behavior or document a verified false positive."
@@ -393,9 +466,12 @@ function buildGroupedEvidence(
   const methods = [...new Set(engines.map((engine) => engine.method).filter(Boolean))].join(", ");
   const engineUpdates = [...new Set(engines.map((engine) => engine.engineUpdate).filter(Boolean))].join(", ");
 
+  const totalEngines = resolveVirusTotalEngineTotal(summary);
+
   return [
     `SHA-256: ${summary.sha256}`,
     ...(summary.threatVerdict ? [`Threat verdict: ${summary.threatVerdict}`] : []),
+    `Total engines: ${totalEngines}`,
     `Category: ${category}`,
     `Result:\n${resultLines}`,
     ...(methods ? [`Method: ${methods}`] : []),

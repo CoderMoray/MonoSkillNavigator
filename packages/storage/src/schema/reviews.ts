@@ -23,6 +23,7 @@ export const skillReviews = pgTable("skill_reviews", {
   virustotalSuspicious: integer("virustotal_suspicious"),
   virustotalHarmless: integer("virustotal_harmless"),
   virustotalUndetected: integer("virustotal_undetected"),
+  virustotalTotalEngines: integer("virustotal_total_engines"),
   virustotalAnalysisUrl: text("virustotal_analysis_url"),
   virustotalError: text("virustotal_error"),
   virustotalThreatVerdict: text("virustotal_threat_verdict"),

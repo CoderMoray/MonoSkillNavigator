@@ -157,6 +157,7 @@ describe("VirusTotal package review adapter", () => {
       status: "completed",
       malicious: 2,
       suspicious: 1,
+      totalEngines: 69,
       threatVerdict: "VERDICT_MALICIOUS"
     });
     expect(report.virusTotal?.engineResults).toHaveLength(3);
@@ -166,7 +167,9 @@ describe("VirusTotal package review adapter", () => {
         severity: "high",
         title: "VirusTotal (malicious)",
         message: "Kaspersky, Microsoft Defender classified this package as malicious.",
-        evidence: expect.stringMatching(/Result:\n\tKaspersky: Trojan\.Generic\n\tMicrosoft Defender: Trojan:Script\/Wacatac/),
+        evidence: expect.stringMatching(
+          /Total engines: 69[\s\S]*Result:\n\tKaspersky: Trojan\.Generic\n\tMicrosoft Defender: Trojan:Script\/Wacatac/
+        ),
         recommendation:
           "Do not publish this package until the flagged content is removed or the VirusTotal detection is reviewed and cleared."
       })
@@ -213,7 +216,20 @@ describe("VirusTotal package review adapter", () => {
         jsonResponse({
           data: {
             attributes: {
-              status: "completed"
+              status: "completed",
+              stats: {
+                malicious: 0,
+                suspicious: 1,
+                harmless: 4,
+                undetected: 60
+              },
+              results: {
+                "Cynet Security": {
+                  category: "suspicious",
+                  result: "Suspicious.Zip",
+                  method: "blacklist"
+                }
+              }
             }
           }
         })

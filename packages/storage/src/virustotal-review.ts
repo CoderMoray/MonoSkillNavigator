@@ -1,4 +1,4 @@
-import { parseThreatVerdict, type VirusTotalScanSummary } from "@skill-platform/review-engine";
+import { parseThreatVerdict, resolveVirusTotalEngineTotal, type VirusTotalScanSummary } from "@skill-platform/review-engine";
 
 export interface VirusTotalReviewColumns {
   virustotalProvider: string | null;
@@ -8,6 +8,7 @@ export interface VirusTotalReviewColumns {
   virustotalSuspicious: number | null;
   virustotalHarmless: number | null;
   virustotalUndetected: number | null;
+  virustotalTotalEngines: number | null;
   virustotalAnalysisUrl: string | null;
   virustotalError: string | null;
   virustotalThreatVerdict: string | null;
@@ -25,6 +26,7 @@ export function virusTotalReviewColumns(
       virustotalSuspicious: null,
       virustotalHarmless: null,
       virustotalUndetected: null,
+      virustotalTotalEngines: null,
       virustotalAnalysisUrl: null,
       virustotalError: null,
       virustotalThreatVerdict: null
@@ -39,6 +41,7 @@ export function virusTotalReviewColumns(
     virustotalSuspicious: summary.suspicious,
     virustotalHarmless: summary.harmless,
     virustotalUndetected: summary.undetected,
+    virustotalTotalEngines: summary.totalEngines,
     virustotalAnalysisUrl: summary.analysisUrl ?? null,
     virustotalError: summary.error ?? null,
     virustotalThreatVerdict: summary.threatVerdict ?? null
@@ -53,6 +56,7 @@ export function parseVirusTotalReviewRow(row: {
   virustotalSuspicious?: number | null;
   virustotalHarmless?: number | null;
   virustotalUndetected?: number | null;
+  virustotalTotalEngines?: number | null;
   virustotalAnalysisUrl?: string | null;
   virustotalError?: string | null;
   virustotalThreatVerdict?: string | null;
@@ -72,8 +76,7 @@ export function parseVirusTotalReviewRow(row: {
         : "completed";
 
   const threatVerdict = parseThreatVerdict(row.virustotalThreatVerdict);
-
-  return {
+  const summary = {
     provider: (row.virustotalProvider as VirusTotalScanSummary["provider"]) ?? "virustotal",
     sha256: row.virustotalSha256 ?? "",
     status,
@@ -81,6 +84,15 @@ export function parseVirusTotalReviewRow(row: {
     suspicious: Number(row.virustotalSuspicious ?? 0),
     harmless: Number(row.virustotalHarmless ?? 0),
     undetected: Number(row.virustotalUndetected ?? 0),
+    totalEngines: Number(row.virustotalTotalEngines ?? 0)
+  } satisfies Pick<
+    VirusTotalScanSummary,
+    "provider" | "sha256" | "status" | "malicious" | "suspicious" | "harmless" | "undetected" | "totalEngines"
+  >;
+
+  return {
+    ...summary,
+    totalEngines: resolveVirusTotalEngineTotal(summary),
     ...(row.virustotalAnalysisUrl ? { analysisUrl: row.virustotalAnalysisUrl } : {}),
     ...(row.virustotalError ? { error: row.virustotalError } : {}),
     ...(threatVerdict ? { threatVerdict } : {})

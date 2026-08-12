@@ -1,4 +1,4 @@
-import type { VirusTotalThreatVerdict } from "../lib/types";
+import type { VirusTotalScanSummary, VirusTotalThreatVerdict } from "../lib/types";
 
 const THREAT_VERDICT_LABELS: Record<VirusTotalThreatVerdict, string> = {
   VERDICT_MALICIOUS: "恶意",
@@ -14,4 +14,16 @@ export function formatVirusTotalThreatVerdict(
     return undefined;
   }
   return THREAT_VERDICT_LABELS[verdict] ?? verdict;
+}
+
+export function resolveVirusTotalEngineTotal(
+  summary: Pick<
+    VirusTotalScanSummary,
+    "malicious" | "suspicious" | "harmless" | "undetected" | "totalEngines"
+  >
+): number {
+  if (summary.totalEngines > 0) {
+    return summary.totalEngines;
+  }
+  return summary.malicious + summary.suspicious + summary.harmless + summary.undetected;
 }

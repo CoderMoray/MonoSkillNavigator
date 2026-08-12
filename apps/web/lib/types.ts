@@ -71,6 +71,7 @@ export interface VirusTotalScanSummary {
   suspicious: number;
   harmless: number;
   undetected: number;
+  totalEngines: number;
   analysisUrl?: string;
   error?: string;
   threatVerdict?: VirusTotalThreatVerdict;

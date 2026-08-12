@@ -70,7 +70,7 @@ import {
   toSkillSpectorSafetyScore
 } from "../../../lib/skillspector-summary";
 import { averageHaluCatchRadarScores, type HaluCatchRadarScores } from "../../../lib/halucatch-scores";
-import { formatVirusTotalThreatVerdict } from "../../../lib/virustotal-summary";
+import { formatVirusTotalThreatVerdict, resolveVirusTotalEngineTotal } from "../../../lib/virustotal-summary";
 import type { PublicUser, RegistryContributor, RegistryIssue, RegistrySkill } from "../../../lib/types";
 
 type DetailPanel =
@@ -390,6 +390,7 @@ export default function SkillDetailPage() {
   const virusTotalDetections = virusTotalScan
     ? virusTotalScan.malicious + virusTotalScan.suspicious
     : 0;
+  const virusTotalEngineTotal = virusTotalScan ? resolveVirusTotalEngineTotal(virusTotalScan) : 0;
   const hiddenPlatformFindingCount = reviewFindings.length - securityFindings.length;
   const isHaluCatchEvaluation = currentVersion.evaluation?.provider === "halucatch-adapter";
   const haluCatchReport = currentVersion.evaluation?.haluCatchReport;
@@ -1361,7 +1362,7 @@ export default function SkillDetailPage() {
                         ? virusTotalScanFailed
                           ? " VirusTotal 扫描未成功完成，以下错误信息来自扫描器。"
                           : virusTotalScan?.status === "completed"
-                            ? ` VirusTotal 已完成：${virusTotalScan.malicious} 个恶意、${virusTotalScan.suspicious} 个可疑检出。`
+                            ? ` VirusTotal 已完成：${virusTotalScan.malicious} 个恶意、${virusTotalScan.suspicious} 个可疑检出${virusTotalEngineTotal ? `，共 ${virusTotalEngineTotal} 家厂商参与扫描。` : "。"}`
                             : " VirusTotal 未命中该归档的历史报告，且未上传新样本。"
                         : null}
                       {hiddenPlatformFindingCount > 0
@@ -1427,6 +1428,12 @@ export default function SkillDetailPage() {
                               : "未检出"}
                           </strong>
                         </div>
+                        {virusTotalScan?.status === "completed" && virusTotalEngineTotal > 0 ? (
+                          <div>
+                            <span>厂家总数</span>
+                            <strong>{virusTotalEngineTotal}</strong>
+                          </div>
+                        ) : null}
                         {formatVirusTotalThreatVerdict(virusTotalScan?.threatVerdict) ? (
                           <div>
                             <span>威胁裁决</span>
