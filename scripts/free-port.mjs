@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { execSync } from "node:child_process";
 import { platform } from "node:os";
+import { pathToFileURL } from "node:url";
 
-function listListeningPids(port) {
+export function listListeningPids(port) {
   if (platform() === "win32") {
     let output = "";
     try {
@@ -52,7 +53,7 @@ function listListeningPids(port) {
   }
 }
 
-function killPid(pid) {
+export function killPid(pid) {
   if (platform() === "win32") {
     execSync(`taskkill /PID ${pid} /F`, { stdio: "ignore" });
     return;
@@ -65,8 +66,11 @@ function killPid(pid) {
   }
 }
 
-function freePort(port) {
-  const pids = listListeningPids(port);
+export function freePort(port, options = {}) {
+  const excludePid = options.excludePid;
+  const pids = listListeningPids(port).filter((pid) =>
+    excludePid === undefined ? true : Number(pid) !== excludePid
+  );
   if (pids.length === 0) {
     console.log(`[free-port] ${port} is free`);
     return;
@@ -85,11 +89,14 @@ function freePort(port) {
 }
 
 const ports = process.argv.slice(2).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0);
-if (ports.length === 0) {
-  console.error("Usage: node scripts/free-port.mjs <port> [port...]");
-  process.exit(1);
-}
+const isCli = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isCli) {
+  if (ports.length === 0) {
+    console.error("Usage: node scripts/free-port.mjs <port> [port...]");
+    process.exit(1);
+  }
 
-for (const port of ports) {
-  freePort(port);
+  for (const port of ports) {
+    freePort(port);
+  }
 }

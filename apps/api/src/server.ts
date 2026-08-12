@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import { pathToFileURL } from "node:url";
 import { evaluateSkillSnapshot } from "@skill-platform/evaluator";
 import { reviewAndEvaluateSkillSnapshot } from "@skill-platform/review-engine";
+import { freeDevListenPort } from "./free-port.js";
 import {
   applySkillAuthor,
   applySkillPublishMetadata,
@@ -1013,6 +1014,8 @@ function printStartupError(phase: string, error: unknown): void {
 async function listenWithRetry(app: FastifyInstance, port: number, host: string): Promise<void> {
   const maxAttempts = 5;
 
+  await freeDevListenPort(port);
+
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       await app.listen({ port, host });
@@ -1020,7 +1023,8 @@ async function listenWithRetry(app: FastifyInstance, port: number, host: string)
     } catch (error) {
       const err = error as NodeJS.ErrnoException;
       if (err.code === "EADDRINUSE" && attempt < maxAttempts) {
-        app.log.warn({ port, host, attempt, maxAttempts }, "Port in use during startup; retrying listen");
+        app.log.warn({ port, host, attempt, maxAttempts }, "Port in use during startup; freeing port and retrying listen");
+        await freeDevListenPort(port);
         await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
         continue;
       }
