@@ -317,7 +317,7 @@ describe("VirusTotal package review adapter", () => {
     expect(report.virusTotal).toMatchObject({
       provider: "virustotal",
       status: "failed",
-      error: "fetch failed"
+      error: expect.stringMatching(/network|fetch failed/i)
     });
     expect(report.findings).toContainEqual(
       expect.objectContaining({
@@ -326,5 +326,45 @@ describe("VirusTotal package review adapter", () => {
       })
     );
     expect(report.verdict).toBe("rejected");
+  });
+
+  test("retries file lookup once after a timeout", async () => {
+    configureVirusTotal();
+    let calls = 0;
+    const fetchMock = vi.fn().mockImplementation(() => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.reject(new Error("VirusTotal file_lookup timed out after 1000ms."));
+      }
+      return Promise.resolve(
+        jsonResponse({
+          data: {
+            attributes: {
+              last_analysis_stats: {
+                malicious: 0,
+                suspicious: 0,
+                harmless: 1,
+                undetected: 1
+              }
+            }
+          }
+        })
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const scan = await runVirusTotalScan(snapshot);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(scan.summary.status).toBe("completed");
+  });
+
+  test("surfaces step diagnosis for HTTP 401 without retrying", async () => {
+    configureVirusTotal();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ error: { message: "Wrong API key" } }, 401)));
+
+    await expect(runVirusTotalScan(snapshot)).rejects.toMatchObject({
+      message: expect.stringMatching(/file lookup failed at step file_lookup \(auth\)/i)
+    });
   });
 });

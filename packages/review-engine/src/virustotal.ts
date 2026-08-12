@@ -9,6 +9,58 @@ const MAX_UPLOAD_LIMIT_BYTES = 650 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 90_000;
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
 
+type VirusTotalStep =
+  | "file_lookup"
+  | "upload_url_request"
+  | "file_upload"
+  | "analysis_poll"
+  | "file_metadata_lookup";
+
+const STEP_TIMEOUT_ENV: Record<VirusTotalStep, string> = {
+  file_lookup: "VIRUSTOTAL_LOOKUP_TIMEOUT_MS",
+  upload_url_request: "VIRUSTOTAL_UPLOAD_URL_TIMEOUT_MS",
+  file_upload: "VIRUSTOTAL_UPLOAD_TIMEOUT_MS",
+  analysis_poll: "VIRUSTOTAL_ANALYSIS_POLL_TIMEOUT_MS",
+  file_metadata_lookup: "VIRUSTOTAL_METADATA_LOOKUP_TIMEOUT_MS"
+};
+
+const STEP_TIMEOUT_DEFAULT_MS: Record<VirusTotalStep, number> = {
+  file_lookup: 30_000,
+  upload_url_request: 30_000,
+  file_upload: 120_000,
+  analysis_poll: 30_000,
+  file_metadata_lookup: 30_000
+};
+
+interface VirusTotalErrorDiagnosis {
+  kind: "timeout" | "network" | "rate_limit" | "auth" | "client" | "server" | "analysis" | "unknown";
+  retryable: boolean;
+  detail: string;
+}
+
+class VirusTotalHttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+    this.name = "VirusTotalHttpError";
+  }
+}
+
+class VirusTotalStepError extends Error {
+  constructor(
+    readonly step: VirusTotalStep,
+    readonly action: string,
+    readonly diagnosis: VirusTotalErrorDiagnosis,
+    cause: unknown
+  ) {
+    super(formatVirusTotalStepFailure(step, action, diagnosis, cause));
+    this.name = "VirusTotalStepError";
+    this.cause = cause;
+  }
+}
+
 export type VirusTotalScanStatus = "completed" | "not_found" | "failed";
 
 export type VirusTotalThreatVerdict =
@@ -129,14 +181,21 @@ function completeScan(
   return { summary, findings: createFindings(summary, report.engineResults) };
 }
 
-async function lookupFileReport(sha256: string, apiKey: string): Promise<VirusTotalReport | undefined> {
-  const response = await virusTotalFetch(`${VIRUSTOTAL_API_BASE_URL}/files/${sha256}`, apiKey);
-  if (response.status === 404) {
-    return undefined;
-  }
+async function lookupFileReport(
+  sha256: string,
+  apiKey: string,
+  step: VirusTotalStep = "file_lookup"
+): Promise<VirusTotalReport | undefined> {
+  const action = describeStepAction(step);
+  return runVirusTotalStep(step, action, async () => {
+    const response = await virusTotalFetch(`${VIRUSTOTAL_API_BASE_URL}/files/${sha256}`, apiKey, { step });
+    if (response.status === 404) {
+      return undefined;
+    }
 
-  const payload = await readJsonResponse(response, "VirusTotal file lookup");
-  return parseFileReportPayload(payload, "VirusTotal file lookup");
+    const payload = await readJsonResponse(response, action);
+    return parseFileReportPayload(payload, action);
+  });
 }
 
 function parseFileReportPayload(payload: unknown, source: string): VirusTotalReport {
@@ -174,7 +233,12 @@ async function enrichReportWithFileMetadata(
     if (attempt > 0) {
       await delay(2_000);
     }
-    const fileReport = await lookupFileReport(sha256, apiKey);
+    let fileReport: VirusTotalReport | undefined;
+    try {
+      fileReport = await lookupFileReport(sha256, apiKey, "file_metadata_lookup");
+    } catch {
+      continue;
+    }
     if (fileReport?.threatVerdict) {
       return { ...report, threatVerdict: fileReport.threatVerdict };
     }
@@ -200,9 +264,11 @@ async function uploadArchive(archive: Buffer, apiKey: string): Promise<string> {
   const form = new FormData();
   form.set("file", new Blob([Uint8Array.from(archive)], { type: "application/zip" }), "skill.zip");
 
-  const payload = await readJsonResponse(
-    await virusTotalFetch(uploadUrl, apiKey, { method: "POST", body: form }),
-    "VirusTotal file upload"
+  const payload = await runVirusTotalStep("file_upload", "VirusTotal file upload", async () =>
+    readJsonResponse(
+      await virusTotalFetch(uploadUrl, apiKey, { method: "POST", body: form, step: "file_upload" }),
+      "VirusTotal file upload"
+    )
   );
   const analysisId = getNestedValue(payload, ["data", "id"]);
   if (typeof analysisId !== "string" || !analysisId.trim()) {
@@ -212,9 +278,13 @@ async function uploadArchive(archive: Buffer, apiKey: string): Promise<string> {
 }
 
 async function getLargeFileUploadUrl(apiKey: string): Promise<string> {
-  const payload = await readJsonResponse(
-    await virusTotalFetch(`${VIRUSTOTAL_API_BASE_URL}/files/upload_url`, apiKey),
-    "VirusTotal upload URL request"
+  const payload = await runVirusTotalStep("upload_url_request", "VirusTotal upload URL request", async () =>
+    readJsonResponse(
+      await virusTotalFetch(`${VIRUSTOTAL_API_BASE_URL}/files/upload_url`, apiKey, {
+        step: "upload_url_request"
+      }),
+      "VirusTotal upload URL request"
+    )
   );
   const uploadUrl = getNestedValue(payload, ["data"]);
   if (typeof uploadUrl !== "string" || !uploadUrl.startsWith("https://")) {
@@ -238,9 +308,15 @@ async function waitForAnalysis(analysisId: string, apiKey: string): Promise<Viru
     }
     pollAttempt += 1;
 
-    const payload = await readJsonResponse(
-      await virusTotalFetch(`${VIRUSTOTAL_API_BASE_URL}/analyses/${encodeURIComponent(analysisId)}`, apiKey),
-      "VirusTotal analysis lookup"
+    const payload = await runVirusTotalStep("analysis_poll", "VirusTotal analysis lookup", async () =>
+      readJsonResponse(
+        await virusTotalFetch(
+          `${VIRUSTOTAL_API_BASE_URL}/analyses/${encodeURIComponent(analysisId)}`,
+          apiKey,
+          { step: "analysis_poll" }
+        ),
+        "VirusTotal analysis lookup"
+      )
     );
     const status = getNestedValue(payload, ["data", "attributes", "status"]);
 
@@ -253,7 +329,16 @@ async function waitForAnalysis(analysisId: string, apiKey: string): Promise<Viru
     }
   }
 
-  throw new Error(`VirusTotal analysis timed out after ${timeoutMs}ms.`);
+  throw new VirusTotalStepError(
+    "analysis_poll",
+    "VirusTotal analysis wait",
+    {
+      kind: "analysis",
+      retryable: false,
+      detail: `analysis did not complete within ${timeoutMs}ms`
+    },
+    new Error(`VirusTotal analysis timed out after ${timeoutMs}ms.`)
+  );
 }
 
 function readAnalysisTimeoutMs(): number {
@@ -263,25 +348,157 @@ function readAnalysisTimeoutMs(): number {
   );
 }
 
-async function virusTotalFetch(url: string, apiKey: string, init?: RequestInit): Promise<Response> {
-  const timeoutMs = readPositiveInteger(process.env.VIRUSTOTAL_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
+interface VirusTotalFetchOptions extends RequestInit {
+  step?: VirusTotalStep;
+  timeoutMs?: number;
+}
+
+async function virusTotalFetch(
+  url: string,
+  apiKey: string,
+  init?: VirusTotalFetchOptions
+): Promise<Response> {
+  const step = init?.step ?? "file_lookup";
+  const timeoutMs = init?.timeoutMs ?? readStepTimeoutMs(step);
+  const { step: _step, timeoutMs: _timeoutMs, ...requestInit } = init ?? {};
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     return await fetch(url, {
-      ...init,
+      ...requestInit,
       headers: { "x-apikey": apiKey },
       signal: controller.signal
     });
   } catch (error) {
     if (controller.signal.aborted) {
-      throw new Error(`VirusTotal request timed out after ${timeoutMs}ms.`);
+      throw new Error(`VirusTotal ${step} timed out after ${timeoutMs}ms.`);
     }
     throw error;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function runVirusTotalStep<T>(
+  step: VirusTotalStep,
+  action: string,
+  operation: () => Promise<T>
+): Promise<T> {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      const diagnosis = diagnoseVirusTotalError(error);
+      if (attempt < 2 && diagnosis.retryable) {
+        await delay(retryDelayMs(diagnosis));
+        continue;
+      }
+      throw new VirusTotalStepError(step, action, diagnosis, error);
+    }
+  }
+
+  throw new Error(`VirusTotal ${step} failed unexpectedly.`);
+}
+
+function retryDelayMs(diagnosis: VirusTotalErrorDiagnosis): number {
+  return diagnosis.kind === "rate_limit" ? 2_000 : 500;
+}
+
+function readStepTimeoutMs(step: VirusTotalStep): number {
+  const specific = process.env[STEP_TIMEOUT_ENV[step]];
+  if (specific?.trim()) {
+    return readPositiveInteger(specific, STEP_TIMEOUT_DEFAULT_MS[step]);
+  }
+  return readPositiveInteger(process.env.VIRUSTOTAL_TIMEOUT_MS, STEP_TIMEOUT_DEFAULT_MS[step]);
+}
+
+function describeStepAction(step: VirusTotalStep): string {
+  switch (step) {
+    case "file_lookup":
+      return "VirusTotal file lookup";
+    case "upload_url_request":
+      return "VirusTotal upload URL request";
+    case "file_upload":
+      return "VirusTotal file upload";
+    case "analysis_poll":
+      return "VirusTotal analysis lookup";
+    case "file_metadata_lookup":
+      return "VirusTotal file metadata lookup";
+  }
+}
+
+function diagnoseVirusTotalError(error: unknown): VirusTotalErrorDiagnosis {
+  if (error instanceof VirusTotalHttpError) {
+    if (error.status === 429) {
+      return {
+        kind: "rate_limit",
+        retryable: true,
+        detail: `HTTP 429 quota or rate limit exceeded`
+      };
+    }
+    if (error.status === 401 || error.status === 403) {
+      return {
+        kind: "auth",
+        retryable: false,
+        detail: `HTTP ${error.status} authorization failure`
+      };
+    }
+    if (error.status >= 500) {
+      return {
+        kind: "server",
+        retryable: true,
+        detail: `HTTP ${error.status} server error`
+      };
+    }
+    return {
+      kind: "client",
+      retryable: false,
+      detail: `HTTP ${error.status} client error`
+    };
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  if (/timed out/i.test(message)) {
+    return { kind: "timeout", retryable: true, detail: message };
+  }
+  if (/fetch failed/i.test(message) || /ECONN|ENOTFOUND|ETIMEDOUT|network/i.test(message)) {
+    const cause = error instanceof Error ? error.cause : undefined;
+    const causeCode =
+      cause && typeof cause === "object" && "code" in cause && typeof cause.code === "string"
+        ? cause.code
+        : undefined;
+    return {
+      kind: "network",
+      retryable: true,
+      detail: causeCode ? `${message} (${causeCode})` : message
+    };
+  }
+  if (/analysis timed out/i.test(message) || /analysis failed/i.test(message)) {
+    return { kind: "analysis", retryable: false, detail: message };
+  }
+
+  return { kind: "unknown", retryable: false, detail: message };
+}
+
+function formatVirusTotalStepFailure(
+  step: VirusTotalStep,
+  action: string,
+  diagnosis: VirusTotalErrorDiagnosis,
+  cause: unknown
+): string {
+  const base = `${action} failed at step ${step} (${diagnosis.kind}): ${diagnosis.detail}`;
+  if (cause instanceof Error && cause.message && cause.message !== diagnosis.detail) {
+    return `${base} — ${cause.message}`;
+  }
+  return base;
+}
+
+export function formatVirusTotalError(error: unknown): string {
+  if (error instanceof VirusTotalStepError) {
+    return error.message;
+  }
+  return diagnoseVirusTotalError(error).detail;
 }
 
 async function readJsonResponse(response: Response, action: string): Promise<unknown> {
@@ -292,7 +509,7 @@ async function readJsonResponse(response: Response, action: string): Promise<unk
 
   const message = getNestedValue(payload, ["error", "message"]);
   const suffix = typeof message === "string" && message.trim() ? `: ${message.trim()}` : "";
-  throw new Error(`${action} failed with HTTP ${response.status}${suffix}`);
+  throw new VirusTotalHttpError(`${action} failed with HTTP ${response.status}${suffix}`, response.status);
 }
 
 function parseStats(value: unknown, source: string): VirusTotalStats {

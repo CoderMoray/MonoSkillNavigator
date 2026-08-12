@@ -14,6 +14,7 @@ import {
   type SkillSpectorScanSummary
 } from "./skillspector.js";
 import {
+  formatVirusTotalError,
   isVirusTotalEnabled,
   runVirusTotalScan,
   type VirusTotalScanSummary
@@ -72,6 +73,7 @@ export type { SkillSpectorScanSummary } from "./skillspector.js";
 export {
   isVirusTotalEnabled,
   isVirusTotalUploadOnMissEnabled,
+  formatVirusTotalError,
   parseEngineResults,
   parseThreatVerdict,
   resolveVirusTotalEngineTotal,
@@ -528,7 +530,7 @@ async function runVirusTotalReviewStep(snapshot: SkillSnapshot): Promise<{
       findings: scan.findings
     };
   } catch (error) {
-    const message = truncateError(error);
+    const message = formatVirusTotalError(error);
     return {
       virusTotal: createFailedVirusTotalSummary(snapshot, error),
       findings: [
@@ -577,7 +579,7 @@ function createFailedVirusTotalSummary(snapshot: SkillSnapshot, error: unknown):
     harmless: 0,
     undetected: 0,
     totalEngines: 0,
-    error: truncateError(error)
+    error: formatVirusTotalError(error)
   };
 }
 

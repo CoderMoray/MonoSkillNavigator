@@ -201,7 +201,8 @@ GET /files/{zipSha256}  → 404
 | --- | --- |
 | 直传上传 | **32 MB**（`POST /files`） |
 | 大文件上传 | **650 MB**（先 `GET /files/upload_url` 再 POST） |
-| 单次 HTTP 超时 | 默认 **90s**（`VIRUSTOTAL_TIMEOUT_MS`） |
+| 单次 HTTP 超时 | 各步骤独立默认（见下）；未设专用变量时回退 `VIRUSTOTAL_TIMEOUT_MS`（默认 90s） |
+| 步骤级超时 | lookup / upload_url / upload / analysis_poll / metadata_lookup 可分别配置；**超时或 transient 网络错误自动重试 1 次** |
 | 分析轮询总时长 | 默认 **90s**（`VIRUSTOTAL_ANALYSIS_TIMEOUT_MS`，未设则同 `VIRUSTOTAL_TIMEOUT_MS`） |
 | 轮询间隔 | 默认 **30s**（`VIRUSTOTAL_POLL_INTERVAL_MS`） |
 
@@ -216,7 +217,8 @@ GET /files/{zipSha256}  → 404
 - `VIRUSTOTAL_API_KEY` 启用 VirusTotal（未配置则跳过 VT 扫描）  
 - `VIRUSTOTAL_ENABLED=false` 可显式关闭 VirusTotal  
 - `VIRUSTOTAL_UPLOAD_ON_MISS=true` 未命中 hash 时上传 ZIP 并轮询（见上文 **配额与速率**；上传新文件链路官方不扣 quota，但耗时长）  
-- `VIRUSTOTAL_TIMEOUT_MS` 单次 HTTP 请求超时（默认 90000）  
+- `VIRUSTOTAL_TIMEOUT_MS` 各步骤 HTTP 超时回退值（默认 90000）  
+- `VIRUSTOTAL_LOOKUP_TIMEOUT_MS`、`VIRUSTOTAL_UPLOAD_TIMEOUT_MS`、`VIRUSTOTAL_ANALYSIS_POLL_TIMEOUT_MS` 等步骤专用超时（见 `.env.example`）  
 - `VIRUSTOTAL_ANALYSIS_TIMEOUT_MS` 上传后分析轮询总超时（默认同 `VIRUSTOTAL_TIMEOUT_MS`）  
 - `VIRUSTOTAL_POLL_INTERVAL_MS` 分析轮询间隔（默认 30000）
 
