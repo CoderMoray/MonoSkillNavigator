@@ -84,7 +84,10 @@ export const skillVersionFiles = pgTable("skill_version_files", {
   skillSlug: text("skill_slug").notNull(),
   version: text("version").notNull(),
   path: text("path").notNull(),
-  content: text("content").notNull(),
+  // File bodies live in the artifact store when MinIO is enabled. PostgreSQL
+  // retains only the file metadata in that mode, while legacy/local records
+  // can continue to keep their content here.
+  content: text("content"),
   size: integer("size").notNull(),
   sha256: text("sha256").notNull(),
 }, (table) => [

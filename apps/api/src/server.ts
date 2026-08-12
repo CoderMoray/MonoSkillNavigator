@@ -24,6 +24,7 @@ import {
   createAuthStoreFromEnv,
   createEmptyCreatorSummary,
   createRegistryStoreFromEnv,
+  getApiBodyLimitBytes,
   isSkillContributor,
   isSkillOwner,
   listCreators,
@@ -154,8 +155,10 @@ function versionManageErrorStatus(message: string): number {
 }
 
 export function buildServer() {
+  const bodyLimit = getApiBodyLimitBytes();
   const app = Fastify({
-    logger: true
+    logger: true,
+    bodyLimit
   });
   const store = createRegistryStoreFromEnv();
   const authStore = createAuthStoreFromEnv();

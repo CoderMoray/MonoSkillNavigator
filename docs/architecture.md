@@ -94,8 +94,9 @@ flowchart TB
   → 合并表单 metadata（name、description、slug 等）到 manifest
   → 生成 SkillSnapshot（contentHash、文件树）
   → review-engine 审查 + 评估
-  → storage 写入 PostgreSQL（Skill、Version、Review、Evaluation）
-  → 可选：artifact ZIP 存入 MinIO
+  → 可选：完整 artifact ZIP 写入 MinIO
+  → storage 写入 PostgreSQL（Skill、Version、Review、Evaluation、artifact descriptor）
+       MinIO 启用时 skill_version_files 只保存路径、大小和 SHA-256
   → 返回 verdict 与评分
 ```
 
@@ -128,8 +129,8 @@ Web 发布路径会在审查前补全缺失或不完整的 frontmatter，避免�
 ### 4.3 读取与分发
 
 ```text
-GET /skills、/skills/:slug → PostgreSQL 查询
-GET /skills/:slug/download → MinIO 或本地 artifact 返回 ZIP
+GET /skills、/skills/:slug → PostgreSQL 元数据；有 MinIO artifact 时从 MinIO 读取文件内容
+GET /skills/:slug/download → MinIO artifact 或 PostgreSQL 文件内容重建 ZIP
 Worker POST /reviews/rerun → 对注册表 Skill 重跑审查
 ```
 
@@ -204,13 +205,15 @@ SkillSpector 与 VirusTotal **并行**执行（`Promise.all`），互不阻塞�
 
 | 存储         | 用途                                   |
 | ---------- | ------------------------------------ |
-| PostgreSQL | Skill 注册表、用户、审查、评分、书签、回收站            |
-| MinIO      | artifact ZIP（`MINIO_ENABLED=true` 时） |
+| PostgreSQL | Skill 注册表、版本元数据、用户、审查、评分、书签、回收站 |
+| MinIO      | artifact ZIP 与文件内容（`MINIO_ENABLED=true` 时） |
 
 
 - ORM：Drizzle（`packages/storage/src/schema/*.ts`）
 - 迁移：`packages/storage/drizzle/*.sql`，API 首次启动自动执行
 - 主要表：`skills`、`skill_versions`、`skill_reviews`、`users`、`skill_bookmarks`、`skill_recycle_bin` 等
+- `MINIO_ENABLED=true` 时，新版本的 `skill_version_files.content` 为 `NULL`；该表保留
+  path、size、sha256 元数据，读取内容时通过 `skill_versions` 中的 artifact descriptor 获取 ZIP。
 
 Review 扩展列（近期）：
 

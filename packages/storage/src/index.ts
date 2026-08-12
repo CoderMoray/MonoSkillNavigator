@@ -18,6 +18,7 @@ export {
 export {
   createRegistryStoreFromEnv,
   createArtifactStoreFromEnv,
+  getApiBodyLimitBytes,
   loadDotEnvIfPresent,
 } from "./env";
 

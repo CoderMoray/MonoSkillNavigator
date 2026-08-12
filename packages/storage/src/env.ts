@@ -5,6 +5,17 @@ import type { ArtifactStore, MinioArtifactStoreOptions, RegistryStore } from "./
 import { MinioArtifactStore } from "./store/minio";
 import { PostgresRegistryStore } from "./store/postgres";
 
+const DEFAULT_API_BODY_LIMIT_MB = 50;
+
+export function getApiBodyLimitBytes(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.API_BODY_LIMIT_MB ?? String(DEFAULT_API_BODY_LIMIT_MB);
+  const mb = Number(raw);
+  if (!Number.isFinite(mb) || mb <= 0) {
+    throw new Error(`API_BODY_LIMIT_MB must be a positive number, got "${raw}"`);
+  }
+  return Math.floor(mb * 1024 * 1024);
+}
+
 export function createRegistryStoreFromEnv(env: NodeJS.ProcessEnv = process.env): RegistryStore {
   const artifactStore = createArtifactStoreFromEnv(env);
   if (!env.DATABASE_URL) {

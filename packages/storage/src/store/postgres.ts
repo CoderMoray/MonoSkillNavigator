@@ -6,6 +6,7 @@ import {
   readSkillZipBuffer,
   findSkillEntryFile,
   skillSnapshotToZipBuffer,
+  type SkillFile,
   type SkillManifest,
   type SkillSnapshot
 } from "@skill-platform/skill-spec";
@@ -93,6 +94,121 @@ function toStringList(value: unknown): string[] {
     return [value];
   }
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+type SkillVersionArtifactRow = Pick<
+  typeof schema.skillVersions.$inferSelect,
+  | "artifactProvider"
+  | "artifactBucket"
+  | "artifactObjectKey"
+  | "artifactContentHash"
+  | "artifactSize"
+  | "artifactStoredAt"
+>;
+
+type StoredSkillFile = Pick<
+  typeof schema.skillVersionFiles.$inferSelect,
+  "path" | "content" | "size" | "sha256"
+>;
+
+function artifactDescriptorFromRow(
+  row: SkillVersionArtifactRow,
+  slug: string,
+  version: string
+): ArtifactDescriptor | undefined {
+  if (!row.artifactProvider) {
+    return undefined;
+  }
+
+  if (
+    !row.artifactBucket ||
+    !row.artifactObjectKey ||
+    !row.artifactContentHash ||
+    row.artifactSize == null ||
+    !row.artifactStoredAt
+  ) {
+    throw new Error(`Artifact descriptor is incomplete for ${slug}@${version}`);
+  }
+
+  return {
+    provider: row.artifactProvider as ArtifactProvider,
+    bucket: row.artifactBucket,
+    objectKey: row.artifactObjectKey,
+    contentHash: row.artifactContentHash,
+    size: Number(row.artifactSize),
+    storedAt: toIsoTimestampString(row.artifactStoredAt),
+  };
+}
+
+function databaseFilesToSnapshotFiles(
+  files: StoredSkillFile[],
+  slug: string,
+  version: string
+): SkillFile[] {
+  return files.map((file) => {
+    if (typeof file.content !== "string") {
+      throw new Error(
+        `Skill content for ${slug}@${version} is stored in its artifact; enable the configured artifact store`
+      );
+    }
+
+    return {
+      path: file.path,
+      content: file.content,
+      size: file.size,
+      sha256: file.sha256,
+    };
+  });
+}
+
+function hydrateFilesFromArtifact(
+  files: StoredSkillFile[],
+  artifactSnapshot: SkillSnapshot,
+  slug: string,
+  version: string
+): SkillFile[] {
+  const artifactFiles = new Map<string, SkillFile>();
+  for (const file of artifactSnapshot.files) {
+    if (artifactFiles.has(file.path)) {
+      throw new Error(`Artifact for ${slug}@${version} contains duplicate file path: ${file.path}`);
+    }
+    artifactFiles.set(file.path, file);
+  }
+
+  if (artifactFiles.size !== files.length) {
+    throw new Error(`Artifact file list does not match stored metadata for ${slug}@${version}`);
+  }
+
+  return files.map((file) => {
+    const artifactFile = artifactFiles.get(file.path);
+    if (
+      !artifactFile ||
+      artifactFile.size !== file.size ||
+      artifactFile.sha256 !== file.sha256
+    ) {
+      throw new Error(`Artifact file metadata does not match PostgreSQL for ${slug}@${version}: ${file.path}`);
+    }
+
+    return {
+      path: file.path,
+      content: artifactFile.content,
+      size: file.size,
+      sha256: file.sha256,
+    };
+  });
+}
+
+function parseManifestFromDatabaseFiles(files: StoredSkillFile[]): SkillManifest | undefined {
+  const skillMd = findSkillEntryFile(files);
+  if (!skillMd || typeof skillMd.content !== "string") {
+    return undefined;
+  }
+
+  try {
+    return parseSkillMarkdown(skillMd.content).manifest;
+  } catch {
+    return undefined;
+  }
 }
 
 async function replaceEvaluationDetails(db: any, slug: string, version: string, evaluation: FunctionalEvaluationReport) {
@@ -569,15 +685,22 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         .from(schema.skillVersionFiles)
         .where(and(eq(schema.skillVersionFiles.skillSlug, slug), eq(schema.skillVersionFiles.version, v.version)))
         .orderBy(schema.skillVersionFiles.path);
-      const parsedManifest = (() => {
-        const skillMd = findSkillEntryFile(files);
-        if (!skillMd) return undefined;
-        try {
-          return parseSkillMarkdown(skillMd.content).manifest;
-        } catch {
-          return undefined;
-        }
-      })();
+      const artifact = artifactDescriptorFromRow(v, slug, v.version);
+      if (artifact && artifact.contentHash !== v.contentHash) {
+        throw new Error(`Artifact content hash does not match PostgreSQL for ${slug}@${v.version}`);
+      }
+
+      const artifactSnapshot = artifact && this.artifactStore
+        ? await this.artifactStore.getSnapshot(artifact)
+        : undefined;
+      if (artifactSnapshot && artifactSnapshot.contentHash !== v.contentHash) {
+        throw new Error(`Artifact content hash does not match PostgreSQL for ${slug}@${v.version}`);
+      }
+
+      const snapshotFiles = artifactSnapshot
+        ? hydrateFilesFromArtifact(files, artifactSnapshot, slug, v.version)
+        : databaseFilesToSnapshotFiles(files, slug, v.version);
+      const parsedManifest = artifactSnapshot?.manifest ?? parseManifestFromDatabaseFiles(files);
 
       const [review] = await this.db.select()
         .from(schema.skillReviews)
@@ -683,16 +806,13 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         contentHash: v.contentHash,
         snapshot: {
           manifest,
-          readme: v.readme,
-          files: files.map((f) => ({ path: f.path, content: f.content, size: f.size, sha256: f.sha256 })),
+          readme: artifactSnapshot?.readme ?? v.readme,
+          files: snapshotFiles,
           contentHash: v.contentHash,
           createdAt: String(v.snapshotCreatedAt),
+          entryPath: artifactSnapshot?.entryPath,
         },
-        artifact: v.artifactProvider ? {
-          provider: v.artifactProvider as "minio", bucket: v.artifactBucket!,
-          objectKey: v.artifactObjectKey!, contentHash: v.artifactContentHash!,
-          size: Number(v.artifactSize ?? 0), storedAt: String(v.artifactStoredAt ?? ""),
-        } : undefined,
+        artifact,
         review: review ? {
           id: review.reviewId, skillSlug: slug, skillName: v.manifestName,
           version: review.reportVersion, contentHash: review.contentHash,
@@ -878,12 +998,17 @@ export class PostgresRegistryStore extends JsonRegistryStore {
       .set({ downloads: sql`${schema.skillVersions.downloads} + 1`, updatedAt: new Date() })
       .where(and(eq(schema.skillVersions.skillSlug, slug), eq(schema.skillVersions.version, resolved)));
 
-    if (v.artifactProvider && this.artifactStore) {
-      return this.artifactStore.getSnapshot({
-        provider: v.artifactProvider as "minio", bucket: v.artifactBucket!,
-        objectKey: v.artifactObjectKey!, contentHash: v.artifactContentHash!,
-        size: Number(v.artifactSize ?? 0), storedAt: String(v.artifactStoredAt ?? ""),
-      });
+    const artifact = artifactDescriptorFromRow(v, slug, resolved);
+    if (artifact && artifact.contentHash !== v.contentHash) {
+      throw new Error(`Artifact content hash does not match PostgreSQL for ${slug}@${resolved}`);
+    }
+
+    if (artifact && this.artifactStore) {
+      const snapshot = await this.artifactStore.getSnapshot(artifact);
+      if (snapshot.contentHash !== v.contentHash) {
+        throw new Error(`Artifact content hash does not match PostgreSQL for ${slug}@${resolved}`);
+      }
+      return snapshot;
     }
 
     const files = await this.db.select()
@@ -899,7 +1024,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     return {
       manifest: { slug, name: v.manifestName, description: v.manifestDescription, tags: tags.map((t) => t.tag), categories: v.categories, topics: v.topics },
       readme: v.readme,
-      files: files.map((f) => ({ path: f.path, content: f.content, size: f.size, sha256: f.sha256 })),
+      files: databaseFilesToSnapshotFiles(files, slug, resolved),
       contentHash: v.contentHash, createdAt: String(v.snapshotCreatedAt),
     };
   }
@@ -1021,10 +1146,9 @@ export class PostgresRegistryStore extends JsonRegistryStore {
 
     if (!existingSkill && !releaseTags.includes("latest")) throw new Error("First version must include latest tag");
 
-    // Artifact to MinIO
-    const artifact = !!(this as any).artifactStore
-      ? await ((this as any).artifactStore as ArtifactStore).putSnapshot(slug, version, snapshot)
-      : undefined;
+    // Store the complete snapshot in MinIO first. Its descriptor is committed
+    // with the version, while skill_version_files retains only file metadata.
+    const artifact = await this.artifactStore?.putSnapshot(slug, version, snapshot);
 
     await this.db.transaction(async (tx) => {
       if (existingSkill) {
@@ -1076,6 +1200,12 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         releaseTags, changelog: options.changelog?.trim() || null,
         contentHash: snapshot.contentHash, readme: snapshot.readme ?? "",
         published: true,
+        artifactProvider: artifact?.provider ?? null,
+        artifactBucket: artifact?.bucket ?? null,
+        artifactObjectKey: artifact?.objectKey ?? null,
+        artifactContentHash: artifact?.contentHash ?? null,
+        artifactSize: artifact?.size ?? null,
+        artifactStoredAt: artifact ? new Date(artifact.storedAt) : null,
         snapshotCreatedAt: now, createdAt: now, updatedAt: now,
       });
 
@@ -1087,7 +1217,14 @@ export class PostgresRegistryStore extends JsonRegistryStore {
 
       if (snapshot.files?.length) {
         await tx.insert(schema.skillVersionFiles).values(
-          snapshot.files.map((f: any) => ({ skillSlug: slug, version, path: f.path, content: f.content, size: f.size, sha256: f.sha256 }))
+          snapshot.files.map((f: any) => ({
+            skillSlug: slug,
+            version,
+            path: f.path,
+            content: artifact ? null : f.content,
+            size: f.size,
+            sha256: f.sha256,
+          }))
         );
       }
 
