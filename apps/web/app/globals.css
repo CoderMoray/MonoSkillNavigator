@@ -2091,6 +2091,60 @@ button {
   margin-top: 4px;
 }
 
+.skill-unpublished-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(234, 88, 12, 0.28);
+  border-radius: var(--radius-md);
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.skill-unpublished-notice-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(234, 88, 12, 0.12);
+}
+
+.skill-unpublished-notice-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.skill-unpublished-notice-body strong {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.skill-unpublished-notice-body p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.6;
+  color: inherit;
+  opacity: 0.92;
+}
+
+:root[data-theme="dark"] .skill-unpublished-notice {
+  border-color: rgba(251, 146, 60, 0.32);
+  background: rgba(154, 52, 18, 0.24);
+  color: #fdba74;
+}
+
+:root[data-theme="dark"] .skill-unpublished-notice-icon {
+  background: rgba(251, 146, 60, 0.14);
+}
+
 .detail-summary-actions .button {
   width: 100%;
   justify-content: center;

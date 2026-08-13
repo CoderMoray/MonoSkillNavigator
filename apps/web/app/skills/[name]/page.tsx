@@ -900,7 +900,15 @@ export default function SkillDetailPage() {
             {downloadError ? <div className="error">{downloadError}</div> : null}
             {manageError ? <div className="error">{manageError}</div> : null}
             {isOwner && isUnpublished ? (
-              <p className="description">此 Skill 已下架，仅你可见。可直接上架恢复公开，或发布新版本后再上架。</p>
+              <div className="skill-unpublished-notice" role="status">
+                <span className="skill-unpublished-notice-icon" aria-hidden="true">
+                  <EyeOff size={18} />
+                </span>
+                <div className="skill-unpublished-notice-body">
+                  <strong>此 Skill 已下架</strong>
+                  <p>仅你可见，不会出现在 Skill 广场与搜索页。可直接上架恢复公开，或发布新版本后再上架。</p>
+                </div>
+              </div>
             ) : null}
           </div>
 
