@@ -59,7 +59,7 @@ import {
 } from "../../../lib/api";
 import { getAuthToken } from "../../../lib/auth-token";
 import { creatorProfilePath } from "../../../lib/creators";
-import { formatDateTime, formatNumber } from "../../../lib/format";
+import { formatDateTime, formatFileSize, formatNumber } from "../../../lib/format";
 import { buildHaluCatchReportPath, extractHaluCatchSummary } from "../../../lib/halucatch-report";
 import { localizeSkillSpectorFinding } from "@skill-platform/review-engine/skillspector-i18n";
 import {
@@ -93,16 +93,6 @@ function asList(value?: string | string[]): string[] {
     return value;
   }
   return value ? [value] : [];
-}
-
-function formatFileSize(size: number): string {
-  if (size < 1024) {
-    return `${size} B`;
-  }
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(1)} KB`;
-  }
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function stripFrontmatter(markdown: string): string {

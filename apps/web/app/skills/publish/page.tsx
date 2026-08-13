@@ -23,7 +23,7 @@ import {
 import { savePublishNotice } from "../../../lib/publish-notice";
 import { getAuthToken } from "../../../lib/auth-token";
 import { creatorProfilePath } from "../../../lib/creators";
-import { formatDateTime } from "../../../lib/format";
+import { formatDateTime, formatFileSize } from "../../../lib/format";
 import { readSkillFrontmatterFromZip } from "../../../lib/parse-skill-archive";
 import {
   buildSkillZipFileFromBrowserFiles,
@@ -344,7 +344,7 @@ function PublishSkillPageContent() {
     if (!file) {
       return "选择 Skill 文件夹或 .zip 包";
     }
-    return `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
+    return `${file.name} · ${formatFileSize(file.size)}`;
   }, [file, parsingArchive]);
 
   const showPublishForm = Boolean(file && !parsingArchive);
