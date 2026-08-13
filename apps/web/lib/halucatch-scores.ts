@@ -46,12 +46,16 @@ export function averageHaluCatchRadarScores(
       continue;
     }
     for (const dimension of HALUCATCH_RADAR_DIMENSIONS) {
-      totals[dimension.key as keyof HaluCatchRadarScores] += scores[dimension.key as keyof HaluCatchRadarScores];
+      const key = dimension.key as keyof HaluCatchRadarScores;
+      totals[key] = (totals[key] ?? 0) + (scores[key] ?? 0);
     }
   }
 
   const count = haluCatchEvaluations.length;
   return Object.fromEntries(
-    HALUCATCH_RADAR_DIMENSIONS.map((dim) => [dim.key, Math.round(totals[dim.key as keyof HaluCatchRadarScores] / count)])
+    HALUCATCH_RADAR_DIMENSIONS.map((dim) => [
+      dim.key,
+      Math.round((totals[dim.key as keyof HaluCatchRadarScores] ?? 0) / count)
+    ])
   ) as HaluCatchRadarScores;
 }

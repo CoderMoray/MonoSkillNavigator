@@ -50,7 +50,7 @@ export default function LeaderboardPage() {
     };
   }, [sort]);
 
-  const selectedSort = sortOptions.find((option) => option.value === sort) ?? sortOptions[0];
+  const selectedSort = sortOptions.find((option) => option.value === sort) ?? sortOptions[0]!;
   const SelectedSortIcon = selectedSort.icon;
 
   return (

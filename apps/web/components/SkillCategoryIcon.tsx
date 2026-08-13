@@ -12,7 +12,7 @@ import {
   Shield,
   Zap
 } from "lucide-react";
-import type { SkillCategory } from "./skill-categories";
+import type { SkillCategory } from "../lib/skill-categories";
 
 export const SKILL_CATEGORY_ICON_MAP: Record<SkillCategory, LucideIcon> = {
   Automation: Bot,

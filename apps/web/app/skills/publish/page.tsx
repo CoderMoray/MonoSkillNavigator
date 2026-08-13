@@ -91,6 +91,12 @@ function PublishSkillPageContent() {
   const router = useRouter();
 
   useEffect(() => {
+    // React's input attributes omit Chromium's non-standard folder picker flag.
+    // Set it imperatively so browser folder selection remains available.
+    folderInputRef.current?.setAttribute("webkitdirectory", "");
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function loadUser() {
@@ -751,7 +757,6 @@ function PublishSkillPageContent() {
                     onChange={handleFolderChange}
                     ref={folderInputRef}
                     type="file"
-                    webkitdirectory=""
                   />
                 </div>
 

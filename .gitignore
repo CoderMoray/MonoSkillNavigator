@@ -38,6 +38,10 @@ Thumbs.db
 # TypeScript
 *.tsbuildinfo
 
+# Playwright
+playwright-report/
+test-results/
+
 # MinIO / Docker volumes
 minio-data/
 pgdata/

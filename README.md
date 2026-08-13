@@ -69,9 +69,13 @@ Skill artifact。
 ## 测试
 
 ```bash
-npm run test           # 8 个 API 烟雾测试（注册/登录/发布/搜索/详情/排行/下载）
+npm run test           # Vitest 回归测试
 npm run test:watch     # watch 模式，改代码自动重跑
+npm run test:e2e       # Playwright 浏览器端到端测试
 ```
+
+`test:e2e` 需要先启动本地 API、Web、PostgreSQL 和 MinIO（例如 `npm run dev` 与
+`npm run infra:up`），并使用已安装的 Chrome 覆盖全部页面、动态详情、账户生命周期与发布失败重试流程。
 
 ## 目录
 

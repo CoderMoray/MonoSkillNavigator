@@ -43,16 +43,23 @@ export default function HomePage() {
   const [sort, setSort] = useState("downloads");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       setLoading(true);
+      setError(null);
       try {
         const data = await getLeaderboard(sort, 12);
         if (!cancelled) {
           setItems(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setItems([]);
+          setError(err instanceof Error ? err.message : "加载失败");
         }
       } finally {
         if (!cancelled) {
@@ -132,6 +139,8 @@ export default function HomePage() {
               ))}
             </div>
           </div>
+
+          {error ? <div className="error">{error}。请确认 API 已通过 npm run dev:api 启动。</div> : null}
 
           {loading ? (
             <div className="claw-list">

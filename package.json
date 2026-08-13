@@ -23,6 +23,7 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "review:demo": "npm --workspace @skill-platform/cli run dev -- review examples/demo-skill",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "vt:stress": "tsx scripts/vt-lookup-stress.mjs --phase all --count 6",
     "test:watch": "vitest",
     "setup": "bash scripts/setup.sh",
@@ -39,6 +40,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.10.2",
     "@types/pg": "^8.20.0",

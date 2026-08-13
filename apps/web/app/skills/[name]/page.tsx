@@ -471,7 +471,7 @@ export default function SkillDetailPage() {
   function openRatingModal() {
     if (viewerExistingRating) {
       setSuccessToast(
-        `你已对该版本评分（v${currentVersion.version} · ${viewerExistingRating.score}/5），切换版本后可对其它版本再评。`
+        `你已对该版本评分（v${viewerExistingRating.version} · ${viewerExistingRating.score}/5），切换版本后可对其它版本再评。`
       );
       return;
     }
@@ -649,6 +649,10 @@ export default function SkillDetailPage() {
       setDownloadError("请先登录后再下载 Skill。");
       return;
     }
+    if (!skill) {
+      setDownloadError("Skill 数据尚未加载完成。");
+      return;
+    }
 
     setDownloadingVersion(version);
     try {
@@ -666,6 +670,11 @@ export default function SkillDetailPage() {
   }
 
   async function handleCopyInstallPrompt() {
+    if (!skill || !currentVersion) {
+      setErrorToast("Skill 数据尚未加载完成。");
+      return;
+    }
+
     const pageUrl =
       typeof window !== "undefined"
         ? `${window.location.origin}/skills/${encodeURIComponent(skill.slug)}`
@@ -688,6 +697,10 @@ export default function SkillDetailPage() {
     const token = getAuthToken();
     if (!token) {
       router.push("/login");
+      return;
+    }
+    if (!skill) {
+      setManageError("Skill 数据尚未加载完成。");
       return;
     }
 
@@ -717,6 +730,10 @@ export default function SkillDetailPage() {
       setManageError("请先登录后再操作。");
       return;
     }
+    if (!skill) {
+      setManageError("Skill 数据尚未加载完成。");
+      return;
+    }
 
     setUnpublishingSkill(true);
     try {
@@ -737,6 +754,10 @@ export default function SkillDetailPage() {
     const token = getAuthToken();
     if (!token) {
       setManageError("请先登录后再操作。");
+      return;
+    }
+    if (!skill) {
+      setManageError("Skill 数据尚未加载完成。");
       return;
     }
 
@@ -788,6 +809,10 @@ export default function SkillDetailPage() {
     const token = getAuthToken();
     if (!token) {
       setManageError("请先登录后再操作。");
+      return;
+    }
+    if (!skill) {
+      setManageError("Skill 数据尚未加载完成。");
       return;
     }
 
