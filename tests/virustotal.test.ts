@@ -16,6 +16,7 @@ const configuredVariables = [
   "VIRUSTOTAL_API_KEY",
   "VIRUSTOTAL_UPLOAD_ON_MISS",
   "VIRUSTOTAL_TIMEOUT_MS",
+  "VIRUSTOTAL_ANALYSIS_TIMEOUT_MS",
   "VIRUSTOTAL_POLL_INTERVAL_MS",
   "HALUCATCH_ENABLED"
 ] as const;
@@ -53,6 +54,7 @@ function configureVirusTotal(): void {
   process.env.VIRUSTOTAL_API_KEY = "test-api-key";
   process.env.VIRUSTOTAL_UPLOAD_ON_MISS = "false";
   process.env.VIRUSTOTAL_TIMEOUT_MS = "1000";
+  process.env.VIRUSTOTAL_ANALYSIS_TIMEOUT_MS = "1000";
   process.env.VIRUSTOTAL_POLL_INTERVAL_MS = "1";
 }
 
@@ -207,6 +209,102 @@ describe("VirusTotal package review adapter", () => {
       suspicious: 0
     });
     expect(scan.findings).toEqual([]);
+  });
+
+  test("waits for a pending hash report instead of accepting zero engine results", async () => {
+    configureVirusTotal();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: {
+            attributes: {
+              last_analysis_stats: {
+                malicious: 0,
+                suspicious: 0,
+                harmless: 0,
+                undetected: 0
+              },
+              last_analysis_results: {}
+            }
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: {
+            attributes: {
+              last_analysis_stats: {
+                malicious: 1,
+                suspicious: 0,
+                harmless: 2,
+                undetected: 60
+              },
+              last_analysis_results: {
+                "Microsoft Defender": {
+                  category: "malicious",
+                  result: "Virus:EICAR-Test-File"
+                }
+              },
+              threat_verdict: "VERDICT_MALICIOUS"
+            }
+          }
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const scan = await runVirusTotalScan(snapshot);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "POST")).toBe(false);
+    expect(scan.summary).toMatchObject({
+      status: "completed",
+      malicious: 1,
+      suspicious: 0,
+      totalEngines: 63,
+      threatVerdict: "VERDICT_MALICIOUS"
+    });
+    expect(scan.findings).toContainEqual(
+      expect.objectContaining({
+        id: expect.stringMatching(/^virustotal-malicious-[a-f0-9]{16}$/),
+        severity: "high",
+        title: "VirusTotal (malicious)"
+      })
+    );
+  });
+
+  test("reports an unresolved zero-engine hash report as an incomplete review stage", async () => {
+    configureVirusTotal();
+    process.env.VIRUSTOTAL_ANALYSIS_TIMEOUT_MS = "10";
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        data: {
+          attributes: {
+            last_analysis_stats: {
+              malicious: 0,
+              suspicious: 0,
+              harmless: 0,
+              undetected: 0
+            },
+            last_analysis_results: {}
+          }
+        }
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { review, failedStages } = await reviewAndEvaluateSkillSnapshot(snapshot, undefined, evaluation());
+
+    expect(review.virusTotal).toMatchObject({
+      status: "failed",
+      totalEngines: 0,
+      error: expect.stringMatching(/analysis did not complete/i)
+    });
+    expect(failedStages).toEqual([
+      expect.objectContaining({
+        stage: "virustotal",
+        message: expect.stringMatching(/analysis did not complete/i)
+      })
+    ]);
   });
 
   test("uploads an unknown archive and waits for its analysis when enabled", async () => {

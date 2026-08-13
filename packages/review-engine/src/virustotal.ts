@@ -139,7 +139,8 @@ export async function runVirusTotalScan(
   const sha256 = createHash("sha256").update(archive).digest("hex");
   const existingReport = await lookupFileReport(sha256, apiKey);
   if (existingReport) {
-    return completeScan(sha256, existingReport);
+    const completedReport = await waitForCompletedFileReport(sha256, apiKey, existingReport);
+    return completeScan(sha256, completedReport);
   }
 
   if (!isVirusTotalUploadOnMissEnabled()) {
@@ -160,7 +161,10 @@ export async function runVirusTotalScan(
 
   const analysisId = await uploadArchive(archive, apiKey);
   const report = await waitForAnalysis(analysisId, apiKey);
-  const enrichedReport = await enrichReportWithFileMetadata(sha256, apiKey, report);
+  const completedReport = hasCompletedEngineStats(report)
+    ? report
+    : await waitForCompletedFileReport(sha256, apiKey, report);
+  const enrichedReport = await enrichReportWithFileMetadata(sha256, apiKey, completedReport);
   return completeScan(sha256, enrichedReport);
 }
 
@@ -203,7 +207,10 @@ function parseFileReportPayload(payload: unknown, source: string): VirusTotalRep
   const engineResults = getNestedValue(payload, ["data", "attributes", "last_analysis_results"]);
   const threatVerdict = parseThreatVerdict(getNestedValue(payload, ["data", "attributes", "threat_verdict"]));
   return {
-    stats: parseStats(stats, source),
+    // A file resource can exist while VirusTotal is still analysing it. In
+    // that state it may have absent or all-zero last_analysis_stats; neither
+    // response is evidence of a completed, clean scan.
+    stats: isRecord(stats) ? parseStats(stats, source) : emptyStats(),
     engineResults: parseEngineResults(engineResults),
     ...(threatVerdict ? { threatVerdict } : {})
   };
@@ -329,12 +336,52 @@ async function waitForAnalysis(analysisId: string, apiKey: string): Promise<Viru
     }
   }
 
-  throw new VirusTotalStepError(
+  throw createAnalysisTimeoutError(timeoutMs);
+}
+
+async function waitForCompletedFileReport(
+  sha256: string,
+  apiKey: string,
+  initialReport: VirusTotalReport
+): Promise<VirusTotalReport> {
+  if (hasCompletedEngineStats(initialReport)) {
+    return initialReport;
+  }
+
+  const timeoutMs = readAnalysisTimeoutMs();
+  const pollIntervalMs = readPositiveInteger(
+    process.env.VIRUSTOTAL_POLL_INTERVAL_MS,
+    DEFAULT_POLL_INTERVAL_MS
+  );
+  const deadline = Date.now() + timeoutMs;
+  let pollAttempt = 0;
+
+  while (Date.now() < deadline) {
+    if (pollAttempt > 0) {
+      await delay(Math.min(pollIntervalMs, Math.max(1, deadline - Date.now())));
+    }
+    pollAttempt += 1;
+
+    const report = await lookupFileReport(sha256, apiKey, "file_metadata_lookup");
+    if (report && hasCompletedEngineStats(report)) {
+      return report;
+    }
+  }
+
+  throw createAnalysisTimeoutError(timeoutMs);
+}
+
+function hasCompletedEngineStats(report: VirusTotalReport): boolean {
+  return report.stats.totalEngines > 0;
+}
+
+function createAnalysisTimeoutError(timeoutMs: number): VirusTotalStepError {
+  return new VirusTotalStepError(
     "analysis_poll",
     "VirusTotal analysis wait",
     {
       kind: "analysis",
-      retryable: false,
+      retryable: true,
       detail: `analysis did not complete within ${timeoutMs}ms`
     },
     new Error(`VirusTotal analysis timed out after ${timeoutMs}ms.`)
@@ -529,6 +576,16 @@ function parseStats(value: unknown, source: string): VirusTotalStats {
     harmless,
     undetected,
     totalEngines
+  };
+}
+
+function emptyStats(): VirusTotalStats {
+  return {
+    malicious: 0,
+    suspicious: 0,
+    harmless: 0,
+    undetected: 0,
+    totalEngines: 0
   };
 }
 
