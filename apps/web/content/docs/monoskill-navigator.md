@@ -34,7 +34,7 @@ MonoSkillNavigator（Skill 管理平台）是一个用于 **发布、审查、�
 
 - **安全**：以 SkillSpector 的 **包级风险分 / 风险等级 / 安装建议**、VirusTotal 检出摘要与 **按类别合并的 finding**（malicious / suspicious 各至多一条）为准（见 [安全检测](./security-scan.md)）。
 - **质量**：以 **HaluCatch 五维雷达** 与 Markdown 报告为准（见 [质量审查](./halucatch-review.md)）。
-- **发布状态（verdict）**：**已发布** 表示无 finding；**需复核** 表示有 finding 但未触发 SkillSpector/VirusTotal 自动拒绝；**已拒绝** 表示命中 high 级或 SkillSpector 高置信度 medium 规则，且 **不会出现在公开搜索**（拥有者仍可在个人中心看到，详见 [发布流程](./publish-workflow.md)）。
+- **发布状态（verdict）**：**已发布** 表示无 finding；**需复核** 表示有 finding 但未触发 SkillSpector/VirusTotal 自动拒绝；**已拒绝** 表示命中 high 级或 SkillSpector 高置信度 medium 规则，且 **不会出现在公开搜索**（拥有者仍可在个人中心看到，详见 [发布流程](./publish-workflow.md)）。若审查流水线未完成（如 VirusTotal 超时），版本 **不会入库**，需在发布页重试。
 
 ## 技术说明（简要）
 
