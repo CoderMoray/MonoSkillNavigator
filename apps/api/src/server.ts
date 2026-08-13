@@ -381,7 +381,15 @@ export function buildServer() {
         return reply.code(403).send({ error: "Only skill contributors can publish new versions" });
       }
 
-      const { review, evaluation } = await reviewAndEvaluateSkillSnapshot(snapshot, version);
+      const { review, evaluation, failedStages } = await reviewAndEvaluateSkillSnapshot(snapshot, version);
+      if (failedStages.length > 0) {
+        return reply.code(503).send({
+          error: "review_pipeline_incomplete",
+          retryable: true,
+          failedStages
+        });
+      }
+
       const registryVersion = await store.publishSnapshot(snapshot, review, evaluation, {
         owner: {
           userId: user.id,
@@ -412,8 +420,8 @@ export function buildServer() {
 
   app.post<{ Body: ReviewBody }>("/reviews/run", async (request) => {
     const { snapshot, version } = readSkillFromBody(request.body);
-    const { review, evaluation } = await reviewAndEvaluateSkillSnapshot(snapshot, version);
-    return { review, evaluation };
+    const { review, evaluation, failedStages } = await reviewAndEvaluateSkillSnapshot(snapshot, version);
+    return { review, evaluation, failedStages };
   });
 
   app.post<{ Body: ReviewBody }>("/evaluations/run", async (request) => {

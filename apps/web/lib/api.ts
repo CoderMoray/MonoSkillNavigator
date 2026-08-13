@@ -213,6 +213,19 @@ export interface PublishSkillFrontmatter {
   topics?: string[];
 }
 
+export type ReviewStage = "skillspector" | "virustotal" | "halucatch";
+
+export interface ReviewStageFailure {
+  stage: ReviewStage;
+  message: string;
+}
+
+export interface ReviewPipelineIncompleteResponse {
+  error: "review_pipeline_incomplete";
+  retryable: true;
+  failedStages: ReviewStageFailure[];
+}
+
 export interface PublishPreviewResponse {
   entryPath: string;
   frontmatter: PublishSkillFrontmatter;
@@ -466,6 +479,40 @@ interface RequestOptions {
   token?: string;
 }
 
+interface ApiErrorResponse {
+  error?: string;
+  retryable?: boolean;
+  failedStages?: ReviewStageFailure[];
+}
+
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly response?: ApiErrorResponse
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
+export function getRetryableReviewFailure(error: unknown): ReviewPipelineIncompleteResponse | undefined {
+  if (
+    !(error instanceof ApiRequestError) ||
+    error.response?.error !== "review_pipeline_incomplete" ||
+    error.response.retryable !== true ||
+    !Array.isArray(error.response.failedStages)
+  ) {
+    return undefined;
+  }
+
+  return {
+    error: "review_pipeline_incomplete",
+    retryable: true,
+    failedStages: error.response.failedStages
+  };
+}
+
 function parseContentDispositionFilename(header: string | null): string | undefined {
   if (!header) {
     return undefined;
@@ -505,8 +552,12 @@ async function request<T>(url: URL, options: RequestOptions = {}): Promise<T> {
   });
 
   if (!response.ok) {
-    const data = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
-    throw new Error(data?.error ?? `API request failed: ${response.status} ${response.statusText}`);
+    const data = (await response.json().catch(() => undefined)) as ApiErrorResponse | undefined;
+    throw new ApiRequestError(
+      data?.error ?? `API request failed: ${response.status} ${response.statusText}`,
+      response.status,
+      data
+    );
   }
 
   return (await response.json()) as T;

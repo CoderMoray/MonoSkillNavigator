@@ -35,6 +35,16 @@ export type ReviewCategory =
   | "reliability";
 export type ReviewSeverity = "low" | "medium" | "high" | "critical";
 export type ReviewVerdict = "published" | "needs-review" | "rejected";
+export type ReviewStage = "skillspector" | "virustotal" | "halucatch";
+
+/**
+ * A configured review integration could not complete. These are operational
+ * failures, not security or quality findings from a successfully completed scan.
+ */
+export interface ReviewStageFailure {
+  stage: ReviewStage;
+  message: string;
+}
 
 export interface ReviewFinding {
   id: string;
@@ -67,6 +77,12 @@ export interface ReviewReport {
   skillSpector?: SkillSpectorScanSummary;
   virusTotal?: VirusTotalScanSummary;
   createdAt: string;
+}
+
+export interface ReviewAndEvaluationResult {
+  review: ReviewReport;
+  evaluation: FunctionalEvaluationReport;
+  failedStages: ReviewStageFailure[];
 }
 
 export type { SkillSpectorScanSummary } from "./skillspector.js";
@@ -173,7 +189,7 @@ export async function reviewAndEvaluateSkillSnapshot(
   snapshot: SkillSnapshot,
   versionOverride?: string,
   evaluationOverride?: FunctionalEvaluationReport
-): Promise<{ review: ReviewReport; evaluation: FunctionalEvaluationReport }> {
+): Promise<ReviewAndEvaluationResult> {
   const findings: ReviewFinding[] = [];
   const version = versionOverride ?? snapshot.manifest.version ?? "0.1.0";
 
@@ -202,18 +218,23 @@ export async function reviewAndEvaluateSkillSnapshot(
   skillSpectorAvailable = skillSpectorResult.skillSpectorAvailable;
   virusTotal = virusTotalResult.virusTotal;
   findings.push(...skillSpectorResult.findings, ...virusTotalResult.findings);
+  const failedStages = [
+    skillSpectorResult.failure,
+    virusTotalResult.failure
+  ].filter((failure): failure is ReviewStageFailure => Boolean(failure));
 
   const evaluation = evaluationOverride ?? (await evaluateSkillSnapshot(snapshot));
-  const haluCatchAvailable = evaluation.provider === "halucatch-adapter";
+  const haluCatchFailure = getHaluCatchStageFailure(evaluation);
+  const haluCatchAvailable = evaluation.provider === "halucatch-adapter" && !haluCatchFailure;
 
   const shouldRunPlatformRules = !haluCatchAvailable || !skillSpectorAvailable;
   if (shouldRunPlatformRules) {
     runPlatformRulesReview(snapshot, findings, { includeContentRules: !skillSpectorAvailable });
   }
 
-  if (isHaluCatchEnabled() && !haluCatchAvailable) {
-    const unavailableFinding = evaluation.findings.find((finding) => finding.id === "halucatch-unavailable");
-    findings.push(createHaluCatchUnavailableReviewFinding(unavailableFinding?.message));
+  if (haluCatchFailure) {
+    findings.push(createHaluCatchUnavailableReviewFinding(haluCatchFailure.message));
+    failedStages.push(haluCatchFailure);
   }
 
   const scores = calculateScores(findings, evaluation, skillSpector);
@@ -233,7 +254,7 @@ export async function reviewAndEvaluateSkillSnapshot(
     createdAt: new Date().toISOString()
   };
 
-  return { review, evaluation };
+  return { review, evaluation, failedStages };
 }
 
 export async function reviewSkillSnapshot(
@@ -416,6 +437,41 @@ function isHaluCatchEnabled(): boolean {
   return process.env.HALUCATCH_ENABLED?.toLowerCase() !== "false";
 }
 
+function getHaluCatchStageFailure(
+  evaluation: FunctionalEvaluationReport
+): ReviewStageFailure | undefined {
+  if (!isHaluCatchEnabled()) {
+    return undefined;
+  }
+
+  const unavailableFinding = evaluation.findings.find((finding) => finding.id === "halucatch-unavailable");
+  if (unavailableFinding) {
+    return {
+      stage: "halucatch",
+      message: unavailableFinding.message
+    };
+  }
+
+  if (evaluation.provider !== "halucatch-adapter") {
+    return {
+      stage: "halucatch",
+      message: "HaluCatch reliability evaluation did not complete successfully for this publish."
+    };
+  }
+
+  const missingDimension = evaluation.findings.find((finding) =>
+    /^halucatch-(foundation|code|rules|guardrails|complexity)-missing$/.test(finding.id)
+  );
+  if (missingDimension) {
+    return {
+      stage: "halucatch",
+      message: missingDimension.message
+    };
+  }
+
+  return undefined;
+}
+
 export function isSkillSpectorReviewFinding(finding: ReviewFinding): boolean {
   return (
     finding.id.startsWith(SKILLSPECTOR_FINDING_PREFIX) &&
@@ -485,6 +541,7 @@ async function runSkillSpectorReviewStep(snapshot: SkillSnapshot): Promise<{
   skillSpector?: SkillSpectorScanSummary;
   skillSpectorAvailable: boolean;
   findings: ReviewFinding[];
+  failure?: ReviewStageFailure;
 }> {
   if (!isSkillSpectorEnabled()) {
     return { skillSpectorAvailable: false, findings: [] };
@@ -498,15 +555,20 @@ async function runSkillSpectorReviewStep(snapshot: SkillSnapshot): Promise<{
       findings: scan.findings
     };
   } catch (error) {
+    const message = truncateError(error);
     return {
       skillSpectorAvailable: false,
+      failure: {
+        stage: "skillspector",
+        message
+      },
       findings: [
         {
           id: SKILLSPECTOR_UNAVAILABLE_FINDING_ID,
           category: "security",
           severity: "high",
           title: "SkillSpector security scan unavailable",
-          message: `SkillSpector static security scan could not run: ${truncateError(error)}`,
+          message: `SkillSpector static security scan could not run: ${message}`,
           recommendation:
             "Install Python 3.12+ with SkillSpector dependencies, keep packages/SkillSpector-main available, or set SKILLSPECTOR_PYTHON before publishing."
         }
@@ -518,6 +580,7 @@ async function runSkillSpectorReviewStep(snapshot: SkillSnapshot): Promise<{
 async function runVirusTotalReviewStep(snapshot: SkillSnapshot): Promise<{
   virusTotal?: VirusTotalScanSummary;
   findings: ReviewFinding[];
+  failure?: ReviewStageFailure;
 }> {
   if (!isVirusTotalEnabled()) {
     return { findings: [] };
@@ -533,6 +596,10 @@ async function runVirusTotalReviewStep(snapshot: SkillSnapshot): Promise<{
     const message = formatVirusTotalError(error);
     return {
       virusTotal: createFailedVirusTotalSummary(snapshot, error),
+      failure: {
+        stage: "virustotal",
+        message
+      },
       findings: [
         {
           id: VIRUSTOTAL_SCAN_FAILED_FINDING_ID,

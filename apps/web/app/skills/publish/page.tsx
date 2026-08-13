@@ -3,18 +3,21 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChangeEvent, DragEvent, FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, ChevronDown, KeyRound, UploadCloud } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, KeyRound, RefreshCw, UploadCloud } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { SkillCategoryLabel } from "../../../components/SkillCategoryIcon";
 import { SuccessToast } from "../../../components/SuccessToast";
 import {
   checkSkillSlugAvailability,
   getCurrentUser,
+  getRetryableReviewFailure,
   getSkill,
   previewSkillArchive,
   publishSkillArchive,
   type PublishSkillFrontmatter,
   type PublishSkillMetadata,
+  type ReviewPipelineIncompleteResponse,
+  type ReviewStage,
   type SkillSlugAvailabilityResponse
 } from "../../../lib/api";
 import { savePublishNotice } from "../../../lib/publish-notice";
@@ -77,6 +80,7 @@ function PublishSkillPageContent() {
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reviewFailure, setReviewFailure] = useState<ReviewPipelineIncompleteResponse | null>(null);
   const [archiveHint, setArchiveHint] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [parsingArchive, setParsingArchive] = useState(false);
@@ -395,6 +399,7 @@ function PublishSkillPageContent() {
 
   async function applyArchiveFile(fileToUpload: File) {
     setError(null);
+    setReviewFailure(null);
     setArchiveHint(null);
     setSuccessToast(null);
     setFile(fileToUpload);
@@ -437,7 +442,12 @@ function PublishSkillPageContent() {
     folderFileList?: FileList | null;
     dataTransfer?: DataTransfer | null;
   }) {
+    if (submitting) {
+      return;
+    }
+
     setError(null);
+    setReviewFailure(null);
     setArchiveHint(null);
     setSuccessToast(null);
 
@@ -511,18 +521,18 @@ function PublishSkillPageContent() {
 
   function handleFileDragEnter(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
-    if (event.dataTransfer.types.includes("Files")) {
+    if (!submitting && event.dataTransfer.types.includes("Files")) {
       setIsDraggingFile(true);
     }
   }
 
   function handleFileDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
+    event.dataTransfer.dropEffect = submitting ? "none" : "copy";
   }
 
   function handleFileDragLeave(event: DragEvent<HTMLDivElement>) {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+    if (!submitting && !event.currentTarget.contains(event.relatedTarget as Node | null)) {
       setIsDraggingFile(false);
     }
   }
@@ -530,6 +540,9 @@ function PublishSkillPageContent() {
   function handleFileDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setIsDraggingFile(false);
+    if (submitting) {
+      return;
+    }
     void ingestUpload({ dataTransfer: event.dataTransfer });
   }
 
@@ -547,9 +560,19 @@ function PublishSkillPageContent() {
     });
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    void submitPublish();
+  }
+
+  async function submitPublish() {
+    if (submitting) {
+      return;
+    }
+
     setError(null);
+    setReviewFailure(null);
+    setIsDraggingFile(false);
 
     const token = getAuthToken();
     if (!token || !user) {
@@ -613,6 +636,11 @@ function PublishSkillPageContent() {
       });
       router.push(user ? creatorProfilePath(user.username) : "/account");
     } catch (err) {
+      const retryableFailure = getRetryableReviewFailure(err);
+      if (retryableFailure) {
+        setReviewFailure(retryableFailure);
+        return;
+      }
       const message = err instanceof Error ? err.message : "发布失败";
       setError(formatPublishError(message));
     } finally {
@@ -675,6 +703,10 @@ function PublishSkillPageContent() {
           <section className="market-panel">
             <div className="profile-content publish-content">
               <form className="publish-form" onSubmit={handleSubmit}>
+                <fieldset
+                  disabled={submitting}
+                  style={{ border: 0, margin: 0, minInlineSize: 0, padding: 0 }}
+                >
                 <div
                   className={`upload-dropzone ${file ? "selected" : ""} ${isDraggingFile ? "dragging" : ""} ${parsingArchive ? "dragging" : ""}`}
                   onDragEnter={handleFileDragEnter}
@@ -899,11 +931,33 @@ function PublishSkillPageContent() {
                       <ArrowRight size={16} />
                     </button>
 
-                    {error || (!canPublish && publishBlockReason) ? (
+                    {reviewFailure ? (
+                      <div className="error compact-error publish-form-feedback" role="alert">
+                        <strong>审查流程未完成，Skill 尚未保存。</strong>
+                        <span>请恢复以下审查服务后，使用当前上传包重新运行完整审查：</span>
+                        <ul>
+                          {reviewFailure.failedStages.map((failure) => (
+                            <li key={failure.stage}>
+                              <strong>{reviewStageLabel(failure.stage)}：</strong> {failure.message}
+                            </li>
+                          ))}
+                        </ul>
+                        <button
+                          className="button secondary compact"
+                          disabled={submitting || !canPublish}
+                          onClick={() => void submitPublish()}
+                          type="button"
+                        >
+                          <RefreshCw size={14} />
+                          {submitting ? "审查重试中..." : "重新运行完整审查"}
+                        </button>
+                      </div>
+                    ) : error || (!canPublish && publishBlockReason) ? (
                       <div className="error compact-error publish-form-feedback">{error ?? publishBlockReason}</div>
                     ) : null}
                   </div>
                 ) : null}
+                </fieldset>
               </form>
             </div>
           </section>
@@ -978,6 +1032,17 @@ function formatPublishError(message: string): string {
     return "该 Slug 对应的 Skill 位于回收站中，请先恢复或等待过期后再发布。";
   }
   return message;
+}
+
+function reviewStageLabel(stage: ReviewStage): string {
+  switch (stage) {
+    case "skillspector":
+      return "SkillSpector 安全审查";
+    case "virustotal":
+      return "VirusTotal 扫描";
+    case "halucatch":
+      return "HaluCatch 可靠性评估";
+  }
 }
 
 function suggestNextPatchVersion(version: string): string {

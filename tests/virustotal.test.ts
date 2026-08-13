@@ -3,6 +3,7 @@ import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import {
   parseEngineResults,
   parseThreatVerdict,
+  reviewAndEvaluateSkillSnapshot,
   reviewSkillSnapshot,
   runVirusTotalScan
 } from "@skill-platform/review-engine";
@@ -15,7 +16,8 @@ const configuredVariables = [
   "VIRUSTOTAL_API_KEY",
   "VIRUSTOTAL_UPLOAD_ON_MISS",
   "VIRUSTOTAL_TIMEOUT_MS",
-  "VIRUSTOTAL_POLL_INTERVAL_MS"
+  "VIRUSTOTAL_POLL_INTERVAL_MS",
+  "HALUCATCH_ENABLED"
 ] as const;
 const originalEnvironment = new Map(
   configuredVariables.map((name) => [name, process.env[name]])
@@ -46,6 +48,7 @@ function jsonResponse(payload: unknown, status = 200): Response {
 
 function configureVirusTotal(): void {
   process.env.SKILLSPECTOR_ENABLED = "false";
+  process.env.HALUCATCH_ENABLED = "false";
   process.env.VIRUSTOTAL_ENABLED = "true";
   process.env.VIRUSTOTAL_API_KEY = "test-api-key";
   process.env.VIRUSTOTAL_UPLOAD_ON_MISS = "false";
@@ -308,11 +311,11 @@ describe("VirusTotal package review adapter", () => {
     );
   });
 
-  test("records a failed scan summary and rejects publish", async () => {
+  test("reports a failed scan as an incomplete review stage", async () => {
     configureVirusTotal();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("fetch failed")));
 
-    const report = await reviewSkillSnapshot(snapshot, undefined, evaluation());
+    const { review: report, failedStages } = await reviewAndEvaluateSkillSnapshot(snapshot, undefined, evaluation());
 
     expect(report.virusTotal).toMatchObject({
       provider: "virustotal",
@@ -326,6 +329,12 @@ describe("VirusTotal package review adapter", () => {
       })
     );
     expect(report.verdict).toBe("rejected");
+    expect(failedStages).toEqual([
+      expect.objectContaining({
+        stage: "virustotal",
+        message: expect.stringMatching(/network|fetch failed/i)
+      })
+    ]);
   });
 
   test("retries file lookup once after a timeout", async () => {
