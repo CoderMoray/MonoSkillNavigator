@@ -17,6 +17,13 @@ export const DOC_NAV: DocNavItem[] = [
     filename: "monoskill-navigator.md"
   },
   {
+    slug: "quick-start-tutorial",
+    title: "新手教程：快速上手",
+    sidebarTitle: "新手教程",
+    href: "/docs/quick-start-tutorial",
+    filename: "quick-start-tutorial.md"
+  },
+  {
     slug: "skill-format",
     title: "Skill 格式",
     sidebarTitle: "Skill 格式",

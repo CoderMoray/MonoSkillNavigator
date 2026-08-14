@@ -3545,6 +3545,16 @@ button {
   margin-top: 0;
 }
 
+.docs-markdown img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.25em auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
 @keyframes shimmer {
   to {
     background-position: -240% 0;
