@@ -12,10 +12,8 @@ export const SKILL_CATEGORY_OPTIONS = [
 
 export type SkillCategory = (typeof SKILL_CATEGORY_OPTIONS)[number];
 
-export const MAX_SKILL_CATEGORY_FILTERS = 3;
-
 export function normalizeSkillCategoryFilters(values: string[]): string[] {
-  return [...new Set(values.map((item) => item.trim()).filter(Boolean))].slice(0, MAX_SKILL_CATEGORY_FILTERS);
+  return [...new Set(values.map((item) => item.trim()).filter(Boolean))];
 }
 
 export function skillMatchesCategories(skillCategories: string[] | undefined, selectedCategories: string[]): boolean {

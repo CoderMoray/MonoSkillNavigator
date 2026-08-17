@@ -28,6 +28,7 @@ import {
   emptyRegistry,
   isSkillOwner,
   matchesContributorUser,
+  normalizeCategoryFilters,
   normalizeReleaseTags,
   resolveVersionReference,
   skillMatchesCategoryFilters,
@@ -219,7 +220,7 @@ export abstract class JsonRegistryStore implements RegistryStore {
   async search(query = "", categories: string[] = []): Promise<SkillSearchResult[]> {
     const data = await this.load();
     const q = query.trim().toLowerCase();
-    const selectedCategories = [...new Set(categories.map((item) => item.trim()).filter(Boolean))].slice(0, 3);
+    const selectedCategories = normalizeCategoryFilters(categories);
     return Object.values(data.skills)
       .filter((s) => s.published !== false)
       .filter((s) => !s.deletedAt)

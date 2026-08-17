@@ -95,11 +95,9 @@ export function isNotFoundError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && (error as { code: string }).code === "ENOENT";
 }
 
-export const MAX_CATEGORY_FILTERS = 3;
-
-export function normalizeCategoryFilters(categories: string | string[] | undefined, max = MAX_CATEGORY_FILTERS): string[] {
+export function normalizeCategoryFilters(categories: string | string[] | undefined): string[] {
   const raw = categories === undefined ? [] : Array.isArray(categories) ? categories : [categories];
-  return [...new Set(raw.flatMap((item) => item.split(",")).map((item) => item.trim()).filter(Boolean))].slice(0, max);
+  return [...new Set(raw.flatMap((item) => item.split(",")).map((item) => item.trim()).filter(Boolean))];
 }
 
 export function skillMatchesCategoryFilters(skillCategories: string[] | undefined, selectedCategories: string[]): boolean {

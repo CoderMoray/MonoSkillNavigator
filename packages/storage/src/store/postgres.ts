@@ -30,6 +30,7 @@ import { parseSkillSpectorReviewRow, skillSpectorReviewColumns } from "../skills
 import { parseVirusTotalReviewRow, virusTotalReviewColumns } from "../virustotal-review";
 import { normalizeContributorRole, assertAssignableContributorRole } from "../contributors";
 import {
+  normalizeCategoryFilters,
   toIsoTimestampString,
   resolveVersionReference,
 } from "../utils";
@@ -284,7 +285,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
   async search(query = "", categories: string[] = []): Promise<SkillSearchResult[]> {
     await this.ensureSchema();
     const q = query.trim();
-    const selectedCategories = [...new Set(categories.map((item) => item.trim()).filter(Boolean))].slice(0, 3);
+    const selectedCategories = normalizeCategoryFilters(categories);
     const searchPattern = q ? `%${q}%` : "%";
 
     const rows = await this.db

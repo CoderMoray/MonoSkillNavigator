@@ -9,7 +9,6 @@ import { PillSelect } from "../../components/PillSelect";
 import { SkillCard } from "../../components/SkillCard";
 import { getLeaderboard, getSkills } from "../../lib/api";
 import {
-  MAX_SKILL_CATEGORY_FILTERS,
   normalizeSkillCategoryFilters,
   SKILL_CATEGORY_OPTIONS
 } from "../../lib/skill-categories";
@@ -89,15 +88,11 @@ export default function SkillsPage() {
   }, [query, sort, activeCategories]);
 
   function toggleCategory(category: string) {
-    setSelectedCategories((current) => {
-      if (current.includes(category)) {
-        return current.filter((item) => item !== category);
-      }
-      if (current.length >= MAX_SKILL_CATEGORY_FILTERS) {
-        return current;
-      }
-      return [...current, category];
-    });
+    setSelectedCategories((current) =>
+      current.includes(category)
+        ? current.filter((item) => item !== category)
+        : [...current, category]
+    );
   }
 
   return (
@@ -136,7 +131,6 @@ export default function SkillsPage() {
                 <button
                   aria-pressed={selectedCategories.includes(item)}
                   className={`category-chip ${selectedCategories.includes(item) ? "active" : ""}`}
-                  disabled={!selectedCategories.includes(item) && selectedCategories.length >= MAX_SKILL_CATEGORY_FILTERS}
                   key={item}
                   onClick={() => toggleCategory(item)}
                   type="button"
