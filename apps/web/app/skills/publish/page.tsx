@@ -8,6 +8,7 @@ import { AppShell } from "../../../components/AppShell";
 import { SkillCategoryLabel } from "../../../components/SkillCategoryIcon";
 import { SuccessToast } from "../../../components/SuccessToast";
 import {
+  ApiRequestError,
   checkSkillSlugAvailability,
   getCurrentUser,
   getRetryableReviewFailure,
@@ -645,6 +646,11 @@ function PublishSkillPageContent() {
       const retryableFailure = getRetryableReviewFailure(err);
       if (retryableFailure) {
         setReviewFailure(retryableFailure);
+        return;
+      }
+      if (err instanceof ApiRequestError && err.response?.error === "publish_rate_limited") {
+        const seconds = err.response.retryAfterSeconds ?? 60;
+        setError(`发布过于频繁，请 ${seconds} 秒后再试。`);
         return;
       }
       const message = err instanceof Error ? err.message : "发布失败";

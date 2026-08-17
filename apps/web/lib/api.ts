@@ -482,6 +482,7 @@ interface RequestOptions {
 interface ApiErrorResponse {
   error?: string;
   retryable?: boolean;
+  retryAfterSeconds?: number;
   failedStages?: ReviewStageFailure[];
 }
 

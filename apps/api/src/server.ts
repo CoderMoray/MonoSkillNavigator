@@ -33,6 +33,7 @@ import {
   mergeOwnerRejectedSkills,
   normalizeCategoryFilters,
   normalizeHandle,
+  PublishRateLimiter,
   type ContributorRole,
   type IssueSeverity,
   type IssueStatus,
@@ -162,6 +163,7 @@ export function buildServer() {
   });
   const store = createRegistryStoreFromEnv();
   const authStore = createAuthStoreFromEnv();
+  const publishRateLimiter = new PublishRateLimiter();
 
   const runRecycleBinPurge = () => {
     void store
@@ -363,6 +365,18 @@ export function buildServer() {
     if (!user) {
       return reply.code(401).send({ error: "Unauthorized" });
     }
+
+    const rateLimit = publishRateLimiter.check(user.id);
+    if (!rateLimit.allowed) {
+      return reply
+        .code(429)
+        .header("Retry-After", String(rateLimit.retryAfterSeconds))
+        .send({
+          error: "publish_rate_limited",
+          retryAfterSeconds: rateLimit.retryAfterSeconds
+        });
+    }
+    publishRateLimiter.recordAttempt(user.id);
 
     try {
       const changelog = normalizeChangelog(request.body.changelog);

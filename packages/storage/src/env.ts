@@ -7,6 +7,10 @@ import { PostgresRegistryStore } from "./store/postgres";
 
 const DEFAULT_API_BODY_LIMIT_MB = 50;
 
+export function isOnDev(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.ON_DEV?.trim().toLowerCase() === "true";
+}
+
 export function getApiBodyLimitBytes(env: NodeJS.ProcessEnv = process.env): number {
   const raw = env.API_BODY_LIMIT_MB ?? String(DEFAULT_API_BODY_LIMIT_MB);
   const mb = Number(raw);

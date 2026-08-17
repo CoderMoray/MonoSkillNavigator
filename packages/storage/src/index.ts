@@ -19,8 +19,15 @@ export {
   createRegistryStoreFromEnv,
   createArtifactStoreFromEnv,
   getApiBodyLimitBytes,
+  isOnDev,
   loadDotEnvIfPresent,
 } from "./env";
+
+export {
+  PublishRateLimiter,
+  PUBLISH_RATE_LIMIT_MS,
+  type PublishRateLimitResult,
+} from "./publish-rate-limit";
 
 export type {
   ContributorRole,
