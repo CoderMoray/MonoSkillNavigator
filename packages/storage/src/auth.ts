@@ -2,6 +2,7 @@ import { randomBytes, scryptSync, timingSafeEqual, createHash, randomUUID } from
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import pg from "pg";
+import { isRegistrationEmailVerificationRequired } from "./env";
 
 export interface PublicUser {
   id: string;
@@ -118,7 +119,7 @@ abstract class JsonAuthStore implements AuthStore {
       throw new Error("Invalid username or password");
     }
 
-    if (!user.emailVerifiedAt) {
+    if (isRegistrationEmailVerificationRequired() && !user.emailVerifiedAt) {
       throw new Error("Email not verified");
     }
 
@@ -461,7 +462,7 @@ export class PostgresAuthStore implements AuthStore {
       throw new Error("Invalid username or password");
     }
 
-    if (!user.email_verified_at) {
+    if (isRegistrationEmailVerificationRequired() && !user.email_verified_at) {
       throw new Error("Email not verified");
     }
 

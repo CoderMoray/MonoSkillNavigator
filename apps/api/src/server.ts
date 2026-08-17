@@ -36,7 +36,7 @@ import {
   PublishRateLimiter,
   getRegistrationVerifyExpiresMs,
   getWebPublicUrl,
-  isOnDev,
+  isRegistrationEmailVerificationRequired,
   isRegistrationEmailConfigured,
   sendRegistrationVerificationEmail,
   type AuthStore,
@@ -205,7 +205,7 @@ export function buildServer() {
 
   app.post<{ Body: RegisterBody }>("/auth/register", async (request, reply) => {
     try {
-      const autoVerifyEmail = isOnDev();
+      const autoVerifyEmail = !isRegistrationEmailVerificationRequired();
       const user = await authStore.register(
         request.body.username,
         request.body.password,
@@ -244,6 +244,10 @@ export function buildServer() {
 
   app.post<{ Body: LoginBody }>("/auth/resend-verification", async (request, reply) => {
     try {
+      if (!isRegistrationEmailVerificationRequired()) {
+        return reply.code(400).send({ error: "registration_email_verification_disabled" });
+      }
+
       if (!isRegistrationEmailConfigured()) {
         return reply.code(503).send({ error: "registration_email_not_configured" });
       }

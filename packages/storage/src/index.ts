@@ -28,6 +28,7 @@ export {
   createArtifactStoreFromEnv,
   getApiBodyLimitBytes,
   isOnDev,
+  isRegistrationEmailVerificationRequired,
   loadDotEnvIfPresent,
 } from "./env";
 

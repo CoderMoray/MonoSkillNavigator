@@ -11,6 +11,17 @@ export function isOnDev(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.ON_DEV?.trim().toLowerCase() === "true";
 }
 
+export function isRegistrationEmailVerificationRequired(env: NodeJS.ProcessEnv = process.env): boolean {
+  const raw = env.REGISTRATION_EMAIL_VERIFICATION_REQUIRED?.trim().toLowerCase();
+  if (raw === "false" || raw === "0" || raw === "no") {
+    return false;
+  }
+  if (raw === "true" || raw === "1" || raw === "yes") {
+    return true;
+  }
+  return true;
+}
+
 export function getApiBodyLimitBytes(env: NodeJS.ProcessEnv = process.env): number {
   const raw = env.API_BODY_LIMIT_MB ?? String(DEFAULT_API_BODY_LIMIT_MB);
   const mb = Number(raw);
