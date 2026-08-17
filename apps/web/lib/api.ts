@@ -157,10 +157,28 @@ export function getApiBaseUrl(): string {
   return API_BASE_URL;
 }
 
-export async function registerUser(username: string, password: string, email: string): Promise<AuthResponse> {
-  return request<AuthResponse>(new URL("/auth/register", API_BASE_URL), {
+export async function registerUser(
+  username: string,
+  password: string,
+  email: string
+): Promise<RegisterAuthResponse> {
+  return request<RegisterAuthResponse>(new URL("/auth/register", API_BASE_URL), {
     method: "POST",
     body: JSON.stringify({ username, password, email })
+  });
+}
+
+export async function verifyEmailToken(token: string): Promise<{ user: PublicUser; verified: true }> {
+  return request<{ user: PublicUser; verified: true }>(new URL("/auth/verify-email", API_BASE_URL), {
+    method: "POST",
+    body: JSON.stringify({ token })
+  });
+}
+
+export async function resendVerificationEmail(username: string, password: string): Promise<{ ok: true; email: string }> {
+  return request<{ ok: true; email: string }>(new URL("/auth/resend-verification", API_BASE_URL), {
+    method: "POST",
+    body: JSON.stringify({ username, password })
   });
 }
 
@@ -450,6 +468,13 @@ interface AuthResponse {
   token: string;
   expiresAt: string;
 }
+
+type RegisterAuthResponse =
+  | AuthResponse
+  | {
+      user: PublicUser;
+      verificationRequired: true;
+    };
 
 export interface PublishSkillResponse {
   slug: string;

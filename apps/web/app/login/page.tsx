@@ -14,6 +14,9 @@ function formatLoginError(message: string): string {
   if (message === "Invalid username or password") {
     return "用户名或密码错误";
   }
+  if (message === "Email not verified") {
+    return "邮箱尚未验证，请查收验证邮件或重新发送";
+  }
   return message;
 }
 

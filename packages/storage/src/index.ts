@@ -8,6 +8,14 @@ export {
 export * from "./auth";
 
 export {
+  getRegistrationVerifyExpiresMs,
+  getWebPublicUrl,
+  isRegistrationEmailConfigured,
+  sendRegistrationVerificationEmail,
+  type RegistrationEmailPayload,
+} from "./registration-email";
+
+export {
   MinioArtifactStore,
 } from "./store/minio";
 

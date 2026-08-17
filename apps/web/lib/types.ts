@@ -229,6 +229,7 @@ export interface PublicUser {
   id: string;
   username: string;
   email: string | null;
+  emailVerified: boolean;
   role: "admin" | "user";
   createdAt: string;
   updatedAt: string;

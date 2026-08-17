@@ -34,6 +34,12 @@ import {
   normalizeCategoryFilters,
   normalizeHandle,
   PublishRateLimiter,
+  getRegistrationVerifyExpiresMs,
+  getWebPublicUrl,
+  isOnDev,
+  isRegistrationEmailConfigured,
+  sendRegistrationVerificationEmail,
+  type AuthStore,
   type ContributorRole,
   type IssueSeverity,
   type IssueStatus,
@@ -98,6 +104,10 @@ interface ChangePasswordBody {
 
 interface DeleteAccountBody {
   password: string;
+}
+
+interface VerifyEmailBody {
+  token: string;
 }
 
 interface SkillParams {
@@ -195,15 +205,71 @@ export function buildServer() {
 
   app.post<{ Body: RegisterBody }>("/auth/register", async (request, reply) => {
     try {
+      const autoVerifyEmail = isOnDev();
       const user = await authStore.register(
         request.body.username,
         request.body.password,
-        request.body.email
+        request.body.email,
+        { autoVerifyEmail }
       );
-      const session = await authStore.login(request.body.username, request.body.password);
-      return reply.code(201).send({ user, token: session.token, expiresAt: session.expiresAt });
+
+      if (autoVerifyEmail) {
+        const session = await authStore.login(request.body.username, request.body.password);
+        return reply.code(201).send({ user, token: session.token, expiresAt: session.expiresAt });
+      }
+
+      if (!isRegistrationEmailConfigured()) {
+        return reply.code(503).send({ error: "registration_email_not_configured" });
+      }
+
+      try {
+        await sendRegistrationVerificationForUser(authStore, user);
+      } catch (error) {
+        return reply.code(503).send({ error: errorMessage(error) });
+      }
+      return reply.code(201).send({ user, verificationRequired: true });
     } catch (error) {
       return reply.code(400).send({ error: errorMessage(error) });
+    }
+  });
+
+  app.post<{ Body: VerifyEmailBody }>("/auth/verify-email", async (request, reply) => {
+    try {
+      const user = await authStore.verifyEmail(request.body.token);
+      return { user, verified: true };
+    } catch (error) {
+      return reply.code(400).send({ error: errorMessage(error) });
+    }
+  });
+
+  app.post<{ Body: LoginBody }>("/auth/resend-verification", async (request, reply) => {
+    try {
+      if (!isRegistrationEmailConfigured()) {
+        return reply.code(503).send({ error: "registration_email_not_configured" });
+      }
+
+      const expiresMs = getRegistrationVerifyExpiresMs();
+      const { user, token } = await authStore.resendEmailVerification(
+        request.body.username,
+        request.body.password,
+        expiresMs
+      );
+      if (!user.email) {
+        return reply.code(400).send({ error: "User email is missing" });
+      }
+
+      const verifyUrl = `${getWebPublicUrl()}/verify-email?token=${encodeURIComponent(token)}`;
+      await sendRegistrationVerificationEmail({
+        to: user.email,
+        username: user.username,
+        verifyUrl
+      });
+
+      return { ok: true, email: user.email };
+    } catch (error) {
+      const message = errorMessage(error);
+      const status = message === "Invalid username or password" ? 401 : 400;
+      return reply.code(status).send({ error: message });
     }
   });
 
@@ -986,6 +1052,24 @@ function readSkillFromBody(
 function stripDataUrlPrefix(value: string): string {
   const commaIndex = value.indexOf(",");
   return value.startsWith("data:") && commaIndex >= 0 ? value.slice(commaIndex + 1) : value;
+}
+
+async function sendRegistrationVerificationForUser(
+  authStore: AuthStore,
+  user: { id: string; username: string; email: string | null }
+): Promise<void> {
+  if (!user.email) {
+    throw new Error("User email is missing");
+  }
+
+  const expiresMs = getRegistrationVerifyExpiresMs();
+  const token = await authStore.createEmailVerificationToken(user.id, expiresMs);
+  const verifyUrl = `${getWebPublicUrl()}/verify-email?token=${encodeURIComponent(token)}`;
+  await sendRegistrationVerificationEmail({
+    to: user.email,
+    username: user.username,
+    verifyUrl
+  });
 }
 
 function normalizeChangelog(value: string | undefined): string | undefined {

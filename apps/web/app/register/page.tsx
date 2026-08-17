@@ -59,6 +59,9 @@ function formatRegisterError(message: string): string {
   if (message === "Password must be at least 8 characters") {
     return "密码至少需要 8 个字符";
   }
+  if (message === "registration_email_not_configured") {
+    return "邮件服务未配置，暂时无法完成注册验证";
+  }
   return message;
 }
 
@@ -99,9 +102,13 @@ export default function RegisterPage() {
 
     setSubmitting(true);
     try {
-      const session = await registerUser(username, password, email);
-      setAuthToken(session.token);
-      router.push(creatorProfilePath(session.user.username));
+      const result = await registerUser(username, password, email);
+      if ("token" in result) {
+        setAuthToken(result.token);
+        router.push(creatorProfilePath(result.user.username));
+        return;
+      }
+      router.push(`/register/pending?email=${encodeURIComponent(result.user.email ?? email)}`);
     } catch (err) {
       setError(formatRegisterError(err instanceof Error ? err.message : "注册失败"));
     } finally {
@@ -173,7 +180,7 @@ export default function RegisterPage() {
             </label>
             {error ? <div className="error compact-error">{error}</div> : null}
             <button className="button primary" disabled={submitting} type="submit">
-              {submitting ? "注册中..." : "注册并登录"}
+              {submitting ? "注册中..." : "注册"}
             </button>
           </form>
 

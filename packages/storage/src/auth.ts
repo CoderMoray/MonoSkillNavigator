@@ -7,6 +7,7 @@ export interface PublicUser {
   id: string;
   username: string;
   email: string | null;
+  emailVerified: boolean;
   role: "admin" | "user";
   createdAt: string;
   updatedAt: string;
@@ -14,6 +15,11 @@ export interface PublicUser {
 
 interface StoredUser extends PublicUser {
   passwordHash: string;
+  emailVerifiedAt: string | null;
+  pendingEmailVerification?: {
+    tokenHash: string;
+    expiresAt: string;
+  };
 }
 
 interface StoredSession {
@@ -36,7 +42,7 @@ export interface LoginResult {
 }
 
 export interface AuthStore {
-  register(username: string, password: string, email: string): Promise<PublicUser>;
+  register(username: string, password: string, email: string, options?: RegisterOptions): Promise<PublicUser>;
   login(username: string, password: string): Promise<LoginResult>;
   logout(token: string): Promise<void>;
   getUserByToken(token: string): Promise<PublicUser | undefined>;
@@ -44,6 +50,13 @@ export interface AuthStore {
   listUsers(): Promise<PublicUser[]>;
   changePassword(token: string, currentPassword: string, newPassword: string): Promise<PublicUser>;
   deleteAccount(token: string, password: string): Promise<void>;
+  createEmailVerificationToken(userId: string, expiresMs: number): Promise<string>;
+  verifyEmail(token: string): Promise<PublicUser>;
+  resendEmailVerification(username: string, password: string, expiresMs: number): Promise<{ user: PublicUser; token: string }>;
+}
+
+export interface RegisterOptions {
+  autoVerifyEmail?: boolean;
 }
 
 const emptyAuthData: AuthData = {
@@ -52,7 +65,12 @@ const emptyAuthData: AuthData = {
 };
 
 abstract class JsonAuthStore implements AuthStore {
-  async register(username: string, password: string, email: string): Promise<PublicUser> {
+  async register(
+    username: string,
+    password: string,
+    email: string,
+    options: RegisterOptions = {}
+  ): Promise<PublicUser> {
     const normalizedUsername = normalizeUsername(username);
     const normalizedEmail = normalizeEmail(email);
     assertPassword(password);
@@ -76,6 +94,8 @@ abstract class JsonAuthStore implements AuthStore {
       id: randomUUID(),
       username: normalizedUsername,
       email: normalizedEmail,
+      emailVerified: options.autoVerifyEmail === true,
+      emailVerifiedAt: options.autoVerifyEmail === true ? now : null,
       role: isFirstUser ? "admin" : "user",
       passwordHash: hashPassword(password),
       createdAt: now,
@@ -96,6 +116,10 @@ abstract class JsonAuthStore implements AuthStore {
 
     if (!user || !verifyPassword(password, user.passwordHash)) {
       throw new Error("Invalid username or password");
+    }
+
+    if (!user.emailVerifiedAt) {
+      throw new Error("Email not verified");
     }
 
     const token = `skp_${randomBytes(32).toString("base64url")}`;
@@ -212,6 +236,84 @@ abstract class JsonAuthStore implements AuthStore {
     await this.save(data);
   }
 
+  async createEmailVerificationToken(userId: string, expiresMs: number): Promise<string> {
+    const data = await this.load();
+    const user = data.users[userId];
+    if (!user) {
+      throw new Error("User not found");
+    }
+    if (user.emailVerifiedAt) {
+      throw new Error("Email already verified");
+    }
+    if (!user.email) {
+      throw new Error("User email is missing");
+    }
+
+    const rawToken = `ev_${randomBytes(32).toString("base64url")}`;
+    user.pendingEmailVerification = {
+      tokenHash: hashToken(rawToken),
+      expiresAt: new Date(Date.now() + expiresMs).toISOString()
+    };
+    user.updatedAt = new Date().toISOString();
+    await this.save(data);
+    return rawToken;
+  }
+
+  async verifyEmail(token: string): Promise<PublicUser> {
+    const data = await this.load();
+    const tokenHash = hashToken(token.trim());
+    const user = Object.values(data.users).find(
+      (item) => item.pendingEmailVerification?.tokenHash === tokenHash
+    );
+
+    if (!user?.pendingEmailVerification) {
+      throw new Error("Invalid or expired verification token");
+    }
+
+    if (new Date(user.pendingEmailVerification.expiresAt).getTime() <= Date.now()) {
+      delete user.pendingEmailVerification;
+      await this.save(data);
+      throw new Error("Invalid or expired verification token");
+    }
+
+    const now = new Date().toISOString();
+    user.emailVerifiedAt = now;
+    user.emailVerified = true;
+    delete user.pendingEmailVerification;
+    user.updatedAt = now;
+    await this.save(data);
+    return toPublicUser(user);
+  }
+
+  async resendEmailVerification(
+    username: string,
+    password: string,
+    expiresMs: number
+  ): Promise<{ user: PublicUser; token: string }> {
+    const normalizedUsername = normalizeUsername(username);
+    const data = await this.load();
+    const user = Object.values(data.users).find(
+      (item) => item.username.toLowerCase() === normalizedUsername.toLowerCase()
+    );
+
+    if (!user || !verifyPassword(password, user.passwordHash)) {
+      throw new Error("Invalid username or password");
+    }
+    if (user.emailVerifiedAt) {
+      throw new Error("Email already verified");
+    }
+    if (!user.email) {
+      throw new Error("User email is missing");
+    }
+
+    const token = await this.createEmailVerificationToken(user.id, expiresMs);
+    const refreshed = (await this.load()).users[user.id];
+    if (!refreshed) {
+      throw new Error("User not found");
+    }
+    return { user: toPublicUser(refreshed), token };
+  }
+
   protected abstract load(): Promise<AuthData>;
   protected abstract save(data: AuthData): Promise<void>;
 }
@@ -251,6 +353,7 @@ interface DatabaseUserRow {
   id: string;
   username: string;
   email: string | null;
+  email_verified_at: AuthDatabaseTimestamp | null;
   role: "admin" | "user";
   password_hash: string;
   created_at: AuthDatabaseTimestamp;
@@ -265,7 +368,12 @@ export class PostgresAuthStore implements AuthStore {
     this.pool = pool ?? new pg.Pool({ connectionString: databaseUrl });
   }
 
-  async register(username: string, password: string, email: string): Promise<PublicUser> {
+  async register(
+    username: string,
+    password: string,
+    email: string,
+    options: RegisterOptions = {}
+  ): Promise<PublicUser> {
     const normalizedUsername = normalizeUsername(username);
     const normalizedEmail = normalizeEmail(email);
     assertPassword(password);
@@ -292,10 +400,13 @@ export class PostgresAuthStore implements AuthStore {
       }
 
       const now = new Date().toISOString();
+      const emailVerifiedAt = options.autoVerifyEmail === true ? now : null;
       const user: StoredUser = {
         id: randomUUID(),
         username: normalizedUsername,
         email: normalizedEmail,
+        emailVerified: emailVerifiedAt !== null,
+        emailVerifiedAt,
         role: Number(count.rows[0]?.count ?? 0) === 0 ? "admin" : "user",
         passwordHash: hashPassword(password),
         createdAt: now,
@@ -304,9 +415,18 @@ export class PostgresAuthStore implements AuthStore {
 
       try {
         await client.query(
-          `insert into platform_users (id, username, email, role, password_hash, created_at, updated_at)
-           values ($1, $2, $3, $4, $5, $6, $7)`,
-          [user.id, user.username, user.email, user.role, user.passwordHash, user.createdAt, user.updatedAt]
+          `insert into platform_users (id, username, email, email_verified_at, role, password_hash, created_at, updated_at)
+           values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            user.id,
+            user.username,
+            user.email,
+            user.emailVerifiedAt,
+            user.role,
+            user.passwordHash,
+            user.createdAt,
+            user.updatedAt
+          ]
         );
       } catch (error) {
         if (isUniqueViolation(error)) {
@@ -329,7 +449,7 @@ export class PostgresAuthStore implements AuthStore {
     const normalizedUsername = normalizeUsername(username);
     await this.ensureSchema();
     const result = await this.pool.query<DatabaseUserRow>(
-      `select id, username, email, role, password_hash, created_at, updated_at
+      `select id, username, email, email_verified_at, role, password_hash, created_at, updated_at
        from platform_users
        where lower(username) = lower($1)
        limit 1`,
@@ -339,6 +459,10 @@ export class PostgresAuthStore implements AuthStore {
 
     if (!user || !verifyPassword(password, user.password_hash)) {
       throw new Error("Invalid username or password");
+    }
+
+    if (!user.email_verified_at) {
+      throw new Error("Email not verified");
     }
 
     const token = `skp_${randomBytes(32).toString("base64url")}`;
@@ -367,7 +491,7 @@ export class PostgresAuthStore implements AuthStore {
     await this.ensureSchema();
     await this.pool.query("delete from auth_sessions where expires_at <= now()");
     const result = await this.pool.query<DatabaseUserRow>(
-      `select u.id, u.username, u.email, u.role, u.password_hash, u.created_at, u.updated_at
+      `select u.id, u.username, u.email, u.email_verified_at, u.role, u.password_hash, u.created_at, u.updated_at
        from auth_sessions s
        join platform_users u on u.id = s.user_id
        where s.token_hash = $1 and s.expires_at > now()
@@ -382,7 +506,7 @@ export class PostgresAuthStore implements AuthStore {
     const normalizedUsername = normalizeUsername(username);
     await this.ensureSchema();
     const result = await this.pool.query<DatabaseUserRow>(
-      `select id, username, email, role, password_hash, created_at, updated_at
+      `select id, username, email, email_verified_at, role, password_hash, created_at, updated_at
        from platform_users
        where lower(username) = lower($1)
        limit 1`,
@@ -395,7 +519,7 @@ export class PostgresAuthStore implements AuthStore {
   async listUsers(): Promise<PublicUser[]> {
     await this.ensureSchema();
     const result = await this.pool.query<DatabaseUserRow>(
-      `select id, username, email, role, password_hash, created_at, updated_at
+      `select id, username, email, email_verified_at, role, password_hash, created_at, updated_at
        from platform_users
        order by lower(username)`
     );
@@ -412,7 +536,7 @@ export class PostgresAuthStore implements AuthStore {
       await client.query("begin");
       await client.query("delete from auth_sessions where expires_at <= now()");
       const result = await client.query<DatabaseUserRow>(
-        `select u.id, u.username, u.email, u.role, u.password_hash, u.created_at, u.updated_at
+        `select u.id, u.username, u.email, u.email_verified_at, u.role, u.password_hash, u.created_at, u.updated_at
          from auth_sessions s
          join platform_users u on u.id = s.user_id
          where s.token_hash = $1
@@ -459,7 +583,7 @@ export class PostgresAuthStore implements AuthStore {
       await client.query("begin");
       await client.query("delete from auth_sessions where expires_at <= now()");
       const result = await client.query<DatabaseUserRow>(
-        `select u.id, u.username, u.email, u.role, u.password_hash, u.created_at, u.updated_at
+        `select u.id, u.username, u.email, u.email_verified_at, u.role, u.password_hash, u.created_at, u.updated_at
          from auth_sessions s
          join platform_users u on u.id = s.user_id
          where s.token_hash = $1
@@ -479,7 +603,15 @@ export class PostgresAuthStore implements AuthStore {
         "select count(*)::text as count from platform_users where role = 'admin'"
       );
       assertCanDeleteUser(
-        { id: user.id, username: user.username, email: user.email, role: user.role, createdAt: "", updatedAt: "" },
+        {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          emailVerified: Boolean(user.email_verified_at),
+          role: user.role,
+          createdAt: "",
+          updatedAt: ""
+        },
         [],
         Number(adminCount.rows[0]?.count ?? 0)
       );
@@ -492,6 +624,126 @@ export class PostgresAuthStore implements AuthStore {
     } finally {
       client.release();
     }
+  }
+
+  async createEmailVerificationToken(userId: string, expiresMs: number): Promise<string> {
+    await this.ensureSchema();
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      const userResult = await client.query<{ id: string; email: string | null; email_verified_at: AuthDatabaseTimestamp | null }>(
+        `select id, email, email_verified_at
+         from platform_users
+         where id = $1
+         for update`,
+        [userId]
+      );
+      const user = userResult.rows[0];
+      if (!user) {
+        throw new Error("User not found");
+      }
+      if (user.email_verified_at) {
+        throw new Error("Email already verified");
+      }
+      if (!user.email) {
+        throw new Error("User email is missing");
+      }
+
+      const rawToken = `ev_${randomBytes(32).toString("base64url")}`;
+      const now = new Date().toISOString();
+      const expiresAt = new Date(Date.now() + expiresMs).toISOString();
+      await client.query("delete from email_verification_tokens where user_id = $1", [userId]);
+      await client.query(
+        `insert into email_verification_tokens (id, user_id, token_hash, expires_at, created_at)
+         values ($1, $2, $3, $4, $5)`,
+        [randomUUID(), userId, hashToken(rawToken), expiresAt, now]
+      );
+      await client.query("commit");
+      return rawToken;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async verifyEmail(token: string): Promise<PublicUser> {
+    await this.ensureSchema();
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("delete from email_verification_tokens where expires_at <= now()");
+      const tokenResult = await client.query<{ user_id: string }>(
+        `select user_id
+         from email_verification_tokens
+         where token_hash = $1 and expires_at > now()
+         limit 1
+         for update`,
+        [hashToken(token.trim())]
+      );
+      const tokenRow = tokenResult.rows[0];
+      if (!tokenRow) {
+        throw new Error("Invalid or expired verification token");
+      }
+
+      const now = new Date().toISOString();
+      await client.query(
+        `update platform_users
+         set email_verified_at = $1, updated_at = $1
+         where id = $2`,
+        [now, tokenRow.user_id]
+      );
+      await client.query("delete from email_verification_tokens where user_id = $1", [tokenRow.user_id]);
+
+      const userResult = await client.query<DatabaseUserRow>(
+        `select id, username, email, email_verified_at, role, password_hash, created_at, updated_at
+         from platform_users
+         where id = $1`,
+        [tokenRow.user_id]
+      );
+      const user = userResult.rows[0];
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      await client.query("commit");
+      return toPublicDatabaseUser(user);
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async resendEmailVerification(
+    username: string,
+    password: string,
+    expiresMs: number
+  ): Promise<{ user: PublicUser; token: string }> {
+    const normalizedUsername = normalizeUsername(username);
+    await this.ensureSchema();
+    const result = await this.pool.query<DatabaseUserRow>(
+      `select id, username, email, email_verified_at, role, password_hash, created_at, updated_at
+       from platform_users
+       where lower(username) = lower($1)
+       limit 1`,
+      [normalizedUsername]
+    );
+    const user = result.rows[0];
+    if (!user || !verifyPassword(password, user.password_hash)) {
+      throw new Error("Invalid username or password");
+    }
+    if (user.email_verified_at) {
+      throw new Error("Email already verified");
+    }
+    if (!user.email) {
+      throw new Error("User email is missing");
+    }
+
+    const token = await this.createEmailVerificationToken(user.id, expiresMs);
+    return { user: toPublicDatabaseUser(user), token };
   }
 
   private async migrateLegacyAuth(client: pg.PoolClient): Promise<void> {
@@ -515,10 +767,19 @@ export class PostgresAuthStore implements AuthStore {
 
       for (const user of Object.values(data.users)) {
         await client.query(
-          `insert into platform_users (id, username, email, role, password_hash, created_at, updated_at)
-           values ($1, $2, $3, $4, $5, $6, $7)
+          `insert into platform_users (id, username, email, email_verified_at, role, password_hash, created_at, updated_at)
+           values ($1, $2, $3, $4, $5, $6, $7, $8)
            on conflict (id) do nothing`,
-          [user.id, user.username, user.email ?? null, user.role, user.passwordHash, user.createdAt, user.updatedAt]
+          [
+            user.id,
+            user.username,
+            user.email ?? null,
+            user.emailVerifiedAt ?? user.createdAt,
+            user.role,
+            user.passwordHash,
+            user.createdAt,
+            user.updatedAt
+          ]
         );
       }
 
@@ -565,6 +826,48 @@ export class PostgresAuthStore implements AuthStore {
     );
   }
 
+  private async migrateEmailVerification(client: pg.PoolClient): Promise<void> {
+    const migrationName = "auth-email-verification-v1";
+    const applied = await client.query<{ name: string }>(
+      "select name from platform_schema_migrations where name = $1",
+      [migrationName]
+    );
+    if (applied.rows.length > 0) {
+      return;
+    }
+
+    await client.query(`alter table platform_users add column if not exists email_verified_at timestamptz`);
+    await client.query(
+      `update platform_users
+       set email_verified_at = coalesce(email_verified_at, created_at)
+       where email_verified_at is null`
+    );
+    await client.query(`
+      create table if not exists email_verification_tokens (
+        id text primary key,
+        user_id text not null references platform_users(id) on delete cascade,
+        token_hash text not null unique,
+        expires_at timestamptz not null,
+        created_at timestamptz not null
+      )
+    `);
+    await client.query(
+      `create index if not exists email_verification_tokens_user_id_idx
+       on email_verification_tokens (user_id)`
+    );
+    await client.query(
+      `create index if not exists email_verification_tokens_expires_at_idx
+       on email_verification_tokens (expires_at)`
+    );
+
+    await client.query(
+      `insert into platform_schema_migrations (name, applied_at)
+       values ($1, now())
+       on conflict (name) do nothing`,
+      [migrationName]
+    );
+  }
+
   private ensureSchema(): Promise<void> {
     this.schemaReady ??= (async () => {
       const client = await this.pool.connect();
@@ -574,6 +877,7 @@ export class PostgresAuthStore implements AuthStore {
         await client.query(relationalAuthSchema);
         await this.migrateLegacyAuth(client);
         await this.migrateEmailColumn(client);
+        await this.migrateEmailVerification(client);
         await client.query("commit");
       } catch (error) {
         await client.query("rollback").catch(() => undefined);
@@ -697,10 +1001,12 @@ function pruneExpiredSessions(data: AuthData): void {
 }
 
 function toPublicUser(user: StoredUser): PublicUser {
+  const emailVerifiedAt = user.emailVerifiedAt ?? null;
   return {
     id: user.id,
     username: user.username,
     email: user.email ?? null,
+    emailVerified: emailVerifiedAt !== null,
     role: user.role,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
@@ -708,10 +1014,12 @@ function toPublicUser(user: StoredUser): PublicUser {
 }
 
 function toPublicDatabaseUser(user: DatabaseUserRow): PublicUser {
+  const emailVerifiedAt = user.email_verified_at ? toAuthIsoString(user.email_verified_at) : null;
   return {
     id: user.id,
     username: user.username,
     email: user.email,
+    emailVerified: emailVerifiedAt !== null,
     role: user.role,
     createdAt: toAuthIsoString(user.created_at),
     updatedAt: toAuthIsoString(user.updated_at)
@@ -729,9 +1037,12 @@ function isUniqueViolation(error: unknown): boolean {
 function normalizeAuthData(data: AuthData): AuthData {
   const users: Record<string, StoredUser> = {};
   for (const [id, user] of Object.entries(data.users ?? {})) {
+    const emailVerifiedAt = user.emailVerifiedAt ?? user.createdAt ?? null;
     users[id] = {
       ...user,
-      email: user.email ?? null
+      email: user.email ?? null,
+      emailVerifiedAt,
+      emailVerified: emailVerifiedAt !== null
     };
   }
 
