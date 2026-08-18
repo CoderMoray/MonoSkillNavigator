@@ -1,7 +1,7 @@
 import { saveBlobAsFile } from "./api";
-import { formatDateTime } from "./format";
+import { formatDateTime, verdictLabel } from "./format";
 import { toSkillSpectorSafetyScore } from "./skillspector-summary";
-import type { FunctionalEvaluationReport, RegistrySkill } from "./types";
+import type { FunctionalEvaluationReport, RegistrySkill, ReviewVerdict } from "./types";
 
 export interface AuditRow {
   slug: string;
@@ -9,6 +9,7 @@ export interface AuditRow {
   creatorLabel: string;
   creatorHandle?: string;
   version: string;
+  status: ReviewVerdict;
   publishDate: string;
   skillSpectorSafetyScore: number | null;
   haluCatchScore: number | null;
@@ -19,6 +20,7 @@ export interface AuditExportRecord {
   skill_name: string;
   creator: string;
   version: string;
+  status: string;
   publish_date: string;
   skillspector_safety_score: number | "";
   halucatch_score: number | "";
@@ -29,6 +31,7 @@ const EXPORT_HEADERS: (keyof AuditExportRecord)[] = [
   "skill_name",
   "creator",
   "version",
+  "status",
   "publish_date",
   "skillspector_safety_score",
   "halucatch_score"
@@ -52,6 +55,7 @@ export function buildAuditRows(skills: RegistrySkill[]): AuditRow[] {
       creatorLabel: owner?.name ?? owner?.username ?? "—",
       creatorHandle: owner?.username,
       version: latest.version,
+      status: latest.status,
       publishDate: latest.createdAt,
       skillSpectorSafetyScore: latest.review.skillSpector
         ? toSkillSpectorSafetyScore(latest.review.skillSpector.riskScore)
@@ -121,6 +125,7 @@ export function auditRowsToExportRecords(rows: AuditRow[]): AuditExportRecord[] 
     skill_name: row.skillName,
     creator: formatCreatorForExport(row),
     version: row.version,
+    status: verdictLabel(row.status),
     publish_date: formatDateTime(row.publishDate),
     skillspector_safety_score: row.skillSpectorSafetyScore ?? "",
     halucatch_score: row.haluCatchScore ?? ""

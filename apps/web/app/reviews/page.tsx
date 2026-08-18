@@ -6,6 +6,7 @@ import { ArrowDownUp, Download, FileSpreadsheet, ShieldCheck } from "lucide-reac
 import { AppShell } from "../../components/AppShell";
 import { ConfirmToast } from "../../components/ConfirmToast";
 import { PillSelect } from "../../components/PillSelect";
+import { VerdictBadge } from "../../components/StatusBadge";
 import {
   buildAuditRows,
   downloadAuditCsv,
@@ -324,6 +325,7 @@ export default function ReviewsPage() {
                       <th scope="col">skill_name</th>
                       <th scope="col">creator</th>
                       <th scope="col">version</th>
+                      <th scope="col">status</th>
                       <th scope="col">publish_date</th>
                       <th scope="col">skillspector_safety_score</th>
                       <th scope="col">halucatch_score</th>
@@ -413,6 +415,9 @@ function AuditTableRow({
         )}
       </td>
       <td className="mono">{row.version}</td>
+      <td>
+        <VerdictBadge verdict={row.status} />
+      </td>
       <td>{formatDateTime(row.publishDate)}</td>
       <td>{formatScore(row.skillSpectorSafetyScore)}</td>
       <td>{formatHaluCatchScore(row.haluCatchScore)}</td>
