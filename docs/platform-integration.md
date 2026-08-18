@@ -57,7 +57,85 @@ location /MonoSkillNavigator/api/ {
 - 同步影响：CORS 配置、`/health` 探测地址、CLI 的 registry 值、Nginx 不再需要 rewrite。
 - **此改动会改变 API 合同（所有 URL 带前缀）**，已集成的外部方需感知。
 
-## 3. 外部平台集成 Checklist
+## 3. 外部平台为 Flask 开发时的注意事项
+
+外部平台若使用 Flask（如 `aaa.bbb.com` 是 Flask 应用），集成 SkillNavigator 时注意以下几点。
+
+### 3.1 集成形态选择
+
+| 形态 | 做法 | 适用 |
+|---|---|---|
+| 链接跳转 | Flask 页面放入口链接，跳转 SkillNavigator 独立部署 | 最简，但非"子页面" |
+| 子路径挂载（推荐） | Nginx 把 `/{brand}/*` 转发到 SkillNavigator，Flask 只管自己的路由 | 与独立部署共用同一套代码 |
+| iframe 嵌入 | Flask 页面用 `<iframe src="...">` 嵌入 | 页面级嵌入，需处理 CSP/Cookie（见 3.5） |
+
+> **核心原则**：SkillNavigator 是独立的 Next.js（Web）+ Fastify（API）服务，**不应在 Flask 进程内运行，也不应改造成 Flask 蓝图**——两个技术栈完全不同，进程内挂载会在构建、依赖、维护上互相拖累。集成层只做"路由/入口"，不做"代码合入"。
+
+### 3.2 Werkzeug DispatcherMiddleware 已移除（易踩坑）
+
+旧教程常把两个 WSGI 应用挂到不同路径，但 **Werkzeug 1.0（2020）已移除** `DispatcherMiddleware`：
+
+```python
+# 错误示例：Werkzeug 1.0+ 会 ImportError
+from werkzeug.middleware.dispatcher import DispatcherMiddleware  # ImportError!
+```
+
+替代方案（手写 WSGI 挂载中间件）：
+```python
+class MountMiddleware:
+    """把 target_app 挂到 /{brand}/ 下，其余请求交给 Flask app。"""
+
+    def __init__(self, app, mount_path, target_app):
+        self.app = app
+        self.mount_path = mount_path.rstrip("/")
+        self.target_app = target_app
+
+    def __call__(self, environ, start_response):
+        if environ["PATH_INFO"].startswith(self.mount_path + "/"):
+            environ["SCRIPT_NAME"] = self.mount_path
+            environ["PATH_INFO"] = environ["PATH_INFO"][len(self.mount_path):]
+            return self.target_app(environ, start_response)
+        return self.app(environ, start_response)
+```
+
+但**更推荐直接用 Nginx 做路径转发**（见 2.2），Flask 零改动、SkillNavigator 也无感知。
+
+### 3.3 ProxyFix（X-Forwarded 头）
+
+请求经过反向代理时，Flask 侧若要正确识别 `X-Forwarded-*`（生成回源 URL、跳转等），需挂 ProxyFix：
+
+```python
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+```
+
+> **安全提醒**：ProxyFix 无条件信任代理头，仅应在反向代理可控的环境使用；Nginx 必须设置 `X-Forwarded-Host`（见 2.2）。
+
+### 3.4 登录体系对接
+
+SkillNavigator 当前是**独立账号体系**（用户名/密码 + session token），**尚未实现 OAuth/OIDC SSO**：
+
+- **当前推荐**：用户进入 SkillNavigator 子页面后独立登录，token 存 SkillNavigator 侧 localStorage；Flask 平台只负责入口/导航，不参与鉴权。
+- **SSO 共享（未来）**：若要求"Flask 登录后免登 SkillNavigator"，需 SkillNavigator 支持 OIDC/OAuth2——当前未实现。接入前先与平台方确认需求，避免返工。
+
+### 3.5 iframe 嵌入的 CSP 与 Cookie
+
+若采用 iframe 嵌入而非子路径挂载：
+
+- SkillNavigator Web 需允许被外部平台 iframe 嵌入（CSP `frame-ancestors`）：
+  ```nginx
+  # SkillNavigator 响应头（Next.js 可通过自定义 headers 配置）
+  add_header Content-Security-Policy "frame-ancestors https://aaa.bbb.com";
+  ```
+- token 走 localStorage 而非 Cookie，规避跨站 SameSite Cookie 被浏览器拦截的问题。
+- 关注 referrer 策略，避免 iframe 内跳转泄露内部路径。
+
+### 3.6 CORS
+
+- Flask 页面直接 fetch SkillNavigator API 时：API 侧 CORS 需放行 Flask 域名（当前 `origin: true` 全放开，生产建议收紧）。
+- 走 Nginx 同域转发（`/{brand}/api`）则天然同源，无 CORS 问题。
+
+## 4. 外部平台集成 Checklist
 
 对嵌入方（如 aaa.bbb.com 团队）：
 
@@ -68,7 +146,7 @@ location /MonoSkillNavigator/api/ {
 - [ ] 用 `curl {registry}/health` 验证连通性
 - [ ] 用 CLI 验证：`skillnav config add embed --registry https://aaa.bbb.com/{brand}/api && skillnav config test embed`
 
-## 4. CLI 侧连接方式（两种模式同一机制）
+## 5. CLI 侧连接方式（两种模式同一机制）
 
 CLI 永远只连 **API base URL（registry）**，不感知模式，差异仅是 URL 是否带前缀：
 
@@ -90,7 +168,7 @@ skillnav publish ./demo    # 发布到当前默认平台
 - `{brand}` 同时驱动：页面 URL 前缀（Web basePath）、API 前缀（代理 location）、CLI 文档示例、邮件署名。
 - **品牌变更流程**：改 `brand.yaml` → 同步改 Web basePath 与 Nginx location → 通知所有已配置 profile 的 CLI 用户更新 registry。
 
-## 6. 相关文档
+## 7. 相关文档
 
 - [CLI 设计文档](./cli-design.md) — 命令集、退出码、输出约定
 - `brand.yaml` — 品牌名唯一事实来源
