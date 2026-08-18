@@ -10,6 +10,9 @@ import { getLeaderboard } from "../../lib/api";
 import { formatDateTime, formatNumber } from "../../lib/format";
 import type { SkillSearchResult } from "../../lib/types";
 
+const LEADERBOARD_PAGE_SIZE = 20;
+const LEADERBOARD_MAX = 100;
+
 const sortOptions = [
   { value: "downloads", label: "下载量", icon: Download },
   { value: "rating", label: "用户评分", icon: Star },
@@ -19,7 +22,9 @@ const sortOptions = [
 export default function LeaderboardPage() {
   const [items, setItems] = useState<SkillSearchResult[]>([]);
   const [sort, setSort] = useState("downloads");
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,9 +34,11 @@ export default function LeaderboardPage() {
       setLoading(true);
       setError(null);
       try {
-        const data = await getLeaderboard(sort, 30);
+        const probeLimit = Math.min(LEADERBOARD_PAGE_SIZE + 1, LEADERBOARD_MAX);
+        const data = await getLeaderboard(sort, probeLimit);
         if (!cancelled) {
-          setItems(data);
+          setItems(data.slice(0, LEADERBOARD_PAGE_SIZE));
+          setHasMore(data.length > LEADERBOARD_PAGE_SIZE);
         }
       } catch (err) {
         if (!cancelled) {
@@ -49,6 +56,27 @@ export default function LeaderboardPage() {
       cancelled = true;
     };
   }, [sort]);
+
+  async function handleLoadMore() {
+    if (loadingMore || !hasMore) {
+      return;
+    }
+
+    const nextDisplay = Math.min(items.length + LEADERBOARD_PAGE_SIZE, LEADERBOARD_MAX);
+    const probeLimit = Math.min(nextDisplay + 1, LEADERBOARD_MAX);
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const data = await getLeaderboard(sort, probeLimit);
+      const nextItems = data.slice(0, nextDisplay);
+      setItems(nextItems);
+      setHasMore(data.length > nextItems.length);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "加载更多失败");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   const selectedSort = sortOptions.find((option) => option.value === sort) ?? sortOptions[0]!;
   const SelectedSortIcon = selectedSort.icon;
@@ -86,30 +114,46 @@ export default function LeaderboardPage() {
           ) : items.length === 0 ? (
             <div className="empty">暂无榜单数据。</div>
           ) : (
-            <ul className="list">
-              {items.map((item, index) => (
-                <li className="list-item" key={item.slug}>
-                  <div className="card-head">
-                    <div>
-                      <Link href={`/skills/${encodeURIComponent(item.slug)}`}>
-                        <strong>#{index + 1} {item.name}</strong>
-                      </Link>
-                      <p className="description">{item.description}</p>
+            <>
+              <ul className="list">
+                {items.map((item, index) => (
+                  <li className="list-item" key={item.slug}>
+                    <div className="card-head">
+                      <div>
+                        <Link href={`/skills/${encodeURIComponent(item.slug)}`}>
+                          <strong>#{index + 1} {item.name}</strong>
+                        </Link>
+                        <p className="description">{item.description}</p>
+                      </div>
+                      <VerdictBadge verdict={item.status} />
                     </div>
-                    <VerdictBadge verdict={item.status} />
-                  </div>
-                  <div className="tag-row">
-                    <span className="badge">
-                      <Star size={13} /> {item.averageRating ? item.averageRating.toFixed(1) : "暂无评分"}
-                    </span>
-                    <span className="badge">
-                      <Download size={13} /> {formatNumber(item.downloads)}
-                    </span>
-                    <span className="badge">更新 {formatDateTime(item.updatedAt)}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                    <div className="tag-row">
+                      <span className="badge">
+                        <Star size={13} /> {item.averageRating ? item.averageRating.toFixed(1) : "暂无评分"}
+                      </span>
+                      <span className="badge">
+                        <Download size={13} /> {formatNumber(item.downloads)}
+                      </span>
+                      <span className="badge">更新 {formatDateTime(item.updatedAt)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {hasMore ? (
+                <div className="audit-load-more">
+                  <button
+                    className="button secondary"
+                    disabled={loadingMore}
+                    onClick={() => void handleLoadMore()}
+                    type="button"
+                  >
+                    {loadingMore ? "加载中…" : `加载更多（已显示 ${items.length} 条）`}
+                  </button>
+                </div>
+              ) : items.length > LEADERBOARD_PAGE_SIZE ? (
+                <p className="audit-load-more-hint">已显示全部 {items.length} 条记录。</p>
+              ) : null}
+            </>
           )}
         </div>
       </div>
