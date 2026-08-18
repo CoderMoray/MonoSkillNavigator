@@ -1,6 +1,6 @@
 # 项目进度总结
 
-**更新日期**：2026-08-11
+**更新日期**：2026-08-19
 
 ## 概述
 
@@ -86,6 +86,20 @@ Skill 管理平台是一个 TypeScript npm workspaces monorepo，用于 Agent Sk
 - [x] CLI：publish、search、install、review 等
 - [x] Worker：批量重审注册表 Skill
 
+### CLI 分发（skillnav）
+
+- [x] CLI 形态定稿为 Python `skillnav`（纯 API 客户端，审查/评估在服务端执行），设计文档 `docs/cli-design.md`
+- [x] `cli-py/` 占位壳（argparse，`skillnav --version/--help`），已发布 PyPI 0.0.1（Trusted Publishing，`pipx install skillnav` 可装）
+- [x] GitHub Actions `pypi.yml`：push `skillnav-*` tag 自动构建发布 + 手动 `workflow_dispatch`
+- [x] 多 Profile 配置模型：`~/.config/skillnav/config.json`，支持独立部署与多个嵌入平台；URL 拼接约定（字符串拼接，禁 `urljoin`）
+- [x] `brand.yaml`：品牌唯一事实来源（当前 `MonoSkillNavigator`，尚未自动同步到代码）
+- [x] 平台集成指南 `docs/platform-integration.md`：两种部署模式（独立 / `/{brand}/` 子路径嵌入），Web basePath + API Nginx 剥前缀
+
+### 仓库与品牌
+
+- [x] GitHub 仓库已改名 `SkillNavigator`（`https://github.com/CoderMoray/SkillNavigator.git`）
+- [x] 代码内品牌引用保持 `MonoSkillNavigator` 不变，品牌名通过 `brand.yaml` 单点管理
+
 ### 测试
 
 - [x] API 烟雾测试（`tests/smoke.test.ts`）
@@ -103,6 +117,9 @@ Skill 管理平台是一个 TypeScript npm workspaces monorepo，用于 Agent Sk
 | 发现 | **rejected** 已从搜索/榜单隐藏；**默认下载仍指向 latest 版本**，尚未切换为「最新通过审查」版本 |
 | 测试 | 烟雾测试未覆盖重复注册、token 过期、回收站边界等 |
 | CI / VT | upload-on-miss 轮询默认 90s 超时；无分步 timeout + retry |
+| CLI（skillnav） | 仅占位壳（0.0.1）；命令实现、多 Profile 命令（`config add/use/list/test`）、token/登录流程等按 `docs/cli-design.md` 待开发 |
+| 品牌 | `brand.yaml` 为事实来源，但尚未接入自动化同步到 Web/邮件/CLI/文档 |
+| 旧 CLI | `apps/cli`（TypeScript/Commander）为内部形态，对外分发由 skillnav 取代，逐步下线 |
 
 ## 验证命令
 
@@ -127,3 +144,8 @@ npm run setup       # 种子用户 + Demo Skill
 | 安装 prompt | `apps/web/lib/skill-install-prompt.ts` |
 | Web 帮助文档 | `apps/web/content/docs/` |
 | 迁移 | `packages/storage/drizzle/` |
+| CLI 设计 | `docs/cli-design.md` |
+| 平台集成指南 | `docs/platform-integration.md` |
+| Python CLI | `cli-py/`（skillnav，PyPI） |
+| PyPI 发布 | `.github/workflows/pypi.yml`（push `skillnav-*` tag 触发） |
+| 品牌配置 | `brand.yaml` |
