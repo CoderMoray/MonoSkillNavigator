@@ -283,6 +283,18 @@ export class PostgresRegistryStore extends JsonRegistryStore {
   // ==================== Read Operations ====================
 
   async search(query = "", categories: string[] = []): Promise<SkillSearchResult[]> {
+    return this.queryPublishedSkills(query, categories, { excludeRejected: true });
+  }
+
+  async listAuditSkills(query = ""): Promise<SkillSearchResult[]> {
+    return this.queryPublishedSkills(query, [], { excludeRejected: false });
+  }
+
+  private async queryPublishedSkills(
+    query: string,
+    categories: string[],
+    options: { excludeRejected: boolean }
+  ): Promise<SkillSearchResult[]> {
     await this.ensureSchema();
     const q = query.trim();
     const selectedCategories = normalizeCategoryFilters(categories);
@@ -329,7 +341,7 @@ export class PostgresRegistryStore extends JsonRegistryStore {
         and(
           isNull(schema.skills.deletedAt),
           eq(schema.skills.published, true),
-          ne(schema.skillVersions.status, "rejected"),
+          options.excludeRejected ? ne(schema.skillVersions.status, "rejected") : undefined,
           q
             ? or(
                 ilike(schema.skills.slug, searchPattern),

@@ -409,6 +409,12 @@ export function buildServer() {
     };
   });
 
+  app.get<{ Querystring: { query?: string } }>("/audits", async (request) => {
+    return {
+      items: await store.listAuditSkills(request.query.query ?? "")
+    };
+  });
+
   app.get<{ Querystring: { query?: string } }>("/creators", async (request) => {
     const skills = await store.search("");
     const users = await authStore.listUsers();

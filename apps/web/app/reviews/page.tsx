@@ -15,7 +15,7 @@ import {
   type AuditSortDirection,
   type AuditSortField
 } from "../../lib/audit-table";
-import { getSkill, getSkills } from "../../lib/api";
+import { getAuditSkills, getSkill } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
 import type { RegistrySkill, SkillSearchResult } from "../../lib/types";
 
@@ -117,7 +117,7 @@ export default function ReviewsPage() {
       setDetailOffset(0);
       setSelectedSlugs(new Set());
       try {
-        const items = await getSkills();
+        const items = await getAuditSkills();
         if (cancelled) {
           return;
         }

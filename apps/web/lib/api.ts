@@ -28,6 +28,16 @@ export async function getSkills(query = "", categories: string[] = []): Promise<
   return data.items;
 }
 
+export async function getAuditSkills(query = ""): Promise<SkillSearchResult[]> {
+  const url = new URL("/audits", API_BASE_URL);
+  if (query.trim()) {
+    url.searchParams.set("query", query.trim());
+  }
+
+  const data = await request<{ items: SkillSearchResult[] }>(url);
+  return data.items;
+}
+
 export async function getLeaderboard(sort = "downloads", limit = 8, categories: string[] = []): Promise<SkillSearchResult[]> {
   const url = new URL("/leaderboard", API_BASE_URL);
   url.searchParams.set("sort", sort);

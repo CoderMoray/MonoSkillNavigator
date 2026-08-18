@@ -200,6 +200,7 @@ export interface RegistryStore {
   listIssues(slug: string, status?: IssueStatus): Promise<RegistryIssue[]>;
   addRating(slug: string, rating: CreateRatingInput): Promise<RegistryRating>;
   search(query?: string, categories?: string[]): Promise<SkillSearchResult[]>;
+  listAuditSkills(query?: string): Promise<SkillSearchResult[]>;
   listUnpublishedSkillsForOwner(ownerUserId: string): Promise<SkillSearchResult[]>;
   listRejectedSkillsForOwner(ownerUserId: string): Promise<SkillSearchResult[]>;
   getSkill(slug: string): Promise<RegistrySkill | undefined>;

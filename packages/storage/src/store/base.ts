@@ -234,6 +234,17 @@ export abstract class JsonRegistryStore implements RegistryStore {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
+  async listAuditSkills(query = ""): Promise<SkillSearchResult[]> {
+    const data = await this.load();
+    const q = query.trim().toLowerCase();
+    return Object.values(data.skills)
+      .filter((s) => s.published !== false)
+      .filter((s) => !s.deletedAt)
+      .filter((s) => !q || s.slug.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))
+      .map(toSearchResult)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
   async listUnpublishedSkillsForOwner(ownerUserId: string): Promise<SkillSearchResult[]> {
     const data = await this.load();
     return Object.values(data.skills)
