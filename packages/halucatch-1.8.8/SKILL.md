@@ -9,7 +9,7 @@ allowed-tools:
   - Write
   - Bash
 compatibility: Requires Python 3.8+; Bash only for local 'python3 halucatch_core.py', no network/arbitrary commands
-author: CoderMoray
+author: Codery
 version: 1.8.8
 metadata:
   hermes:
@@ -25,7 +25,7 @@ metadata:
       bins:
       - python3
     emoji: 🔍
-    homepage: https://github.com/CoderMoray/HaluCatch
+    homepage: https://github.com/Codery/HaluCatch
 slug: halucatch
 displayName: HaluCatch / 捕幻
 tags:

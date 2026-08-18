@@ -4,7 +4,7 @@ HaluCatch evaluates AI skill execution reliability across data pipeline integrit
 This skill is ready for commercial/non-commercial use. <br>
 
 ## Publisher: <br>
-[codermoray](https://clawhub.ai/user/codermoray) <br>
+[Codery](https://clawhub.ai/user/Codery) <br>
 
 ### License/Terms of Use: <br>
 MIT <br>
@@ -24,9 +24,9 @@ Mitigation: Confirm the output location before running and use --output-dir only
 
 
 ## Reference(s): <br>
-- [ClawHub Skill Page](https://clawhub.ai/codermoray/skills/halucatch) <br>
-- [HaluCatch Repository](https://github.com/CoderMoray/HaluCatch) <br>
-- [HaluCatch Documentation and Demo](https://codermoray.github.io/HaluCatch/) <br>
+- [ClawHub Skill Page](https://clawhub.ai/Codery/skills/halucatch) <br>
+- [HaluCatch Repository](https://github.com/Codery/HaluCatch) <br>
+- [HaluCatch Documentation and Demo](https://Codery.github.io/HaluCatch/) <br>
 
 
 ## Skill Output: <br>

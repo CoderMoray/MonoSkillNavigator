@@ -3,7 +3,7 @@ name: Publish skillnav to PyPI
 # PyPI Trusted Publishing (OIDC) 需要在 PyPI 后台一次性授权，填写如下：
 #   https://pypi.org/manage/account/publishing/
 #   Project name : skillnav
-#   Owner        : CoderMoray
+#   Owner        : Codery
 #   Repository   : SkillNavigator   (GitHub 仓库名，仓库改名后以新名为准)
 #   Workflow name: pypi.yml
 # 首次发布会自动在 PyPI 创建 skillnav 项目。

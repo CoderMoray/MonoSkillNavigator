@@ -43,7 +43,7 @@ def _friendly_error(lang):
             'file_not_found': '❌ 目录不存在或路径错误。→ 用 ls 确认目标路径，检查拼写。',
             'disk_full': '❌ 磁盘空间不足：无法写入报告文件。→ 清理磁盘后重试。',
             'empty_dir': '❌ 目标目录为空或不包含可审查的文件。→ 确认目录内有 SKILL.md 或 .py/.js 文件。',
-            'unexpected': '❌ 程序遇到意外错误。→ 复制下方的错误信息，贴到 github.com/CoderMoray/HaluCatch/issues 反馈。详情：',
+            'unexpected': '❌ 程序遇到意外错误。→ 复制下方的错误信息，贴到 github.com/Codery/HaluCatch/issues 反馈。详情：',
             'interrupted': '\n⏹️  操作已取消。',
         },
         'en': {
@@ -51,7 +51,7 @@ def _friendly_error(lang):
             'file_not_found': '❌ Directory not found. → Verify the path exists with ls, check for typos.',
             'disk_full': '❌ Disk full: cannot write report. → Free up space and retry.',
             'empty_dir': '❌ Target directory is empty or contains no scannable files. → Ensure SKILL.md or .py/.js files exist.',
-            'unexpected': '❌ Unexpected error. → Copy the details below and report at github.com/CoderMoray/HaluCatch/issues. Details:',
+            'unexpected': '❌ Unexpected error. → Copy the details below and report at github.com/Codery/HaluCatch/issues. Details:',
             'interrupted': '\n⏹️  Operation cancelled.',
         },
     }[lang]

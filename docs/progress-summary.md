@@ -97,7 +97,7 @@ Skill 管理平台是一个 TypeScript npm workspaces monorepo，用于 Agent Sk
 
 ### 仓库与品牌
 
-- [x] GitHub 仓库已改名 `SkillNavigator`（`https://github.com/CoderMoray/SkillNavigator.git`）
+- [x] GitHub 仓库已改名 `SkillNavigator`（`https://github.com/Codery/SkillNavigator.git`）
 - [x] 代码内品牌引用保持 `MonoSkillNavigator` 不变，品牌名通过 `brand.yaml` 单点管理
 
 ### 测试

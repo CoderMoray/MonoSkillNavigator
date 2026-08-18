@@ -140,7 +140,7 @@ python3 -m halucatch --skill-dir . --output-dir ./ci-reports  # 完整审查出�
 - ⚠️ 存在模糊表述 ['大概']（说明书写了模糊词，AI 可能会猜错）
 ```
 
-包含专业版（11 项指标表 + KaTeX 公式）和行动版（修复清单）。完整示例：运行 `python3 halucatch_core.py --skill-dir .` 审自己的项目，或查看 [在线 Demo](https://codermoray.github.io/HaluCatch/) 的交互式报告预览。
+包含专业版（11 项指标表 + KaTeX 公式）和行动版（修复清单）。完整示例：运行 `python3 halucatch_core.py --skill-dir .` 审自己的项目，或查看 [在线 Demo](https://Codery.github.io/HaluCatch/) 的交互式报告预览。
 
 ---
 
