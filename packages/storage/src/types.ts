@@ -196,6 +196,7 @@ export interface RegistryStore {
   upsertReview(slug: string, version: string, review: ReviewReport): Promise<RegistryVersion>;
   upsertEvaluation(slug: string, version: string, evaluation: FunctionalEvaluationReport): Promise<RegistryVersion>;
   addContributor(slug: string, contributor: Omit<RegistryContributor, "id" | "addedAt">): Promise<RegistryContributor>;
+  removeContributor(slug: string, contributorId: string): Promise<void>;
   createIssue(slug: string, issue: CreateIssueInput): Promise<RegistryIssue>;
   listIssues(slug: string, status?: IssueStatus): Promise<RegistryIssue[]>;
   addRating(slug: string, rating: CreateRatingInput): Promise<RegistryRating>;

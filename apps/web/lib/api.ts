@@ -303,6 +303,23 @@ export async function addSkillContributor(
   return data.contributor;
 }
 
+export async function removeSkillContributor(
+  token: string,
+  skillSlug: string,
+  contributorId: string
+): Promise<void> {
+  await request<{ ok: true }>(
+    new URL(
+      `/skills/${encodeURIComponent(skillSlug)}/contributors/${encodeURIComponent(contributorId)}`,
+      API_BASE_URL
+    ),
+    {
+      method: "DELETE",
+      token
+    }
+  );
+}
+
 export async function createSkillIssue(
   token: string,
   skillSlug: string,

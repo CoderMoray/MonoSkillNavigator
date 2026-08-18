@@ -1670,6 +1670,11 @@ button {
   padding: 14px;
 }
 
+.contributor-remove-button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .rating-stars {
   display: inline-flex;
   gap: 4px;

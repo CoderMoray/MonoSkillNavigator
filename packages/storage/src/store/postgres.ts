@@ -993,6 +993,27 @@ export class PostgresRegistryStore extends JsonRegistryStore {
     };
   }
 
+  async removeContributor(slug: string, contributorId: string): Promise<void> {
+    await this.ensureSchema();
+
+    const [existing] = await this.db
+      .select()
+      .from(schema.skillContributors)
+      .where(and(eq(schema.skillContributors.skillSlug, slug), eq(schema.skillContributors.id, contributorId)))
+      .limit(1);
+
+    if (!existing) {
+      throw new Error("contributor_not_found");
+    }
+    if (normalizeContributorRole(existing.role) === "owner") {
+      throw new Error("cannot_modify_owner_contributor");
+    }
+
+    await this.db
+      .delete(schema.skillContributors)
+      .where(and(eq(schema.skillContributors.skillSlug, slug), eq(schema.skillContributors.id, contributorId)));
+  }
+
   async downloadSnapshot(slug: string, version = "latest"): Promise<any | undefined> {
     await this.ensureSchema();
     const skill = await this.getSkill(slug);

@@ -168,6 +168,26 @@ export abstract class JsonRegistryStore implements RegistryStore {
     return created;
   }
 
+  async removeContributor(slug: string, contributorId: string): Promise<void> {
+    const data = await this.load();
+    const skill = data.skills[slug];
+    if (!skill) {
+      throw new Error(`Skill not found: ${slug}`);
+    }
+
+    const index = skill.contributors.findIndex((item) => item.id === contributorId);
+    if (index === -1) {
+      throw new Error("contributor_not_found");
+    }
+    if (skill.contributors[index]!.role === "owner") {
+      throw new Error("cannot_modify_owner_contributor");
+    }
+
+    skill.contributors.splice(index, 1);
+    skill.updatedAt = new Date().toISOString();
+    await this.save(data);
+  }
+
   async createIssue(slug: string, issue: CreateIssueInput): Promise<RegistryIssue> {
     const data = await this.load();
     const skill = data.skills[slug];

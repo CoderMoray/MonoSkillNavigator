@@ -304,6 +304,21 @@ program
   });
 
 program
+  .command("remove-contributor")
+  .description("Remove a skill contributor (skill owner token required)")
+  .argument("<slug>", "Skill slug")
+  .requiredOption("--id <id>", "Contributor id")
+  .option("--registry <url>", "Registry API URL", defaultRegistry)
+  .option("--token <token>", "Bearer token, defaults to SKILL_AUTH_TOKEN")
+  .action(async (slug: string, options: { id: string; registry: string; token?: string }) => {
+    const response = await deleteJson<Record<string, unknown>>(
+      `${options.registry}/skills/${encodeURIComponent(slug)}/contributors/${encodeURIComponent(options.id)}`,
+      requireAuthToken(options.token)
+    );
+    printJson(response.body);
+  });
+
+program
   .command("review-remote")
   .description("Ask the API to review a local skill snapshot without publishing it")
   .argument("<package>", "Skill directory or .zip package")
@@ -382,6 +397,23 @@ async function postJson<T>(url: string, body: unknown, token?: string): Promise<
     method: "POST",
     headers,
     body: JSON.stringify(body)
+  });
+
+  return {
+    status: response.status,
+    body: (await response.json()) as T
+  };
+}
+
+async function deleteJson<T>(url: string, token?: string): Promise<ApiResponse<T>> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers
   });
 
   return {

@@ -125,6 +125,11 @@ interface VersionParams {
   version: string;
 }
 
+interface ContributorParams {
+  slug: string;
+  contributorId: string;
+}
+
 type LeaderboardQuerySort = LeaderboardSort | "compliance" | "privacy";
 
 function filterSkillVersionsForViewer(skill: RegistrySkill, user: PublicUser | undefined): RegistrySkill {
@@ -659,6 +664,35 @@ export function buildServer() {
       }
       if (message === "contributor_already_exists") {
         return reply.code(409).send({ error: message });
+      }
+      throw error;
+    }
+  });
+
+  app.delete<{ Params: ContributorParams }>("/skills/:slug/contributors/:contributorId", async (request, reply) => {
+    const user = await getAuthenticatedUser(request.headers.authorization, authStore);
+    if (!user) {
+      return reply.code(401).send({ error: "Unauthorized" });
+    }
+
+    const skill = await store.getSkill(request.params.slug);
+    if (!skill) {
+      return reply.code(404).send({ error: "skill_not_found" });
+    }
+    if (!isSkillOwner(skill, user)) {
+      return reply.code(403).send({ error: "only_owner_can_remove_contributors" });
+    }
+
+    try {
+      await store.removeContributor(request.params.slug, request.params.contributorId);
+      return { ok: true };
+    } catch (error) {
+      const message = errorMessage(error);
+      if (message === "contributor_not_found") {
+        return reply.code(404).send({ error: message });
+      }
+      if (message === "cannot_modify_owner_contributor") {
+        return reply.code(400).send({ error: message });
       }
       throw error;
     }

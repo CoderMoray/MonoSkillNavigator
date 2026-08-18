@@ -31,6 +31,7 @@ import {
   X
 } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
+import { ConfirmToast } from "../../../components/ConfirmToast";
 import { ErrorToast } from "../../../components/ErrorToast";
 import { SuccessToast } from "../../../components/SuccessToast";
 import { HaluCatchRadar } from "../../../components/HaluCatchRadar";
@@ -52,6 +53,7 @@ import {
   getSkills,
   republishSkill,
   republishSkillVersion,
+  removeSkillContributor,
   saveBlobAsFile,
   unpublishSkill,
   unpublishSkillVersion,
@@ -125,8 +127,14 @@ function formatContributorError(message: string): string {
   if (message === "only_owner_can_add_contributors") {
     return "仅 Skill Owner 可添加 contributor。";
   }
+  if (message === "only_owner_can_remove_contributors") {
+    return "仅 Skill Owner 可移除 contributor。";
+  }
+  if (message === "contributor_not_found") {
+    return "未找到该 contributor。";
+  }
   if (message === "Unauthorized") {
-    return "请先登录后再添加 contributor。";
+    return "请先登录后再管理 contributor。";
   }
   if (message === "skill_not_found") {
     return "Skill 不存在或已被删除。";
@@ -172,6 +180,8 @@ export default function SkillDetailPage() {
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [contributorName, setContributorName] = useState("");
   const [addingContributor, setAddingContributor] = useState(false);
+  const [removeContributorConfirm, setRemoveContributorConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [removingContributorId, setRemovingContributorId] = useState<string | null>(null);
   const [issueType, setIssueType] = useState<RegistryIssue["type"]>("bug");
   const [issueSeverity, setIssueSeverity] = useState<RegistryIssue["severity"]>("medium");
   const [issueTitle, setIssueTitle] = useState("");
@@ -534,6 +544,48 @@ export default function SkillDetailPage() {
     }
   }
 
+  async function handleConfirmRemoveContributor() {
+    if (!removeContributorConfirm) {
+      return;
+    }
+
+    const { id: contributorId, name: contributorDisplayName } = removeContributorConfirm;
+    const token = getAuthToken();
+    if (!token) {
+      setErrorToast("请先登录后再管理 contributor。");
+      return;
+    }
+    if (!skill) {
+      setErrorToast("Skill 数据尚未加载完成。");
+      return;
+    }
+    if (!viewer || !isSkillOwner(skill, viewer)) {
+      setErrorToast("仅 Skill Owner 可移除 contributor。");
+      return;
+    }
+
+    setRemovingContributorId(contributorId);
+    try {
+      await removeSkillContributor(token, skill.slug, contributorId);
+      setSkill((current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          contributors: current.contributors.filter((item) => item.id !== contributorId)
+        };
+      });
+      setSuccessToast(`已移除 contributor ${contributorDisplayName}`);
+      setRemoveContributorConfirm(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "移除 contributor 失败";
+      setErrorToast(formatContributorError(message));
+    } finally {
+      setRemovingContributorId(null);
+    }
+  }
+
   async function handleSubmitIssue(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIssueError(null);
@@ -820,6 +872,22 @@ export default function SkillDetailPage() {
 
   return (
     <AppShell title={skill.name}>
+      {removeContributorConfirm ? (
+        <ConfirmToast
+          confirmClassName="button secondary compact danger"
+          confirmLabel="移除"
+          confirming={removingContributorId === removeContributorConfirm.id}
+          confirmingLabel="移除中…"
+          message={`确定将 ${removeContributorConfirm.name} 从该 Skill 的 contributor 中移除吗？移除后对方将无法再发布新版本。`}
+          onCancel={() => {
+            if (removingContributorId === null) {
+              setRemoveContributorConfirm(null);
+            }
+          }}
+          onConfirm={() => void handleConfirmRemoveContributor()}
+          title="确认移除 contributor"
+        />
+      ) : null}
       {errorToast ? <ErrorToast message={errorToast} onClose={() => setErrorToast(null)} /> : null}
       {successToast ? <SuccessToast message={successToast} onClose={() => setSuccessToast(null)} /> : null}
       <div className="page-stack">
@@ -1073,7 +1141,7 @@ export default function SkillDetailPage() {
                     </form>
                   ) : isContributor && viewer ? (
                     <p className="description" style={{ marginBottom: 12 }}>
-                      仅 Skill Owner 可添加 contributor。
+                      仅 Skill Owner 可添加或移除 contributor。
                     </p>
                   ) : null}
                   {skill.contributors.length === 0 ? (
@@ -1082,10 +1150,27 @@ export default function SkillDetailPage() {
                     <ul className="list">
                       {skill.contributors.map((contributor) => (
                         <li className="list-item" key={contributor.id}>
-                          <Users size={15} /> <strong>{contributor.name}</strong>
-                          <p className="description">
-                            {contributor.role} · {formatDateTime(contributor.addedAt)}
-                          </p>
+                          <div className="card-head" style={{ marginBottom: 0 }}>
+                            <div>
+                              <Users size={15} /> <strong>{contributor.name}</strong>
+                              <p className="description">
+                                {contributor.role} · {formatDateTime(contributor.addedAt)}
+                              </p>
+                            </div>
+                            {isOwner && contributor.role === "contributor" ? (
+                              <button
+                                className="button secondary compact contributor-remove-button"
+                                disabled={removingContributorId === contributor.id}
+                                onClick={() =>
+                                  setRemoveContributorConfirm({ id: contributor.id, name: contributor.name })
+                                }
+                                type="button"
+                              >
+                                <Trash2 size={14} />
+                                {removingContributorId === contributor.id ? "移除中..." : "移除"}
+                              </button>
+                            ) : null}
+                          </div>
                         </li>
                       ))}
                     </ul>
