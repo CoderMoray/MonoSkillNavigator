@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skillnav"
+version = "0.0.1"
+description = "CLI client for the Skill management platform (MonoSkillNavigator)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+keywords = ["skill", "cli", "agent", "registry"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+[project.scripts]
+skillnav = "skillnav.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

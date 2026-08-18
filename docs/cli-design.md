@@ -1,0 +1,158 @@
+# skillnav CLI 设计文档
+
+> 状态：设计定稿 · 实现进行中（0.0.1 占位壳已注册 PyPI）
+> 日期：2026-08-19
+
+## 1. 背景与定位
+
+Skill 管理平台（MonoSkillNavigator）对外提供 Web UI 与 HTTP API。`skillnav` 是平台的**官方命令行客户端**，面向开发者与 Agent：
+
+- **纯 API 客户端**：所有审查（SkillSpector 安全扫描）、评估（HaluCatch 质量评估）均在服务端同步执行，CLI 不包含任何本地审查逻辑。
+- **职责边界**：鉴权、上传发布、查询状态、获取安全/质量报告、搜索、下载、社区交互（评分/Issue/贡献者）。
+- 对标调研：skillhub CLI（Python/argparse）、clawhub CLI（Node/Commander）。吸收点：`--dry-run` 预检、`--no-input`（Agent 场景）、`token`/`whoami`（CI 调试）、`--registry` 多环境指向。
+
+## 2. 命名与分发
+
+| 项 | 值 |
+|---|---|
+| 包名 / 命令名 | `skillnav`（PyPI 未占用，2026-08-19 确认；npm 亦可用） |
+| 技术栈 | Python ≥ 3.9，CLI 框架：typer（正式版）/ argparse（占位壳） |
+| 安装 | `pipx install skillnav` 或 `pip install --user skillnav` |
+| 环境变量前缀 | `SKILLNAV_` |
+
+**取代关系**：对外分发的 CLI 形态为 skillnav；仓库内 `apps/cli`（TypeScript/Commander）逐步下线，或仅作开发期内部工具保留。
+
+## 3. 全局选项与环境
+
+优先级：**命令行 flag > 环境变量 > 配置文件 > 内置默认**。
+
+| 全局选项 | 含义 | 默认 |
+|---|---|---|
+| `--registry <url>` | API base URL | 配置 → `https://api.skillnav.example` |
+| `--json` | 机器可读输出（覆盖默认人类可读） | off |
+| `--no-input` | 禁止任何交互提示（Agent 场景，未登录即报错） | off |
+| `-v, --version` | 打印版本 | — |
+
+环境变量：
+
+- `SKILLNAV_REGISTRY`：API base URL
+- `SKILLNAV_TOKEN`：直接提供 token（CI 场景，不落盘）
+
+## 4. 配置与鉴权
+
+配置文件：`~/.config/skillnav/config.json`（权限 0600）：
+
+```json
+{
+  "registry": "https://api.example.com",
+  "token": "sk_...",
+  "identity": { "username": "alice", "userId": 1 }
+}
+```
+
+- `skillnav login` 写入 token + identity（identity 来自 `GET /auth/me`）。
+- `skillnav logout` 清除 token 与 identity，保留 registry。
+- 需要鉴权的命令未登录时：报错 `not logged in (run: skillnav login)`，退出码 2；若带 `--no-input` 直接失败，不提示。
+
+## 5. 命令树
+
+```
+skillnav
+├─ 登录与身份
+│  ├─ login [--token KEY] [--registry URL]     # token 直传（skillhub 式）；后续可加 --device Device Flow
+│  ├─ logout
+│  ├─ whoami                                   # GET /auth/me，打印当前身份
+│  └─ token                                    # 打印已存 token（CI 调试）
+├─ 发布与审查（服务端执行）
+│  ├─ publish <dir|zip> [--version] [--changelog] [--dry-run] [--json]
+│  ├─ review   <dir|zip> [--version] [--json]  # 远程审查不发布 → POST /reviews/run
+│  ├─ status   <slug> [--json]                 # 发布状态 + 各版本审查结论 → GET /skills/:slug
+│  └─ report   <slug> [--version] [--json]     # 安全/质量报告 → GET /skills/:slug/versions/:version
+├─ 检索
+│  ├─ search <query> [--category] [--json]     # GET /skills?query=
+│  ├─ top [--sort] [--limit] [--json]          # GET /leaderboard
+│  └─ info <slug> [--json]                     # GET /skills/:slug
+├─ 分发
+│  ├─ download <slug> [--version] [-o PATH]    # 下载 zip → GET .../download
+│  └─ install  <slug> [--version] [--dir DIR]  # 下载并解压为目录
+├─ 社区
+│  ├─ rate <slug> --score N [--comment]        # POST /skills/:slug/ratings
+│  ├─ issue <slug> --title T [--type] [--severity] [--body]   # POST /skills/:slug/issues
+│  ├─ issues <slug> [--status]                 # GET /skills/:slug/issues
+│  ├─ contributor <slug> --name N              # POST /skills/:slug/contributors
+│  └─ remove-contributor <slug> --id ID        # DELETE /skills/:slug/contributors/:id
+└─ skill / skill2（预留）
+```
+
+## 6. 关键命令行为
+
+### `publish`
+
+- 读取本地目录（须含 `SKILL.md`）或 `.zip`，原样上传（不解析内容，由服务端校验）。
+- `--dry-run`：调用 `POST /skills/publish/preview`（服务端预检：元数据 + 打包校验），不落库、不发版。
+- 成功（201）：打印 slug、version、status、contentHash，并按需展示 review / evaluation 摘要；`--json` 输出完整响应体。
+- 失败语义：`skill_in_recycle_bin` → 提示先恢复；`Only skill contributors can publish new versions` → 提示需要贡献者权限；`review_pipeline_incomplete`（503）→ 提示可重试。
+
+### `review`
+
+- 调用 `POST /reviews/run`（当前无需登录），返回安全 + 质量报告。
+- 是"发布前先看报告"的路径：`skillnav review ./demo && skillnav publish ./demo`。
+
+### `report`
+
+- 取指定版本（默认最新已发布版本）的完整 review / evaluation。
+- 输出分区：Security（SkillSpector findings）/ Quality（HaluCatch results），人类可读模式给出 verdict、riskScore、scores 与 findings 列表。
+
+## 7. 输出与退出码约定
+
+**输出**：
+
+- 默认：人类可读（对齐现有 TS CLI 的 `printReview` / `printEvaluation` 风格）。
+- `--json`：输出**服务端原始响应体**（不二次包装），便于脚本消费。
+- 错误一律写 stderr：`skillnav: <message>`；`--json` 模式下错误输出 `{"error": "..."}`。
+
+**退出码**：
+
+| 码 | 含义 |
+|---|---|
+| 0 | 成功 |
+| 1 | 业务失败（API 4xx/5xx，已打印错误） |
+| 2 | 未登录 / 鉴权失败 |
+| 3 | 用法错误（argparse 默认即 2，此处保留为参数错误） |
+| 4 | 网络错误（连接失败/超时） |
+| 130 | 用户中断（SIGINT） |
+
+## 8. 与现有 API 映射
+
+| skillnav 命令 | API 端点 | 鉴权 |
+|---|---|---|
+| login | `POST /auth/login` | 公开 |
+| logout | `POST /auth/logout` | Bearer |
+| whoami | `GET /auth/me` | Bearer |
+| publish | `POST /skills/publish` | Bearer |
+| publish --dry-run | `POST /skills/publish/preview` | Bearer |
+| review | `POST /reviews/run` | 公开 |
+| status / info | `GET /skills/:slug` | 视可见性 |
+| report | `GET /skills/:slug/versions/:version` | 视可见性 |
+| search | `GET /skills?query=` | 公开 |
+| top | `GET /leaderboard` | 公开 |
+| download / install | `GET /skills/:slug/versions/:version/download` | Bearer |
+| rate | `POST /skills/:slug/ratings` | Bearer |
+| issue | `POST /skills/:slug/issues` | Bearer |
+| issues | `GET /skills/:slug/issues` | 公开 |
+| contributor | `POST /skills/:slug/contributors` | Bearer（owner） |
+| remove-contributor | `DELETE /skills/:slug/contributors/:id` | Bearer（owner） |
+
+## 9. 版本与里程碑
+
+- `0.0.1`（已发布）：PyPI 占位壳，可安装、`skillnav --version`、`--help`。
+- `0.1.0`：登录与身份（login/logout/whoami/token）+ 检索（search/top/info/status）。
+- `0.2.0`：发布流（publish/--dry-run/review）+ report 完整展示。
+- `0.3.0`：分发（download/install）+ 社区（rate/issue/issues/contributor）。
+- `1.0.0`：冻结命令集；补齐 `--json` 全命令覆盖、错误处理与帮助文档；`apps/cli` TS 版下线。
+
+## 10. 待定事项
+
+- 登录方式：先 `--token` 直传；后续评估 `--device` Device Flow（服务端需支持 OAuth 设备授权）。
+- `--registry` 默认值：上线后改为正式域名。
+- 是否增加 `sync`（扫描本地 skills 批量发布/更新，clawhub 有）：留作 P1。

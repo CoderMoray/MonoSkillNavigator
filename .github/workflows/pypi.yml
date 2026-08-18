@@ -1,0 +1,38 @@
+name: Publish skillnav to PyPI
+
+# PyPI Trusted Publishing (OIDC) 需要在 PyPI 后台一次性授权，填写如下：
+#   https://pypi.org/manage/account/publishing/
+#   Project name : skillnav
+#   Owner        : CoderMoray
+#   Repository   : SkillNavigator   (GitHub 仓库名，仓库改名后以新名为准)
+#   Workflow name: pypi.yml
+# 首次发布会自动在 PyPI 创建 skillnav 项目。
+
+on:
+  push:
+    tags:
+      - "skillnav-*"
+  workflow_dispatch:
+
+jobs:
+  pypi:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Trusted Publishing (OIDC), no API token needed
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build --outdir dist
+        working-directory: cli-py
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: cli-py/dist
