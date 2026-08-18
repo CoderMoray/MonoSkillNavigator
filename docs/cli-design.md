@@ -28,36 +28,60 @@ Skill 管理平台（MonoSkillNavigator）对外提供 Web UI 与 HTTP API。`sk
 
 | 全局选项 | 含义 | 默认 |
 |---|---|---|
-| `--registry <url>` | API base URL | 配置 → `https://api.skillnav.example` |
+| `--registry <url>` | API base URL（覆盖 profile） | 配置 → 见下 |
+| `--profile <name>` | 指定平台 profile | 配置 `defaultProfile` |
 | `--json` | 机器可读输出（覆盖默认人类可读） | off |
 | `--no-input` | 禁止任何交互提示（Agent 场景，未登录即报错） | off |
 | `-v, --version` | 打印版本 | — |
 
 环境变量：
 
-- `SKILLNAV_REGISTRY`：API base URL
+- `SKILLNAV_REGISTRY`：API base URL（覆盖 profile 的 registry）
+- `SKILLNAV_PROFILE`：指定平台 profile
 - `SKILLNAV_TOKEN`：直接提供 token（CI 场景，不落盘）
 
-## 4. 配置与鉴权
+## 4. 配置与鉴权（多 Profile 模型）
 
-配置文件：`~/.config/skillnav/config.json`（权限 0600）：
+配置文件：`~/.config/skillnav/config.json`（权限 0600）。采用 **多 profile（平台实例）模型**——一个 CLI 可管理多个平台（独立部署 + 多个嵌入平台）：
 
 ```json
 {
-  "registry": "https://api.example.com",
-  "token": "sk_...",
-  "identity": { "username": "alice", "userId": 1 }
+  "defaultProfile": "prod",
+  "profiles": {
+    "prod": {
+      "registry": "https://api.skillnav.example.com",
+      "token": "sk_...",
+      "identity": { "username": "alice", "userId": 1 }
+    },
+    "corp": {
+      "registry": "https://aaa.bbb.com/MonoSkillNavigator/api"
+    }
+  }
 }
 ```
 
-- `skillnav login` 写入 token + identity（identity 来自 `GET /auth/me`）。
-- `skillnav logout` 清除 token 与 identity，保留 registry。
+**profile 含义**：一个"平台实例"。`registry` 是完整 API base URL，**允许包含路径前缀**（嵌入部署形态，见 [平台集成指南](./platform-integration.md)）。
+
+**优先级**：`--registry`（命令行）> `--profile`（命令行）> `SKILLNAV_REGISTRY` / `SKILLNAV_PROFILE`（环境变量）> 配置 `defaultProfile`。
+
+**URL 拼接约定（重要）**：请求端点一律用**字符串拼接** `f"{registry}/skills/publish"`，**禁止**使用 `urljoin` / `new URL()` 等规范化函数——它们会丢弃 registry 的路径前缀，导致带前缀的嵌入 API 请求 404。
+
+**命令行为**：
+
+- `skillnav login` 写入当前 profile 的 token + identity（identity 来自 `GET /auth/me`）。
+- `skillnav logout` 清除当前 profile 的 token 与 identity。
+- `skillnav config add <name> --registry <url>`：添加平台实例；`config use <name>`：切换默认；`config list`：列出；`config test [name]`：调 `GET {registry}/health` 验证连通性。
 - 需要鉴权的命令未登录时：报错 `not logged in (run: skillnav login)`，退出码 2；若带 `--no-input` 直接失败，不提示。
 
 ## 5. 命令树
 
 ```
 skillnav
+├─ 平台配置
+│  ├─ config add <name> --registry <url>       # 添加平台实例
+│  ├─ config use <name>                        # 切换默认平台
+│  ├─ config list                              # 列出平台实例
+│  └─ config test [name]                       # 验证连通性（GET /health）
 ├─ 登录与身份
 │  ├─ login [--token KEY] [--registry URL]     # token 直传（skillhub 式）；后续可加 --device Device Flow
 │  ├─ logout
@@ -129,6 +153,7 @@ skillnav
 | login | `POST /auth/login` | 公开 |
 | logout | `POST /auth/logout` | Bearer |
 | whoami | `GET /auth/me` | Bearer |
+| config test | `GET /health` | 公开 |
 | publish | `POST /skills/publish` | Bearer |
 | publish --dry-run | `POST /skills/publish/preview` | Bearer |
 | review | `POST /reviews/run` | 公开 |
@@ -146,7 +171,7 @@ skillnav
 ## 9. 版本与里程碑
 
 - `0.0.1`（已发布）：PyPI 占位壳，可安装、`skillnav --version`、`--help`。
-- `0.1.0`：登录与身份（login/logout/whoami/token）+ 检索（search/top/info/status）。
+- `0.1.0`：平台配置（config add/use/list/test）+ 登录与身份（login/logout/whoami/token）+ 检索（search/top/info/status）。
 - `0.2.0`：发布流（publish/--dry-run/review）+ report 完整展示。
 - `0.3.0`：分发（download/install）+ 社区（rate/issue/issues/contributor）。
 - `1.0.0`：冻结命令集；补齐 `--json` 全命令覆盖、错误处理与帮助文档；`apps/cli` TS 版下线。
