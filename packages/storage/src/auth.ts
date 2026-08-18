@@ -54,6 +54,7 @@ export interface AuthStore {
   createEmailVerificationToken(userId: string, expiresMs: number): Promise<string>;
   verifyEmail(token: string): Promise<PublicUser>;
   resendEmailVerification(username: string, password: string, expiresMs: number): Promise<{ user: PublicUser; token: string }>;
+  validateUnverifiedUserForVerification(username: string, password: string): Promise<PublicUser>;
   purgeExpiredUnverifiedUsers(retentionDays: number): Promise<number>;
 }
 
@@ -292,6 +293,17 @@ abstract class JsonAuthStore implements AuthStore {
     password: string,
     expiresMs: number
   ): Promise<{ user: PublicUser; token: string }> {
+    const user = await this.validateUnverifiedUserForVerification(username, password);
+    const token = await this.createEmailVerificationToken(user.id, expiresMs);
+    const data = await this.load();
+    const refreshed = data.users[user.id];
+    if (!refreshed) {
+      throw new Error("User not found");
+    }
+    return { user: toPublicUser(refreshed), token };
+  }
+
+  async validateUnverifiedUserForVerification(username: string, password: string): Promise<PublicUser> {
     const normalizedUsername = normalizeUsername(username);
     const data = await this.load();
     const user = Object.values(data.users).find(
@@ -308,12 +320,7 @@ abstract class JsonAuthStore implements AuthStore {
       throw new Error("User email is missing");
     }
 
-    const token = await this.createEmailVerificationToken(user.id, expiresMs);
-    const refreshed = (await this.load()).users[user.id];
-    if (!refreshed) {
-      throw new Error("User not found");
-    }
-    return { user: toPublicUser(refreshed), token };
+    return toPublicUser(user);
   }
 
   async purgeExpiredUnverifiedUsers(retentionDays: number): Promise<number> {
@@ -769,6 +776,12 @@ export class PostgresAuthStore implements AuthStore {
     password: string,
     expiresMs: number
   ): Promise<{ user: PublicUser; token: string }> {
+    const user = await this.validateUnverifiedUserForVerification(username, password);
+    const token = await this.createEmailVerificationToken(user.id, expiresMs);
+    return { user, token };
+  }
+
+  async validateUnverifiedUserForVerification(username: string, password: string): Promise<PublicUser> {
     const normalizedUsername = normalizeUsername(username);
     await this.ensureSchema();
     const result = await this.pool.query<DatabaseUserRow>(
@@ -789,8 +802,7 @@ export class PostgresAuthStore implements AuthStore {
       throw new Error("User email is missing");
     }
 
-    const token = await this.createEmailVerificationToken(user.id, expiresMs);
-    return { user: toPublicDatabaseUser(user), token };
+    return toPublicDatabaseUser(user);
   }
 
   async purgeExpiredUnverifiedUsers(retentionDays: number): Promise<number> {

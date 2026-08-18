@@ -34,6 +34,7 @@ import {
   normalizeCategoryFilters,
   normalizeHandle,
   PublishRateLimiter,
+  VerificationEmailRateLimiter,
   getRegistrationVerifyExpiresMs,
   getRegistrationUnverifiedRetentionDays,
   getWebPublicUrl,
@@ -175,6 +176,7 @@ export function buildServer() {
   const store = createRegistryStoreFromEnv();
   const authStore = createAuthStoreFromEnv();
   const publishRateLimiter = new PublishRateLimiter();
+  const verificationEmailRateLimiter = new VerificationEmailRateLimiter();
 
   const runRecycleBinPurge = () => {
     void store
@@ -249,9 +251,16 @@ export function buildServer() {
       }
 
       try {
-        await sendRegistrationVerificationForUser(authStore, user);
+        await sendRegistrationVerificationForUser(authStore, user, verificationEmailRateLimiter);
       } catch (error) {
-        return reply.code(503).send({ error: errorMessage(error) });
+        const message = errorMessage(error);
+        if (message === "verification_email_rate_limited") {
+          return reply.code(429).send({
+            error: message,
+            retryAfterSeconds: getVerificationEmailRateLimitRetryAfter(error)
+          });
+        }
+        return reply.code(503).send({ error: message });
       }
       return reply.code(201).send({ user, verificationRequired: true });
     } catch (error) {
@@ -279,11 +288,23 @@ export function buildServer() {
       }
 
       const expiresMs = getRegistrationVerifyExpiresMs();
-      const { user, token } = await authStore.resendEmailVerification(
+      const user = await authStore.validateUnverifiedUserForVerification(
         request.body.username,
-        request.body.password,
-        expiresMs
+        request.body.password
       );
+      const rateLimit = verificationEmailRateLimiter.check(user.id);
+      if (!rateLimit.allowed) {
+        return reply
+          .code(429)
+          .header("Retry-After", String(rateLimit.retryAfterSeconds))
+          .send({
+            error: "verification_email_rate_limited",
+            retryAfterSeconds: rateLimit.retryAfterSeconds
+          });
+      }
+      verificationEmailRateLimiter.recordAttempt(user.id);
+
+      const token = await authStore.createEmailVerificationToken(user.id, expiresMs);
       if (!user.email) {
         return reply.code(400).send({ error: "User email is missing" });
       }
@@ -298,8 +319,16 @@ export function buildServer() {
       return { ok: true, email: user.email };
     } catch (error) {
       const message = errorMessage(error);
-      const status = message === "Invalid username or password" ? 401 : 400;
-      return reply.code(status).send({ error: message });
+      const status =
+        message === "Invalid username or password"
+          ? 401
+          : message === "verification_email_rate_limited"
+            ? 429
+            : 400;
+      return reply.code(status).send({
+        error: message,
+        retryAfterSeconds: getVerificationEmailRateLimitRetryAfter(error)
+      });
     }
   });
 
@@ -1086,11 +1115,20 @@ function stripDataUrlPrefix(value: string): string {
 
 async function sendRegistrationVerificationForUser(
   authStore: AuthStore,
-  user: { id: string; username: string; email: string | null }
+  user: { id: string; username: string; email: string | null },
+  rateLimiter: VerificationEmailRateLimiter
 ): Promise<void> {
   if (!user.email) {
     throw new Error("User email is missing");
   }
+
+  const rateLimit = rateLimiter.check(user.id);
+  if (!rateLimit.allowed) {
+    const error = new Error("verification_email_rate_limited") as Error & { retryAfterSeconds?: number };
+    error.retryAfterSeconds = rateLimit.retryAfterSeconds;
+    throw error;
+  }
+  rateLimiter.recordAttempt(user.id);
 
   const expiresMs = getRegistrationVerifyExpiresMs();
   const token = await authStore.createEmailVerificationToken(user.id, expiresMs);
@@ -1100,6 +1138,18 @@ async function sendRegistrationVerificationForUser(
     username: user.username,
     verifyUrl
   });
+}
+
+function getVerificationEmailRateLimitRetryAfter(error: unknown): number | undefined {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "retryAfterSeconds" in error &&
+    typeof (error as { retryAfterSeconds?: unknown }).retryAfterSeconds === "number"
+  ) {
+    return (error as { retryAfterSeconds: number }).retryAfterSeconds;
+  }
+  return undefined;
 }
 
 function normalizeChangelog(value: string | undefined): string | undefined {

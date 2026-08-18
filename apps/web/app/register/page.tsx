@@ -62,6 +62,9 @@ function formatRegisterError(message: string): string {
   if (message === "registration_email_not_configured") {
     return "邮件服务未配置，暂时无法完成注册验证";
   }
+  if (message === "verification_email_rate_limited") {
+    return "验证邮件发送过于频繁，请稍后再试";
+  }
   return message;
 }
 

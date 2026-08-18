@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { MailCheck, MailWarning } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
-import { resendVerificationEmail, verifyEmailToken } from "../../lib/api";
+import { resendVerificationEmail, verifyEmailToken, ApiRequestError } from "../../lib/api";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -52,6 +52,11 @@ function VerifyEmailContent() {
       const result = await resendVerificationEmail(username, password);
       setResendMessage(`验证邮件已重新发送至 ${result.email}，请查收。`);
     } catch (error) {
+      if (error instanceof ApiRequestError && error.response?.error === "verification_email_rate_limited") {
+        const seconds = error.response.retryAfterSeconds ?? 60;
+        setResendMessage(`发送过于频繁，请 ${seconds} 秒后再试。`);
+        return;
+      }
       setResendMessage(error instanceof Error ? error.message : "重新发送失败");
     } finally {
       setResending(false);

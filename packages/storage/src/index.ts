@@ -39,6 +39,12 @@ export {
   type PublishRateLimitResult,
 } from "./publish-rate-limit";
 
+export {
+  VerificationEmailRateLimiter,
+  VERIFICATION_EMAIL_RATE_LIMIT_MS,
+  type VerificationEmailRateLimitResult,
+} from "./verification-email-rate-limit";
+
 export type {
   ContributorRole,
   IssueType,
