@@ -10,6 +10,9 @@ export interface PublishNotice {
   isNewVersion: boolean;
 }
 
+/** In-memory copy after sessionStorage is cleared; survives React Strict Mode remounts until dismissed. */
+let activePublishNotice: PublishNotice | null = null;
+
 export function savePublishNotice(notice: PublishNotice): void {
   if (typeof window === "undefined") {
     return;
@@ -34,11 +37,37 @@ export function readPublishNotice(): PublishNotice | null {
   }
 }
 
+/** Claim a pending publish notice for display (sessionStorage is cleared on first claim). */
+export function claimPublishNotice(): PublishNotice | null {
+  if (activePublishNotice) {
+    return activePublishNotice;
+  }
+
+  const notice = readPublishNotice();
+  if (!notice) {
+    return null;
+  }
+
+  clearPublishNotice();
+  activePublishNotice = notice;
+  return notice;
+}
+
+/** @deprecated Use claimPublishNotice */
+export function consumePublishNotice(): PublishNotice | null {
+  return claimPublishNotice();
+}
+
+export function releasePublishNotice(): void {
+  activePublishNotice = null;
+}
+
 export function clearPublishNotice(): void {
   if (typeof window === "undefined") {
     return;
   }
   sessionStorage.removeItem(STORAGE_KEY);
+  activePublishNotice = null;
 }
 
 export function publishNoticeTitle(notice: PublishNotice): string {

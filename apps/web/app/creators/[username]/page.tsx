@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "../../../components/AppShell";
 import { CreatorProfileView } from "../../../components/CreatorProfileView";
 import { PublishNoticeToast } from "../../../components/PublishNoticeToast";
 import { SuccessToast } from "../../../components/SuccessToast";
 import { getCreatorProfile, getCurrentUser } from "../../../lib/api";
 import { clearFlashToast, readFlashToast } from "../../../lib/flash-toast";
-import { clearPublishNotice, readPublishNotice, type PublishNotice } from "../../../lib/publish-notice";
+import { claimPublishNotice, releasePublishNotice, type PublishNotice } from "../../../lib/publish-notice";
 import { getAuthToken } from "../../../lib/auth-token";
 import { normalizeHandle, type CreatorSummary } from "../../../lib/creators";
 import type { PublicUser } from "../../../lib/types";
@@ -21,8 +21,13 @@ export default function CreatorProfilePage() {
   const [viewer, setViewer] = useState<PublicUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [publishNotice, setPublishNotice] = useState<PublishNotice | null>(() => readPublishNotice());
+  const [publishNotice, setPublishNotice] = useState<PublishNotice | null>(null);
   const [flashToast, setFlashToast] = useState<string | null>(() => readFlashToast());
+
+  const dismissPublishNotice = useCallback(() => {
+    releasePublishNotice();
+    setPublishNotice(null);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,6 +44,16 @@ export default function CreatorProfilePage() {
         if (!cancelled) {
           setCreator(matched);
           setViewer(currentUser);
+
+          const isProfileOwner = Boolean(
+            currentUser && normalizeHandle(currentUser.username) === handle
+          );
+          if (isProfileOwner) {
+            const notice = claimPublishNotice();
+            if (notice) {
+              setPublishNotice(notice);
+            }
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -83,20 +98,14 @@ export default function CreatorProfilePage() {
 
   return (
     <AppShell title={`@${creator.handle}`}>
-      {flashToast ? (
+      {isOwner && publishNotice ? (
+        <PublishNoticeToast notice={publishNotice} onClose={dismissPublishNotice} />
+      ) : flashToast ? (
         <SuccessToast
           message={flashToast}
           onClose={() => {
             clearFlashToast();
             setFlashToast(null);
-          }}
-        />
-      ) : isOwner && publishNotice ? (
-        <PublishNoticeToast
-          notice={publishNotice}
-          onClose={() => {
-            clearPublishNotice();
-            setPublishNotice(null);
           }}
         />
       ) : null}

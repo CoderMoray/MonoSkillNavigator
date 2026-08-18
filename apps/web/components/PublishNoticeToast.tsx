@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { AlertCircle, CheckCircle2, X, XCircle } from "lucide-react";
 import type { PublishNotice } from "../lib/publish-notice";
 import { publishNoticeDescription, publishNoticeTitle } from "../lib/publish-notice";
@@ -14,13 +14,28 @@ interface PublishNoticeToastProps {
 }
 
 export function PublishNoticeToast({ notice, onClose }: PublishNoticeToastProps) {
+  const onCloseRef = useRef(onClose);
+  const closedRef = useRef(false);
+
+  onCloseRef.current = onClose;
+
+  const dismiss = useCallback(() => {
+    if (closedRef.current) {
+      return;
+    }
+    closedRef.current = true;
+    onCloseRef.current();
+  }, []);
+
   const Icon =
     notice.verdict === "published" ? CheckCircle2 : notice.verdict === "needs-review" ? AlertCircle : XCircle;
 
   useEffect(() => {
-    const timer = window.setTimeout(onClose, AUTO_DISMISS_MS);
-    return () => window.clearTimeout(timer);
-  }, [onClose]);
+    const timer = window.setTimeout(dismiss, AUTO_DISMISS_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [dismiss]);
 
   return (
     <div
@@ -38,12 +53,12 @@ export function PublishNoticeToast({ notice, onClose }: PublishNoticeToastProps)
         <Link
           className="publish-notice-toast-link"
           href={`/skills/${encodeURIComponent(notice.slug)}`}
-          onClick={onClose}
+          onClick={dismiss}
         >
           查看 Skill 详情
         </Link>
       </div>
-      <button aria-label="关闭" className="publish-notice-toast-close" onClick={onClose} type="button">
+      <button aria-label="关闭" className="publish-notice-toast-close" onClick={dismiss} type="button">
         <X size={14} />
       </button>
     </div>
