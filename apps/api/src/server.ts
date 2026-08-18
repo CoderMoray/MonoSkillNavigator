@@ -35,6 +35,7 @@ import {
   normalizeHandle,
   PublishRateLimiter,
   getRegistrationVerifyExpiresMs,
+  getRegistrationUnverifiedRetentionDays,
   getWebPublicUrl,
   isRegistrationEmailVerificationRequired,
   isRegistrationEmailConfigured,
@@ -190,6 +191,31 @@ export function buildServer() {
   runRecycleBinPurge();
   const recycleBinPurgeTimer = setInterval(runRecycleBinPurge, 6 * 60 * 60 * 1000);
   recycleBinPurgeTimer.unref?.();
+
+  const runUnverifiedUserPurge = () => {
+    if (!isRegistrationEmailVerificationRequired()) {
+      return;
+    }
+
+    const retentionDays = getRegistrationUnverifiedRetentionDays();
+    if (retentionDays <= 0) {
+      return;
+    }
+
+    void authStore
+      .purgeExpiredUnverifiedUsers(retentionDays)
+      .then((count) => {
+        if (count > 0) {
+          app.log.info({ count, retentionDays }, "Purged expired unverified users");
+        }
+      })
+      .catch((error) => {
+        app.log.error({ err: error }, "Unverified user purge failed");
+      });
+  };
+  runUnverifiedUserPurge();
+  const unverifiedUserPurgeTimer = setInterval(runUnverifiedUserPurge, 6 * 60 * 60 * 1000);
+  unverifiedUserPurgeTimer.unref?.();
 
   app.register(cors, {
     origin: true,

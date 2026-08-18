@@ -27,6 +27,7 @@ export {
   createRegistryStoreFromEnv,
   createArtifactStoreFromEnv,
   getApiBodyLimitBytes,
+  getRegistrationUnverifiedRetentionDays,
   isOnDev,
   isRegistrationEmailVerificationRequired,
   loadDotEnvIfPresent,

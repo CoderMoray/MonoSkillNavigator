@@ -22,6 +22,19 @@ export function isRegistrationEmailVerificationRequired(env: NodeJS.ProcessEnv =
   return true;
 }
 
+const DEFAULT_REGISTRATION_UNVERIFIED_RETENTION_DAYS = 3;
+
+export function getRegistrationUnverifiedRetentionDays(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.REGISTRATION_UNVERIFIED_RETENTION_DAYS?.trim();
+  const days = raw ? Number(raw) : DEFAULT_REGISTRATION_UNVERIFIED_RETENTION_DAYS;
+  if (!Number.isFinite(days) || days < 0) {
+    throw new Error(
+      `REGISTRATION_UNVERIFIED_RETENTION_DAYS must be a non-negative number, got "${raw ?? ""}"`
+    );
+  }
+  return Math.floor(days);
+}
+
 export function getApiBodyLimitBytes(env: NodeJS.ProcessEnv = process.env): number {
   const raw = env.API_BODY_LIMIT_MB ?? String(DEFAULT_API_BODY_LIMIT_MB);
   const mb = Number(raw);

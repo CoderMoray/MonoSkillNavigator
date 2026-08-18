@@ -54,6 +54,7 @@ export interface AuthStore {
   createEmailVerificationToken(userId: string, expiresMs: number): Promise<string>;
   verifyEmail(token: string): Promise<PublicUser>;
   resendEmailVerification(username: string, password: string, expiresMs: number): Promise<{ user: PublicUser; token: string }>;
+  purgeExpiredUnverifiedUsers(retentionDays: number): Promise<number>;
 }
 
 export interface RegisterOptions {
@@ -313,6 +314,51 @@ abstract class JsonAuthStore implements AuthStore {
       throw new Error("User not found");
     }
     return { user: toPublicUser(refreshed), token };
+  }
+
+  async purgeExpiredUnverifiedUsers(retentionDays: number): Promise<number> {
+    if (retentionDays <= 0) {
+      return 0;
+    }
+
+    const data = await this.load();
+    const cutoffMs = Date.now() - retentionDays * 86_400_000;
+    const adminCount = Object.values(data.users).filter((user) => user.role === "admin").length;
+    let adminsMarkedForDeletion = 0;
+    const userIdsToDelete: string[] = [];
+
+    for (const user of Object.values(data.users)) {
+      if (user.emailVerifiedAt) {
+        continue;
+      }
+      if (new Date(user.createdAt).getTime() > cutoffMs) {
+        continue;
+      }
+      if (user.role === "admin") {
+        if (adminCount - adminsMarkedForDeletion <= 1) {
+          continue;
+        }
+        adminsMarkedForDeletion += 1;
+      }
+      userIdsToDelete.push(user.id);
+    }
+
+    if (userIdsToDelete.length === 0) {
+      return 0;
+    }
+
+    const deleteSet = new Set(userIdsToDelete);
+    for (const userId of userIdsToDelete) {
+      delete data.users[userId];
+    }
+    for (const [sessionId, session] of Object.entries(data.sessions)) {
+      if (deleteSet.has(session.userId)) {
+        delete data.sessions[sessionId];
+      }
+    }
+
+    await this.save(data);
+    return userIdsToDelete.length;
   }
 
   protected abstract load(): Promise<AuthData>;
@@ -747,6 +793,31 @@ export class PostgresAuthStore implements AuthStore {
     return { user: toPublicDatabaseUser(user), token };
   }
 
+  async purgeExpiredUnverifiedUsers(retentionDays: number): Promise<number> {
+    if (retentionDays <= 0) {
+      return 0;
+    }
+
+    await this.ensureSchema();
+    const cutoff = new Date(Date.now() - retentionDays * 86_400_000).toISOString();
+    const result = await this.pool.query<{ id: string }>(
+      `with admin_totals as (
+         select count(*)::int as total from platform_users where role = 'admin'
+       )
+       delete from platform_users u
+       where u.email_verified_at is null
+         and u.created_at <= $1
+         and not (
+           u.role = 'admin'
+           and (select total from admin_totals) = 1
+         )
+       returning u.id`,
+      [cutoff]
+    );
+
+    return result.rowCount ?? result.rows.length;
+  }
+
   private async migrateLegacyAuth(client: pg.PoolClient): Promise<void> {
     const migrationName = "auth-json-to-relational-v1";
     const applied = await client.query<{ name: string }>(
@@ -1038,7 +1109,12 @@ function isUniqueViolation(error: unknown): boolean {
 function normalizeAuthData(data: AuthData): AuthData {
   const users: Record<string, StoredUser> = {};
   for (const [id, user] of Object.entries(data.users ?? {})) {
-    const emailVerifiedAt = user.emailVerifiedAt ?? user.createdAt ?? null;
+    const emailVerifiedAt =
+      user.emailVerifiedAt !== undefined
+        ? user.emailVerifiedAt
+        : user.emailVerified === false
+          ? null
+          : user.createdAt ?? null;
     users[id] = {
       ...user,
       email: user.email ?? null,
