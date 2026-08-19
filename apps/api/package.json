@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx --watch src/server.ts"
+    "dev": "tsx --watch src/server.ts",
+    "start": "tsx src/server.ts"
   },
   "dependencies": {
     "@skill-platform/evaluator": "0.1.0",

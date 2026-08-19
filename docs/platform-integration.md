@@ -73,6 +73,26 @@ location /MonoSkillNavigator/api/ {
 - 同步影响：CORS 配置、`/health` 探测地址、CLI 的 registry 值、Nginx 不再需要 rewrite。
 - **此改动会改变 API 合同（所有 URL 带前缀）**，已集成的外部方需感知。
 
+### 2.3 生产启动命令
+
+构建与启动均通过根目录 `package.json` 脚本（`start:web` / `start:api`）：
+
+```bash
+# 1. 构建 Web（嵌入模式：注入 basePath；独立部署：不设该变量）
+NEXT_PUBLIC_BASE_PATH=/MonoSkillNavigator npm run build:web
+
+# 2. 启动 Web（产物为构建时注入的 basePath 对应的模式）
+npm run start:web        # 即 next start --port 3001
+
+# 3. 启动 API（Fastify）
+PORT=3000 HOST=0.0.0.0 npm run start:api   # 生产必须设 HOST=0.0.0.0 才能被 Nginx/外部访问
+```
+
+- API 与 Web 是两个独立进程，需分别守护（systemd / pm2 / supervisor）。
+- API 端口默认 `3000`，Web 默认 `3001`，均可通过 `PORT` / `--port` 调整。
+- `apps/api` 无独立 build 步骤，`start:api` 直接以 `tsx` 运行 `src/server.ts` 源码。
+- 独立部署不设 `NEXT_PUBLIC_BASE_PATH` 构建即可，两种模式共用同一套启动命令。
+
 ## 3. 外部平台为 Flask 开发时的注意事项
 
 外部平台若使用 Flask（如 `aaa.bbb.com` 是 Flask 应用），集成 SkillNavigator 时注意以下几点。
