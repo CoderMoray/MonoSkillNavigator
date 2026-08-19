@@ -20,15 +20,31 @@
   └─ https://aaa.bbb.com/MonoSkillNavigator/api/*   → Nginx → 127.0.0.1:3000/*（剥前缀后转发 Fastify）
 ```
 
-### 2.1 Web：Next.js 函数式 basePath
+### 2.1 Web：环境变量驱动的 basePath
 
-`apps/web/next.config.ts` 按 hostname 返回 basePath，一份构建同时支持两种模式：
+`apps/web/next.config.ts` 通过环境变量 `NEXT_PUBLIC_BASE_PATH` 注入 basePath。basePath 是 **Next.js 构建期常量**（不支持运行时按 hostname 动态解析），因此一份构建产物对应一种模式：
 
 ```ts
+import type { NextConfig } from "next";
+
 const nextConfig: NextConfig = {
-  basePath: ({ hostname }) =>
-    hostname === "aaa.bbb.com" ? "/MonoSkillNavigator" : "",
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH ?? "",   // 唯一新增：构建期注入
+  reactStrictMode: true,
+  transpilePackages: ["@skill-platform/skill-spec"],
+  allowedDevOrigins: ["127.0.0.1"],
 };
+
+export default nextConfig;
+```
+
+**两种模式各构建一次**：
+
+```bash
+# 独立部署：不设该变量（空串，等价于无 basePath，向后兼容）
+npm run build:web
+
+# 嵌入部署：指定子路径前缀
+NEXT_PUBLIC_BASE_PATH=/MonoSkillNavigator npm run build:web
 ```
 
 - 组件内 `<Link href="/skills">`、`next/image`、`next/link` 会自动带上 basePath，**业务代码无需改动**。
@@ -140,7 +156,7 @@ SkillNavigator 当前是**独立账号体系**（用户名/密码 + session toke
 对嵌入方（如 aaa.bbb.com 团队）：
 
 - [ ] 确认反向代理：`/{brand}/api/*` 转发到 SkillNavigator API 并剥前缀
-- [ ] 确认 Web basePath：`basePath` 指向 `/{brand}`
+- [ ] 确认 Web basePath：构建时设 `NEXT_PUBLIC_BASE_PATH=/{brand}`
 - [ ] 确认 CORS：`apps/api` 目前 `origin: true`（允许所有来源），生产建议收紧为 `aaa.bbb.com`
 - [ ] 发布上传体量：Nginx `client_max_body_size` 与服务端 body limit 匹配（发布 zip 可能较大）
 - [ ] 用 `curl {registry}/health` 验证连通性
@@ -165,8 +181,8 @@ skillnav publish ./demo    # 发布到当前默认平台
 
 ## 5. 品牌联动
 
-- `{brand}` 同时驱动：页面 URL 前缀（Web basePath）、API 前缀（代理 location）、CLI 文档示例、邮件署名。
-- **品牌变更流程**：改 `brand.yaml` → 同步改 Web basePath 与 Nginx location → 通知所有已配置 profile 的 CLI 用户更新 registry。
+- `{brand}` 同时驱动：页面 URL 前缀（Web basePath，构建时由 `NEXT_PUBLIC_BASE_PATH` 注入）、API 前缀（代理 location）、CLI 文档示例、邮件署名。
+- **品牌变更流程**：改 `brand.yaml` → 重新构建 Web（设 `NEXT_PUBLIC_BASE_PATH=/{brand}`）并同步改 Nginx location → 通知所有已配置 profile 的 CLI 用户更新 registry。
 
 ## 7. 相关文档
 
