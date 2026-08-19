@@ -11,8 +11,11 @@ import { setAuthToken } from "../../lib/auth-token";
 import { creatorProfilePath } from "../../lib/creators";
 
 function formatLoginError(message: string): string {
-  if (message === "Invalid username or password") {
-    return "用户名或密码错误";
+  if (message === "Invalid username") {
+    return "用户名或邮箱错误";
+  }
+  if (message === "Invalid password") {
+    return "密码错误";
   }
   if (message === "Email not verified") {
     return "邮箱尚未验证，请查收验证邮件或重新发送";
@@ -57,8 +60,8 @@ export default function LoginPage() {
 
           <form className="form-grid" onSubmit={handleSubmit}>
             <label className="field">
-              <span>用户名</span>
-              <input autoComplete="username" onChange={(event) => setUsername(event.target.value)} required value={username} />
+              <span>用户名或邮箱</span>
+              <input autoComplete="username" onChange={(event) => setUsername(event.target.value)} placeholder="用户名或邮箱" required value={username} />
             </label>
             <label className="field">
               <span>密码</span>

@@ -111,14 +111,20 @@ abstract class JsonAuthStore implements AuthStore {
   }
 
   async login(username: string, password: string): Promise<LoginResult> {
-    const normalizedUsername = normalizeUsername(username);
+    const lookup = resolveLoginIdentifier(username);
     const data = await this.load();
-    const user = Object.values(data.users).find(
-      (item) => item.username.toLowerCase() === normalizedUsername.toLowerCase()
-    );
+    const user = Object.values(data.users).find((item) => {
+      if (item.username.toLowerCase() === lookup.raw.toLowerCase()) {
+        return true;
+      }
+      return item.email !== null && item.email.toLowerCase() === lookup.raw.toLowerCase();
+    });
 
-    if (!user || !verifyPassword(password, user.passwordHash)) {
-      throw new Error("Invalid username or password");
+    if (!user) {
+      throw new Error("Invalid username");
+    }
+    if (!verifyPassword(password, user.passwordHash)) {
+      throw new Error("Invalid password");
     }
 
     if (isRegistrationEmailVerificationRequired() && !user.emailVerifiedAt) {
@@ -500,19 +506,23 @@ export class PostgresAuthStore implements AuthStore {
   }
 
   async login(username: string, password: string): Promise<LoginResult> {
-    const normalizedUsername = normalizeUsername(username);
     await this.ensureSchema();
+    const lookup = resolveLoginIdentifier(username);
     const result = await this.pool.query<DatabaseUserRow>(
       `select id, username, email, email_verified_at, role, password_hash, created_at, updated_at
        from platform_users
-       where lower(username) = lower($1)
+       where (lower(username) = lower($1))
+          or (email is not null and lower(email) = lower($1))
        limit 1`,
-      [normalizedUsername]
+      [lookup.raw]
     );
     const user = result.rows[0];
 
-    if (!user || !verifyPassword(password, user.password_hash)) {
-      throw new Error("Invalid username or password");
+    if (!user) {
+      throw new Error("Invalid username");
+    }
+    if (!verifyPassword(password, user.password_hash)) {
+      throw new Error("Invalid password");
     }
 
     if (isRegistrationEmailVerificationRequired() && !user.email_verified_at) {
@@ -1048,6 +1058,27 @@ function normalizeUsername(username: string): string {
     throw new Error("Username must be 3-64 characters and contain only letters, numbers, dots, underscores, or hyphens");
   }
   return normalized;
+}
+
+/**
+ * Resolve a login identifier that may be either a username or an email address.
+ * Returns the trimmed raw value for lookup; format violations surface as
+ * "Invalid username" so the login endpoint never leaks validation details.
+ */
+function resolveLoginIdentifier(identifier: string): { raw: string } {
+  const raw = identifier.trim();
+  try {
+    if (raw.includes("@")) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
+        throw new Error("Invalid username");
+      }
+    } else {
+      normalizeUsername(raw);
+    }
+  } catch {
+    throw new Error("Invalid username");
+  }
+  return { raw };
 }
 
 function normalizeEmail(email: string): string {

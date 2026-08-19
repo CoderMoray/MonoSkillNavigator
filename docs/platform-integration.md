@@ -151,7 +151,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 SkillNavigator 当前是**独立账号体系**（用户名/密码 + session token），**尚未实现 OAuth/OIDC SSO**：
 
-- **当前推荐**：用户进入 SkillNavigator 子页面后独立登录，token 存 SkillNavigator 侧 localStorage；Flask 平台只负责入口/导航，不参与鉴权。
+- **当前推荐**：用户进入 SkillNavigator 子页面后独立登录（登录账号标识支持用户名或邮箱），token 存 SkillNavigator 侧 localStorage；Flask 平台只负责入口/导航，不参与鉴权。
 - **SSO 共享（未来）**：若要求"Flask 登录后免登 SkillNavigator"，需 SkillNavigator 支持 OIDC/OAuth2——当前未实现。接入前先与平台方确认需求，避免返工。
 
 ### 3.5 iframe 嵌入的 CSP 与 Cookie

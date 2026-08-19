@@ -95,7 +95,7 @@ npm run test:e2e       # Playwright 浏览器端到端测试
 
 - `GET /health`
 - `POST /auth/register`
-- `POST /auth/login`
+- `POST /auth/login`（账号标识支持用户名或邮箱，`body: { username, password }`）
 - `POST /auth/logout`
 - `GET /auth/me`
 - `POST /auth/change-password`
