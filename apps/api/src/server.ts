@@ -250,7 +250,7 @@ export function buildServer() {
 
   app.post<{ Body: RegisterBody }>("/auth/register", async (request, reply) => {
     if (!isPublicRegistrationEnabled()) {
-      return reply.code(403).send({ error: "public_registration_disabled" });
+      return reply.code(403).send({ error: "Registration is disabled" });
     }
 
     try {

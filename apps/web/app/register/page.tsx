@@ -44,6 +44,9 @@ function setRegisterPasswordValidity(input: HTMLInputElement, label: string) {
 }
 
 function formatRegisterError(message: string): string {
+  if (message === "Registration is disabled") {
+    return "暂未开放注册，请联系管理员创建账号";
+  }
   if (message === "Username already exists") {
     return "该用户名已被注册";
   }
