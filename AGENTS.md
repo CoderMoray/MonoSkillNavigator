@@ -48,6 +48,7 @@ npm run setup           # 安装 SkillSpector（PyPI 或 GitHub）并写入种�
 npm run setup:skillspector  # 仅安装 SkillSpector Python 依赖
 npm run test            # 8 个 API 烟雾测试
 npm run typecheck       # TypeScript 编译检查
+npm run build:web       # 构建 Web；嵌入子路径时：NEXT_PUBLIC_BASE_PATH=/xxx npm run build:web
 npm run infra:up        # Docker 备选（PostgreSQL + MinIO）
 
 # 改表结构
