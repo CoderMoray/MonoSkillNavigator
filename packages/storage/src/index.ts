@@ -8,10 +8,13 @@ export {
 export * from "./auth";
 
 export {
+  getPasswordResetExpiresMs,
   getRegistrationVerifyExpiresMs,
   getWebPublicUrl,
   isRegistrationEmailConfigured,
+  sendPasswordResetEmail,
   sendRegistrationVerificationEmail,
+  type PasswordResetEmailPayload,
   type RegistrationEmailPayload,
 } from "./registration-email";
 
@@ -29,6 +32,8 @@ export {
   getApiBodyLimitBytes,
   getRegistrationUnverifiedRetentionDays,
   isOnDev,
+  isLoginErrorStrict,
+  isPublicRegistrationEnabled,
   isRegistrationEmailVerificationRequired,
   loadDotEnvIfPresent,
 } from "./env";

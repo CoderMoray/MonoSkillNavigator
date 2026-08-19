@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Send one registration verification email via MailManager (stdin JSON payload)."""
+"""Send one auth email via MailManager (stdin JSON payload).
+
+Supports mail_type "verify" (registration email verification, default)
+and "password_reset" (forgot-password reset link).
+"""
 from __future__ import annotations
 
 import contextlib
@@ -55,15 +59,17 @@ def main() -> int:
 
     to = payload.get("to")
     username = payload.get("username")
-    verify_url = payload.get("verifyUrl")
+    mail_type = payload.get("mailType") or "verify"
+    url_field = "verifyUrl" if mail_type == "verify" else "resetUrl"
+    action_url = payload.get(url_field)
     if not isinstance(to, str) or not to.strip():
         print(json.dumps({"ok": False, "error": "missing_to"}))
         return 1
     if not isinstance(username, str) or not username.strip():
         print(json.dumps({"ok": False, "error": "missing_username"}))
         return 1
-    if not isinstance(verify_url, str) or not verify_url.strip():
-        print(json.dumps({"ok": False, "error": "missing_verify_url"}))
+    if not isinstance(action_url, str) or not action_url.strip():
+        print(json.dumps({"ok": False, "error": f"missing_{url_field}"}))
         return 1
 
     sys.path.insert(0, str(_packages_dir()))
@@ -87,7 +93,23 @@ def main() -> int:
         maildrop_dir=maildrop_dir,
     )
 
-    subject = "请验证您的 MonoSkillNavigator 账户邮箱"
+    if mail_type == "password_reset":
+        subject = "重置您的 MonoSkillNavigator 账户密码"
+        main_content = (
+            "我们收到了重置密码的请求。请点击下方链接设置新密码："
+            f'<br><br><a href="{action_url.strip()}">{action_url.strip()}</a>'
+        )
+        note = "若您未发起重置请求，请忽略此邮件，您的密码不会被更改。"
+        comment = "链接有效期为 1 小时，过期后请重新申请。"
+    else:
+        subject = "请验证您的 MonoSkillNavigator 账户邮箱"
+        main_content = (
+            "感谢注册 MonoSkillNavigator。请点击下方链接验证邮箱后完成账户激活："
+            f'<br><br><a href="{action_url.strip()}">{action_url.strip()}</a>'
+        )
+        note = "若您未发起注册，请忽略此邮件。"
+        comment = "链接有效期为 24 小时，过期后可在登录页重新申请验证邮件。"
+
     with contextlib.redirect_stdout(sys.stderr):
         mail.generate(
             to=[to.strip()],
@@ -97,13 +119,10 @@ def main() -> int:
             content_body={
                 "subject": subject,
                 "name": username.strip(),
-                "main_content": (
-                    "感谢注册 MonoSkillNavigator。请点击下方链接验证邮箱后完成账户激活："
-                    f'<br><br><a href="{verify_url.strip()}">{verify_url.strip()}</a>'
-                ),
-                "note": "若您未发起注册，请忽略此邮件。",
+                "main_content": main_content,
+                "note": note,
                 "end_content": "",
-                "comment": "链接有效期为 24 小时，过期后可在登录页重新申请验证邮件。",
+                "comment": comment,
                 "signature_name": "<strong>MonoSkillNavigator Team</strong>",
                 "signature_email": os.environ["REPORT_MAIL_USERNAME"],
             },

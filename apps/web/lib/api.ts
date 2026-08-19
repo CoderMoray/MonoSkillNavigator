@@ -199,6 +199,20 @@ export async function loginUser(username: string, password: string): Promise<Aut
   });
 }
 
+export async function forgotPassword(identifier: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(new URL("/auth/forgot-password", API_BASE_URL), {
+    method: "POST",
+    body: JSON.stringify({ identifier })
+  });
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(new URL("/auth/reset-password", API_BASE_URL), {
+    method: "POST",
+    body: JSON.stringify({ token, newPassword })
+  });
+}
+
 export async function logoutUser(token: string): Promise<void> {
   await request<{ ok: boolean }>(new URL("/auth/logout", API_BASE_URL), {
     method: "POST",

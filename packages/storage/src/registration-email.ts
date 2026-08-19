@@ -6,6 +6,14 @@ export interface RegistrationEmailPayload {
   to: string;
   username: string;
   verifyUrl: string;
+  mailType?: "verify" | "password_reset";
+}
+
+export interface PasswordResetEmailPayload {
+  to: string;
+  username: string;
+  resetUrl: string;
+  mailType: "password_reset";
 }
 
 export function isRegistrationEmailConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -22,6 +30,15 @@ export function getRegistrationVerifyExpiresMs(env: NodeJS.ProcessEnv = process.
   const ms = raw ? Number(raw) : 86_400_000;
   if (!Number.isFinite(ms) || ms <= 0) {
     throw new Error(`REGISTRATION_VERIFY_EXPIRES_MS must be a positive number, got "${raw ?? ""}"`);
+  }
+  return Math.floor(ms);
+}
+
+export function getPasswordResetExpiresMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.PASSWORD_RESET_EXPIRES_MS?.trim();
+  const ms = raw ? Number(raw) : 3_600_000;
+  if (!Number.isFinite(ms) || ms <= 0) {
+    throw new Error(`PASSWORD_RESET_EXPIRES_MS must be a positive number, got "${raw ?? ""}"`);
   }
   return Math.floor(ms);
 }
@@ -82,6 +99,20 @@ export async function sendRegistrationVerificationEmail(
   payload: RegistrationEmailPayload,
   env: NodeJS.ProcessEnv = process.env
 ): Promise<void> {
+  await sendAuthEmail(payload, env);
+}
+
+export async function sendPasswordResetEmail(
+  payload: PasswordResetEmailPayload,
+  env: NodeJS.ProcessEnv = process.env
+): Promise<void> {
+  await sendAuthEmail(payload, env);
+}
+
+async function sendAuthEmail(
+  payload: RegistrationEmailPayload | PasswordResetEmailPayload,
+  env: NodeJS.ProcessEnv
+): Promise<void> {
   if (!isRegistrationEmailConfigured(env)) {
     throw new Error("registration_email_not_configured");
   }
@@ -109,16 +140,16 @@ export async function sendRegistrationVerificationEmail(
 
   throw lastCommandError instanceof Error
     ? new Error(
-        `No Python runtime was found for registration email delivery. Set REGISTRATION_EMAIL_PYTHON=python in .env. (${lastCommandError.message})`
+        `No Python runtime was found for auth email delivery. Set REGISTRATION_EMAIL_PYTHON=python in .env. (${lastCommandError.message})`
       )
-    : new Error("No Python runtime was found for registration email delivery.");
+    : new Error("No Python runtime was found for auth email delivery.");
 }
 
 function runPythonMailScript(
   command: string,
   prefixArgs: string[],
   scriptPath: string,
-  payload: RegistrationEmailPayload,
+  payload: RegistrationEmailPayload | PasswordResetEmailPayload,
   env: NodeJS.ProcessEnv
 ): Promise<void> {
   return new Promise((resolve, reject) => {

@@ -35,11 +35,14 @@ import {
   normalizeHandle,
   PublishRateLimiter,
   VerificationEmailRateLimiter,
+  getPasswordResetExpiresMs,
   getRegistrationVerifyExpiresMs,
   getRegistrationUnverifiedRetentionDays,
   getWebPublicUrl,
+  isPublicRegistrationEnabled,
   isRegistrationEmailVerificationRequired,
   isRegistrationEmailConfigured,
+  sendPasswordResetEmail,
   sendRegistrationVerificationEmail,
   type AuthStore,
   type ContributorRole,
@@ -97,6 +100,15 @@ interface RegisterBody {
 interface LoginBody {
   username: string;
   password: string;
+}
+
+interface ForgotPasswordBody {
+  identifier: string;
+}
+
+interface ResetPasswordBody {
+  token: string;
+  newPassword: string;
 }
 
 interface ChangePasswordBody {
@@ -237,6 +249,10 @@ export function buildServer() {
   }));
 
   app.post<{ Body: RegisterBody }>("/auth/register", async (request, reply) => {
+    if (!isPublicRegistrationEnabled()) {
+      return reply.code(403).send({ error: "public_registration_disabled" });
+    }
+
     try {
       const autoVerifyEmail = !isRegistrationEmailVerificationRequired();
       const user = await authStore.register(
@@ -343,6 +359,47 @@ export function buildServer() {
       return { user: session.user, token: session.token, expiresAt: session.expiresAt };
     } catch (error) {
       return reply.code(401).send({ error: errorMessage(error) });
+    }
+  });
+
+  app.post<{ Body: ForgotPasswordBody }>("/auth/forgot-password", async (request, reply) => {
+    // Always return ok:true regardless of whether the identifier exists,
+    // so the endpoint cannot be used to enumerate registered accounts.
+    if (!isRegistrationEmailConfigured()) {
+      return reply.code(503).send({ error: "registration_email_not_configured" });
+    }
+
+    try {
+      const { user, token } = await authStore.requestPasswordReset(
+        request.body.identifier,
+        getPasswordResetExpiresMs()
+      );
+      if (!user.email) {
+        return reply.code(400).send({ error: "User email is missing" });
+      }
+      const resetUrl = `${getWebPublicUrl()}/reset-password?token=${encodeURIComponent(token)}`;
+      await sendPasswordResetEmail({
+        to: user.email,
+        username: user.username,
+        resetUrl,
+        mailType: "password_reset"
+      });
+      return { ok: true };
+    } catch (error) {
+      const message = errorMessage(error);
+      if (message === "Invalid username" || message === "User email is missing") {
+        return { ok: true };
+      }
+      return reply.code(400).send({ error: message });
+    }
+  });
+
+  app.post<{ Body: ResetPasswordBody }>("/auth/reset-password", async (request, reply) => {
+    try {
+      const user = await authStore.resetPassword(request.body.token, request.body.newPassword);
+      return { ok: true, user };
+    } catch (error) {
+      return reply.code(400).send({ error: errorMessage(error) });
     }
   });
 

@@ -2,7 +2,7 @@ import { randomBytes, scryptSync, timingSafeEqual, createHash, randomUUID } from
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import pg from "pg";
-import { isRegistrationEmailVerificationRequired } from "./env";
+import { isLoginErrorStrict, isRegistrationEmailVerificationRequired } from "./env";
 
 export interface PublicUser {
   id: string;
@@ -18,6 +18,10 @@ interface StoredUser extends PublicUser {
   passwordHash: string;
   emailVerifiedAt: string | null;
   pendingEmailVerification?: {
+    tokenHash: string;
+    expiresAt: string;
+  };
+  pendingPasswordReset?: {
     tokenHash: string;
     expiresAt: string;
   };
@@ -56,6 +60,8 @@ export interface AuthStore {
   resendEmailVerification(username: string, password: string, expiresMs: number): Promise<{ user: PublicUser; token: string }>;
   validateUnverifiedUserForVerification(username: string, password: string): Promise<PublicUser>;
   purgeExpiredUnverifiedUsers(retentionDays: number): Promise<number>;
+  requestPasswordReset(identifier: string, expiresMs: number): Promise<{ user: PublicUser; token: string }>;
+  resetPassword(token: string, newPassword: string): Promise<PublicUser>;
 }
 
 export interface RegisterOptions {
@@ -121,10 +127,10 @@ abstract class JsonAuthStore implements AuthStore {
     });
 
     if (!user) {
-      throw new Error("Invalid username");
+      throw loginError("username");
     }
     if (!verifyPassword(password, user.passwordHash)) {
-      throw new Error("Invalid password");
+      throw loginError("password");
     }
 
     if (isRegistrationEmailVerificationRequired() && !user.emailVerifiedAt) {
@@ -329,6 +335,52 @@ abstract class JsonAuthStore implements AuthStore {
     return toPublicUser(user);
   }
 
+  async requestPasswordReset(identifier: string, expiresMs: number): Promise<{ user: PublicUser; token: string }> {
+    const lookup = resolveLoginIdentifier(identifier);
+    const data = await this.load();
+    const user = findUserByIdentifier(Object.values(data.users), lookup.raw);
+    if (!user) {
+      throw new Error("Invalid username");
+    }
+    if (!user.email) {
+      throw new Error("User email is missing");
+    }
+
+    const rawToken = `pr_${randomBytes(32).toString("base64url")}`;
+    user.pendingPasswordReset = {
+      tokenHash: hashToken(rawToken),
+      expiresAt: new Date(Date.now() + expiresMs).toISOString()
+    };
+    user.updatedAt = new Date().toISOString();
+    await this.save(data);
+    return { user: toPublicUser(user), token: rawToken };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<PublicUser> {
+    assertPassword(newPassword);
+    const data = await this.load();
+    const tokenHash = hashToken(token.trim());
+    const user = Object.values(data.users).find(
+      (item) => item.pendingPasswordReset?.tokenHash === tokenHash
+    );
+
+    if (!user?.pendingPasswordReset) {
+      throw new Error("Invalid or expired reset token");
+    }
+    if (new Date(user.pendingPasswordReset.expiresAt).getTime() <= Date.now()) {
+      delete user.pendingPasswordReset;
+      await this.save(data);
+      throw new Error("Invalid or expired reset token");
+    }
+
+    const now = new Date().toISOString();
+    user.passwordHash = hashPassword(newPassword);
+    delete user.pendingPasswordReset;
+    user.updatedAt = now;
+    await this.save(data);
+    return toPublicUser(user);
+  }
+
   async purgeExpiredUnverifiedUsers(retentionDays: number): Promise<number> {
     if (retentionDays <= 0) {
       return 0;
@@ -519,10 +571,10 @@ export class PostgresAuthStore implements AuthStore {
     const user = result.rows[0];
 
     if (!user) {
-      throw new Error("Invalid username");
+      throw loginError("username");
     }
     if (!verifyPassword(password, user.password_hash)) {
-      throw new Error("Invalid password");
+      throw loginError("password");
     }
 
     if (isRegistrationEmailVerificationRequired() && !user.email_verified_at) {
@@ -815,6 +867,99 @@ export class PostgresAuthStore implements AuthStore {
     return toPublicDatabaseUser(user);
   }
 
+  async requestPasswordReset(identifier: string, expiresMs: number): Promise<{ user: PublicUser; token: string }> {
+    await this.ensureSchema();
+    const lookup = resolveLoginIdentifier(identifier);
+    const userResult = await this.pool.query<DatabaseUserRow>(
+      `select id, username, email, email_verified_at, role, password_hash, created_at, updated_at
+       from platform_users
+       where (lower(username) = lower($1))
+          or (email is not null and lower(email) = lower($1))
+       limit 1`,
+      [lookup.raw]
+    );
+    const user = userResult.rows[0];
+    if (!user) {
+      throw new Error("Invalid username");
+    }
+    if (!user.email) {
+      throw new Error("User email is missing");
+    }
+
+    const rawToken = `pr_${randomBytes(32).toString("base64url")}`;
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + expiresMs).toISOString();
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("delete from password_reset_tokens where user_id = $1", [user.id]);
+      await client.query(
+        `insert into password_reset_tokens (id, user_id, token_hash, expires_at, created_at)
+         values ($1, $2, $3, $4, $5)`,
+        [randomUUID(), user.id, hashToken(rawToken), expiresAt, now]
+      );
+      await client.query("commit");
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    return { user: toPublicDatabaseUser(user), token: rawToken };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<PublicUser> {
+    assertPassword(newPassword);
+    await this.ensureSchema();
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("delete from password_reset_tokens where expires_at <= now()");
+      const tokenResult = await client.query<{ user_id: string }>(
+        `select user_id
+         from password_reset_tokens
+         where token_hash = $1 and expires_at > now()
+         limit 1
+         for update`,
+        [hashToken(token.trim())]
+      );
+      const tokenRow = tokenResult.rows[0];
+      if (!tokenRow) {
+        throw new Error("Invalid or expired reset token");
+      }
+
+      const now = new Date().toISOString();
+      const passwordHash = hashPassword(newPassword);
+      await client.query(
+        `update platform_users
+         set password_hash = $1, updated_at = $2
+         where id = $3`,
+        [passwordHash, now, tokenRow.user_id]
+      );
+      await client.query("delete from password_reset_tokens where user_id = $1", [tokenRow.user_id]);
+
+      const userResult = await client.query<DatabaseUserRow>(
+        `select id, username, email, email_verified_at, role, password_hash, created_at, updated_at
+         from platform_users
+         where id = $1`,
+        [tokenRow.user_id]
+      );
+      const user = userResult.rows[0];
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      await client.query("commit");
+      return toPublicDatabaseUser(user);
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async purgeExpiredUnverifiedUsers(retentionDays: number): Promise<number> {
     if (retentionDays <= 0) {
       return 0;
@@ -962,6 +1107,42 @@ export class PostgresAuthStore implements AuthStore {
     );
   }
 
+  private async migratePasswordReset(client: pg.PoolClient): Promise<void> {
+    const migrationName = "auth-password-reset-v1";
+    const applied = await client.query<{ name: string }>(
+      "select name from platform_schema_migrations where name = $1",
+      [migrationName]
+    );
+    if (applied.rows.length > 0) {
+      return;
+    }
+
+    await client.query(`
+      create table if not exists password_reset_tokens (
+        id text primary key,
+        user_id text not null references platform_users(id) on delete cascade,
+        token_hash text not null unique,
+        expires_at timestamptz not null,
+        created_at timestamptz not null
+      )
+    `);
+    await client.query(
+      `create index if not exists password_reset_tokens_user_id_idx
+       on password_reset_tokens (user_id)`
+    );
+    await client.query(
+      `create index if not exists password_reset_tokens_expires_at_idx
+       on password_reset_tokens (expires_at)`
+    );
+
+    await client.query(
+      `insert into platform_schema_migrations (name, applied_at)
+       values ($1, now())
+       on conflict (name) do nothing`,
+      [migrationName]
+    );
+  }
+
   private ensureSchema(): Promise<void> {
     this.schemaReady ??= (async () => {
       const client = await this.pool.connect();
@@ -972,6 +1153,7 @@ export class PostgresAuthStore implements AuthStore {
         await this.migrateLegacyAuth(client);
         await this.migrateEmailColumn(client);
         await this.migrateEmailVerification(client);
+        await this.migratePasswordReset(client);
         await client.query("commit");
       } catch (error) {
         await client.query("rollback").catch(() => undefined);
@@ -1061,24 +1243,50 @@ function normalizeUsername(username: string): string {
 }
 
 /**
+ * Login error message honoring LOGIN_ERROR_STRICT. Strict mode (default)
+ * always returns the unified message so account existence is not disclosed;
+ * lenient mode distinguishes unknown account ("Invalid username") from a
+ * wrong password ("Invalid password") for internal migration debugging.
+ */
+function loginError(reason: "username" | "password"): Error {
+  if (isLoginErrorStrict()) {
+    return new Error("Invalid username or password");
+  }
+  return new Error(reason === "username" ? "Invalid username" : "Invalid password");
+}
+
+/**
  * Resolve a login identifier that may be either a username or an email address.
- * Returns the trimmed raw value for lookup; format violations surface as
- * "Invalid username" so the login endpoint never leaks validation details.
+ * Returns the trimmed raw value for lookup; format violations surface through
+ * loginError("username") so the login endpoint never leaks validation details.
  */
 function resolveLoginIdentifier(identifier: string): { raw: string } {
   const raw = identifier.trim();
   try {
     if (raw.includes("@")) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
-        throw new Error("Invalid username");
+        throw loginError("username");
       }
     } else {
       normalizeUsername(raw);
     }
   } catch {
-    throw new Error("Invalid username");
+    throw loginError("username");
   }
   return { raw };
+}
+
+/** Match a user by username or email (case-insensitive), for file-based stores. */
+function findUserByIdentifier<T extends { username: string; email: string | null }>(
+  users: T[],
+  rawIdentifier: string
+): T | undefined {
+  const needle = rawIdentifier.toLowerCase();
+  return users.find(
+    (user) =>
+      user.username.toLowerCase() === needle ||
+      (user.email !== null && user.email.toLowerCase() === needle)
+  );
 }
 
 function normalizeEmail(email: string): string {

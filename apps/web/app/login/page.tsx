@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { LogIn } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
 import { ErrorToast } from "../../components/ErrorToast";
@@ -11,6 +11,11 @@ import { setAuthToken } from "../../lib/auth-token";
 import { creatorProfilePath } from "../../lib/creators";
 
 function formatLoginError(message: string): string {
+  // 严格模式（默认）：统一文案，不暴露账号是否存在
+  if (message === "Invalid username or password") {
+    return "用户名或密码错误";
+  }
+  // 宽松模式：区分账号标识错误与密码错误
   if (message === "Invalid username") {
     return "用户名或邮箱错误";
   }
@@ -23,12 +28,20 @@ function formatLoginError(message: string): string {
   return message;
 }
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [resetNotice, setResetNotice] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("reset") === "ok") {
+      setResetNotice(true);
+    }
+  }, [searchParams]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,6 +62,11 @@ export default function LoginPage() {
   return (
     <AppShell title="登录">
       {errorToast ? <ErrorToast message={errorToast} onClose={() => setErrorToast(null)} /> : null}
+      {resetNotice ? (
+        <div className="description" role="status">
+          密码已重置，请使用新密码登录。
+        </div>
+      ) : null}
       <div className="auth-page">
         <section className="auth-card card">
           <span className="eyebrow">
@@ -80,10 +98,31 @@ export default function LoginPage() {
           </form>
 
           <p className="description">
+            <Link className="text-link" href="/forgot-password">
+              忘记密码？
+            </Link>
+          </p>
+          <p className="description">
             还没有账户？<Link className="text-link" href="/register">注册新用户</Link>
           </p>
         </section>
       </div>
     </AppShell>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <AppShell title="登录">
+          <div className="auth-page">
+            <div className="empty">加载中…</div>
+          </div>
+        </AppShell>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }
