@@ -13,8 +13,17 @@ import { buildSkillDownloadFileName, parseSkillDownloadVersion } from "@skill-pl
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:3000";
 
+/**
+ * Build an API URL that preserves the base path prefix (e.g. "/MonoSkillNavigator/api").
+ * Using new URL(path, base) with an absolute path would override the base path entirely;
+ * appending "/" makes the reference relative so the prefix survives.
+ */
+export function apiUrl(path: string): URL {
+  return new URL(path.replace(/^\/+/, ""), `${API_BASE_URL.replace(/\/+$/, "")}/`);
+}
+
 export async function getSkills(query = "", categories: string[] = []): Promise<SkillSearchResult[]> {
-  const url = new URL("/skills", API_BASE_URL);
+  const url = apiUrl("/skills");
   if (query.trim()) {
     url.searchParams.set("query", query.trim());
   }
@@ -29,7 +38,7 @@ export async function getSkills(query = "", categories: string[] = []): Promise<
 }
 
 export async function getAuditSkills(query = ""): Promise<SkillSearchResult[]> {
-  const url = new URL("/audits", API_BASE_URL);
+  const url = apiUrl("/audits");
   if (query.trim()) {
     url.searchParams.set("query", query.trim());
   }
@@ -39,7 +48,7 @@ export async function getAuditSkills(query = ""): Promise<SkillSearchResult[]> {
 }
 
 export async function getLeaderboard(sort = "downloads", limit = 8, categories: string[] = []): Promise<SkillSearchResult[]> {
-  const url = new URL("/leaderboard", API_BASE_URL);
+  const url = apiUrl("/leaderboard");
   url.searchParams.set("sort", sort);
   url.searchParams.set("limit", String(limit));
   for (const category of categories) {
@@ -53,7 +62,7 @@ export async function getLeaderboard(sort = "downloads", limit = 8, categories: 
 }
 
 export async function getCreators(query = ""): Promise<CreatorSummary[]> {
-  const url = new URL("/creators", API_BASE_URL);
+  const url = apiUrl("/creators");
   if (query.trim()) {
     url.searchParams.set("query", query.trim());
   }
@@ -64,14 +73,14 @@ export async function getCreators(query = ""): Promise<CreatorSummary[]> {
 
 export async function getCreatorProfile(username: string, token?: string): Promise<CreatorSummary> {
   const data = await request<{ creator: CreatorSummary }>(
-    new URL(`/creators/${encodeURIComponent(username)}`, API_BASE_URL),
+    apiUrl(`/creators/${encodeURIComponent(username)}`),
     { token }
   );
   return data.creator;
 }
 
 export async function getSkill(slug: string, token?: string): Promise<RegistrySkill> {
-  return request<RegistrySkill>(new URL(`/skills/${encodeURIComponent(slug)}`, API_BASE_URL), { token });
+  return request<RegistrySkill>(apiUrl(`/skills/${encodeURIComponent(slug)}`), { token });
 }
 
 export type SkillSlugAvailabilityResponse =
@@ -97,7 +106,7 @@ export async function checkSkillSlugAvailability(
   token?: string
 ): Promise<SkillSlugAvailabilityResponse> {
   return request<SkillSlugAvailabilityResponse>(
-    new URL(`/skills/${encodeURIComponent(slug)}/availability`, API_BASE_URL),
+    apiUrl(`/skills/${encodeURIComponent(slug)}/availability`),
     { token }
   );
 }
@@ -113,10 +122,7 @@ export async function downloadSkillVersion(
   version: string,
   skillName?: string
 ): Promise<SkillDownloadResult> {
-  const url = new URL(
-    `/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}/download`,
-    API_BASE_URL
-  );
+  const url = apiUrl(`/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}/download`);
 
   const response = await fetch(url.toString(), {
     headers: {
@@ -172,56 +178,56 @@ export async function registerUser(
   password: string,
   email: string
 ): Promise<RegisterAuthResponse> {
-  return request<RegisterAuthResponse>(new URL("/auth/register", API_BASE_URL), {
+  return request<RegisterAuthResponse>(apiUrl("/auth/register"), {
     method: "POST",
     body: JSON.stringify({ username, password, email })
   });
 }
 
 export async function verifyEmailToken(token: string): Promise<{ user: PublicUser; verified: true }> {
-  return request<{ user: PublicUser; verified: true }>(new URL("/auth/verify-email", API_BASE_URL), {
+  return request<{ user: PublicUser; verified: true }>(apiUrl("/auth/verify-email"), {
     method: "POST",
     body: JSON.stringify({ token })
   });
 }
 
 export async function resendVerificationEmail(username: string, password: string): Promise<{ ok: true; email: string }> {
-  return request<{ ok: true; email: string }>(new URL("/auth/resend-verification", API_BASE_URL), {
+  return request<{ ok: true; email: string }>(apiUrl("/auth/resend-verification"), {
     method: "POST",
     body: JSON.stringify({ username, password })
   });
 }
 
 export async function loginUser(username: string, password: string): Promise<AuthResponse> {
-  return request<AuthResponse>(new URL("/auth/login", API_BASE_URL), {
+  return request<AuthResponse>(apiUrl("/auth/login"), {
     method: "POST",
     body: JSON.stringify({ username, password })
   });
 }
 
 export async function forgotPassword(identifier: string): Promise<{ ok: true }> {
-  return request<{ ok: true }>(new URL("/auth/forgot-password", API_BASE_URL), {
+  return request<{ ok: true }>(apiUrl("/auth/forgot-password"), {
     method: "POST",
     body: JSON.stringify({ identifier })
   });
 }
 
 export async function resetPassword(token: string, newPassword: string): Promise<{ ok: true }> {
-  return request<{ ok: true }>(new URL("/auth/reset-password", API_BASE_URL), {
+  return request<{ ok: true }>(apiUrl("/auth/reset-password"), {
     method: "POST",
     body: JSON.stringify({ token, newPassword })
   });
 }
 
 export async function logoutUser(token: string): Promise<void> {
-  await request<{ ok: boolean }>(new URL("/auth/logout", API_BASE_URL), {
+  await request<{ ok: boolean }>(apiUrl("/auth/logout"), {
     method: "POST",
     token
   });
 }
 
 export async function getCurrentUser(token: string): Promise<PublicUser> {
-  const data = await request<{ user: PublicUser }>(new URL("/auth/me", API_BASE_URL), { token });
+  const data = await request<{ user: PublicUser }>(apiUrl("/auth/me"), { token });
   return data.user;
 }
 
@@ -230,7 +236,7 @@ export async function changePassword(
   currentPassword: string,
   newPassword: string
 ): Promise<PublicUser> {
-  const data = await request<{ user: PublicUser }>(new URL("/auth/change-password", API_BASE_URL), {
+  const data = await request<{ user: PublicUser }>(apiUrl("/auth/change-password"), {
     method: "POST",
     token,
     body: JSON.stringify({ currentPassword, newPassword })
@@ -239,7 +245,7 @@ export async function changePassword(
 }
 
 export async function deleteAccount(token: string, password: string): Promise<void> {
-  await request<{ ok: boolean }>(new URL("/auth/delete-account", API_BASE_URL), {
+  await request<{ ok: boolean }>(apiUrl("/auth/delete-account"), {
     method: "POST",
     token,
     body: JSON.stringify({ password })
@@ -277,7 +283,7 @@ export async function previewSkillArchive(
   token: string,
   archiveBase64: string
 ): Promise<PublishPreviewResponse> {
-  return request<PublishPreviewResponse>(new URL("/skills/publish/preview", API_BASE_URL), {
+  return request<PublishPreviewResponse>(apiUrl("/skills/publish/preview"), {
     method: "POST",
     token,
     body: JSON.stringify({ archiveBase64 })
@@ -290,7 +296,7 @@ export async function publishSkillArchive(
   metadata: PublishSkillMetadata,
   changelog?: string
 ): Promise<PublishSkillResponse> {
-  return request<PublishSkillResponse>(new URL("/skills/publish", API_BASE_URL), {
+  return request<PublishSkillResponse>(apiUrl("/skills/publish"), {
     method: "POST",
     token,
     body: JSON.stringify({
@@ -307,7 +313,7 @@ export async function addSkillContributor(
   name: string
 ): Promise<RegistryContributor> {
   const data = await request<{ contributor: RegistryContributor }>(
-    new URL(`/skills/${encodeURIComponent(skillSlug)}/contributors`, API_BASE_URL),
+    apiUrl(`/skills/${encodeURIComponent(skillSlug)}/contributors`),
     {
       method: "POST",
       token,
@@ -323,10 +329,7 @@ export async function removeSkillContributor(
   contributorId: string
 ): Promise<void> {
   await request<{ ok: true }>(
-    new URL(
-      `/skills/${encodeURIComponent(skillSlug)}/contributors/${encodeURIComponent(contributorId)}`,
-      API_BASE_URL
-    ),
+    apiUrl(`/skills/${encodeURIComponent(skillSlug)}/contributors/${encodeURIComponent(contributorId)}`),
     {
       method: "DELETE",
       token
@@ -345,7 +348,7 @@ export async function createSkillIssue(
   }
 ): Promise<RegistryIssue> {
   const data = await request<{ issue: RegistryIssue }>(
-    new URL(`/skills/${encodeURIComponent(skillSlug)}/issues`, API_BASE_URL),
+    apiUrl(`/skills/${encodeURIComponent(skillSlug)}/issues`),
     {
       method: "POST",
       token,
@@ -365,7 +368,7 @@ export async function addSkillRating(
   }
 ): Promise<{ rating: RegistryRating; averageRating: number; ratingCount: number }> {
   return request<{ rating: RegistryRating; averageRating: number; ratingCount: number }>(
-    new URL(`/skills/${encodeURIComponent(skillSlug)}/ratings`, API_BASE_URL),
+    apiUrl(`/skills/${encodeURIComponent(skillSlug)}/ratings`),
     {
       method: "POST",
       token,
@@ -376,7 +379,7 @@ export async function addSkillRating(
 
 export async function unpublishSkill(token: string, slug: string): Promise<RegistrySkill> {
   const data = await request<{ skill: RegistrySkill }>(
-    new URL(`/skills/${encodeURIComponent(slug)}/unpublish`, API_BASE_URL),
+    apiUrl(`/skills/${encodeURIComponent(slug)}/unpublish`),
     {
       method: "POST",
       token
@@ -387,7 +390,7 @@ export async function unpublishSkill(token: string, slug: string): Promise<Regis
 
 export async function republishSkill(token: string, slug: string): Promise<RegistrySkill> {
   const data = await request<{ skill: RegistrySkill }>(
-    new URL(`/skills/${encodeURIComponent(slug)}/republish`, API_BASE_URL),
+    apiUrl(`/skills/${encodeURIComponent(slug)}/republish`),
     {
       method: "POST",
       token
@@ -398,10 +401,7 @@ export async function republishSkill(token: string, slug: string): Promise<Regis
 
 export async function unpublishSkillVersion(token: string, slug: string, version: string): Promise<RegistrySkill> {
   const data = await request<{ skill: RegistrySkill }>(
-    new URL(
-      `/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}/unpublish`,
-      API_BASE_URL
-    ),
+    apiUrl(`/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}/unpublish`),
     {
       method: "POST",
       token
@@ -412,10 +412,7 @@ export async function unpublishSkillVersion(token: string, slug: string, version
 
 export async function republishSkillVersion(token: string, slug: string, version: string): Promise<RegistrySkill> {
   const data = await request<{ skill: RegistrySkill }>(
-    new URL(
-      `/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}/republish`,
-      API_BASE_URL
-    ),
+    apiUrl(`/skills/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}/republish`),
     {
       method: "POST",
       token
@@ -429,7 +426,7 @@ export async function deleteSkill(
   slug: string
 ): Promise<{ ok: true; recycleBin: true; deletedAt: string; purgeAt: string }> {
   return request<{ ok: true; recycleBin: true; deletedAt: string; purgeAt: string }>(
-    new URL(`/skills/${encodeURIComponent(slug)}`, API_BASE_URL),
+    apiUrl(`/skills/${encodeURIComponent(slug)}`),
     {
       method: "DELETE",
       token
@@ -439,7 +436,7 @@ export async function deleteSkill(
 
 export async function restoreSkill(token: string, slug: string): Promise<RegistrySkill> {
   const data = await request<{ skill: RegistrySkill }>(
-    new URL(`/skills/${encodeURIComponent(slug)}/restore`, API_BASE_URL),
+    apiUrl(`/skills/${encodeURIComponent(slug)}/restore`),
     {
       method: "POST",
       token
@@ -453,7 +450,7 @@ export async function purgeRecycleBinSkill(
   slug: string
 ): Promise<{ ok: true; purged: true; slug: string }> {
   return request<{ ok: true; purged: true; slug: string }>(
-    new URL(`/skills/${encodeURIComponent(slug)}/purge`, API_BASE_URL),
+    apiUrl(`/skills/${encodeURIComponent(slug)}/purge`),
     {
       method: "DELETE",
       token
@@ -471,14 +468,14 @@ export interface RecycleBinSkill {
 }
 
 export async function getRecycleBin(token: string): Promise<RecycleBinSkill[]> {
-  const data = await request<{ items: RecycleBinSkill[] }>(new URL("/users/me/recycle-bin", API_BASE_URL), {
+  const data = await request<{ items: RecycleBinSkill[] }>(apiUrl("/users/me/recycle-bin"), {
     token
   });
   return data.items;
 }
 
 export async function getBookmarkedSkills(token: string): Promise<SkillSearchResult[]> {
-  const data = await request<{ items: SkillSearchResult[] }>(new URL("/users/me/bookmarks", API_BASE_URL), {
+  const data = await request<{ items: SkillSearchResult[] }>(apiUrl("/users/me/bookmarks"), {
     token
   });
   return data.items;
@@ -486,7 +483,7 @@ export async function getBookmarkedSkills(token: string): Promise<SkillSearchRes
 
 export async function bookmarkSkill(token: string, slug: string): Promise<void> {
   await request<{ ok: true; bookmarked: true }>(
-    new URL(`/skills/${encodeURIComponent(slug)}/bookmark`, API_BASE_URL),
+    apiUrl(`/skills/${encodeURIComponent(slug)}/bookmark`),
     {
       method: "PUT",
       token
@@ -496,7 +493,7 @@ export async function bookmarkSkill(token: string, slug: string): Promise<void> 
 
 export async function unbookmarkSkill(token: string, slug: string): Promise<void> {
   await request<{ ok: true; bookmarked: false }>(
-    new URL(`/skills/${encodeURIComponent(slug)}/bookmark`, API_BASE_URL),
+    apiUrl(`/skills/${encodeURIComponent(slug)}/bookmark`),
     {
       method: "DELETE",
       token

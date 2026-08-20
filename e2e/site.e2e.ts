@@ -2,6 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 
 const API_BASE_URL = process.env.E2E_API_BASE_URL ?? "http://127.0.0.1:3000";
+
+/** Build an API URL preserving any base path prefix (e.g. "/MonoSkillNavigator/api"). */
+function apiUrl(path: string): URL {
+  return new URL(path.replace(/^\/+/, ""), `${API_BASE_URL.replace(/\/+$/, "")}/`);
+}
 const DOC_SLUGS = [
   "monoskill-navigator",
   "skill-format",
@@ -36,8 +41,8 @@ let disposableAccount: DisposableAccount | null = null;
 
 async function loadFixtures(): Promise<SiteFixtures> {
   const [skillsResponse, creatorsResponse] = await Promise.all([
-    fetch(new URL("/skills", API_BASE_URL)),
-    fetch(new URL("/creators", API_BASE_URL))
+    fetch(apiUrl("/skills")),
+    fetch(apiUrl("/creators"))
   ]);
 
   expect(skillsResponse.ok, "The API must expose at least one Skill for route coverage.").toBeTruthy();
@@ -92,7 +97,7 @@ async function cleanupDisposableAccount(): Promise<void> {
 
   const account = disposableAccount;
   disposableAccount = null;
-  const loginResponse = await fetch(new URL("/auth/login", API_BASE_URL), {
+  const loginResponse = await fetch(apiUrl("/auth/login"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(account)
@@ -103,7 +108,7 @@ async function cleanupDisposableAccount(): Promise<void> {
 
   expect(loginResponse.ok, `Could not log in to clean up ${account.username}.`).toBeTruthy();
   const { token } = (await loginResponse.json()) as { token: string };
-  const deleteResponse = await fetch(new URL("/auth/delete-account", API_BASE_URL), {
+  const deleteResponse = await fetch(apiUrl("/auth/delete-account"), {
     method: "POST",
     headers: {
       authorization: `Bearer ${token}`,

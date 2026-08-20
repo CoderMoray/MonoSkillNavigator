@@ -14,6 +14,11 @@ import {
 
 const defaultRegistry = process.env.SKILL_REGISTRY_URL ?? "http://127.0.0.1:3000";
 
+/** Build a registry URL preserving any base path prefix (e.g. "/MonoSkillNavigator/api"). */
+function registryUrl(registry: string, path: string): URL {
+  return new URL(path.replace(/^\/+/, ""), `${registry.replace(/\/+$/, "")}/`);
+}
+
 interface ApiResponse<T> {
   status: number;
   body: T;
@@ -111,7 +116,7 @@ program
   .argument("[query]", "Search query", "")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
   .action(async (query: string, options: { registry: string }) => {
-    const url = new URL("/skills", options.registry);
+    const url = registryUrl(options.registry, "/skills");
     if (query) {
       url.searchParams.set("query", query);
     }
@@ -127,7 +132,7 @@ program
   .option("--limit <limit>", "Number of skills to show", "20")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
   .action(async (options: { sort: string; limit: string; registry: string }) => {
-    const url = new URL("/leaderboard", options.registry);
+    const url = registryUrl(options.registry, "/leaderboard");
     url.searchParams.set("sort", options.sort);
     url.searchParams.set("limit", options.limit);
 
@@ -275,7 +280,7 @@ program
   .option("--status <status>", "open, triaged, closed")
   .option("--registry <url>", "Registry API URL", defaultRegistry)
   .action(async (slug: string, options: { status?: string; registry: string }) => {
-    const url = new URL(`/skills/${encodeURIComponent(slug)}/issues`, options.registry);
+    const url = registryUrl(options.registry, `/skills/${encodeURIComponent(slug)}/issues`);
     if (options.status) {
       url.searchParams.set("status", options.status);
     }
